@@ -31,12 +31,12 @@ export class AuthStateStore implements OnModuleInit {
   }
 
   async incrementOtpAttempts(
-    phone: string,
+    email: string,
     purpose: OtpPurpose,
     maxAttempts: number,
     ttlSeconds: number,
   ): Promise<IncrementOtpResult> {
-    const key = this.otpAttemptsKey(phone, purpose);
+    const key = this.otpAttemptsKey(email, purpose);
 
     await this.tryRedisSet(
       key,
@@ -49,9 +49,9 @@ export class AuthStateStore implements OnModuleInit {
     );
 
     const result = await this.databaseService.query<{ attempts: number }>(
-      `INSERT INTO auth_otp_attempts (phone, purpose, attempts, expires_at)
+      `INSERT INTO auth_otp_attempts (email, purpose, attempts, expires_at)
        VALUES ($1, $2, 1, NOW() + ($3::text || ' seconds')::interval)
-       ON CONFLICT (phone, purpose)
+       ON CONFLICT (email, purpose)
        DO UPDATE SET
          attempts = CASE
                       WHEN auth_otp_attempts.expires_at <= NOW() THEN 1
@@ -63,20 +63,20 @@ export class AuthStateStore implements OnModuleInit {
                       END,
          updated_at = NOW()
        RETURNING attempts`,
-      [phone, purpose, ttlSeconds],
+      [email, purpose, ttlSeconds],
     );
 
     const attempts = result.rows[0].attempts;
     if (attempts >= maxAttempts) {
-      await this.clearOtpAttempts(phone, purpose);
+      await this.clearOtpAttempts(email, purpose);
       return { attempts, locked: true };
     }
 
     return { attempts, locked: false };
   }
 
-  async clearOtpAttempts(phone: string, purpose: OtpPurpose): Promise<void> {
-    const key = this.otpAttemptsKey(phone, purpose);
+  async clearOtpAttempts(email: string, purpose: OtpPurpose): Promise<void> {
+    const key = this.otpAttemptsKey(email, purpose);
 
     await this.tryRedisSet(
       key,
@@ -85,13 +85,13 @@ export class AuthStateStore implements OnModuleInit {
     );
 
     await this.databaseService.query(
-      'DELETE FROM auth_otp_attempts WHERE phone = $1 AND purpose = $2',
-      [phone, purpose],
+      'DELETE FROM auth_otp_attempts WHERE email = $1 AND purpose = $2',
+      [email, purpose],
     );
   }
 
-  async saveOtpTransactionReqId(phone: string, purpose: OtpPurpose, transactionReqID: string, ttlSeconds: number): Promise<void> {
-    const key = this.otpTransactionKey(phone, purpose);
+  async saveOtpTransactionReqId(email: string, purpose: OtpPurpose, transactionReqID: string, ttlSeconds: number): Promise<void> {
+    const key = this.otpTransactionKey(email, purpose);
     await this.tryRedisSet(
       key,
       () => this.redisService.set(key, transactionReqID, ttlSeconds),
@@ -99,8 +99,8 @@ export class AuthStateStore implements OnModuleInit {
     );
   }
 
-  async getOtpTransactionReqId(phone: string, purpose: OtpPurpose): Promise<string | null> {
-    const key = this.otpTransactionKey(phone, purpose);
+  async getOtpTransactionReqId(email: string, purpose: OtpPurpose): Promise<string | null> {
+    const key = this.otpTransactionKey(email, purpose);
     if (!this.redisService.isEnabled()) {
       return null;
     }
@@ -114,8 +114,8 @@ export class AuthStateStore implements OnModuleInit {
     }
   }
 
-  async clearOtpTransactionReqId(phone: string, purpose: OtpPurpose): Promise<void> {
-    const key = this.otpTransactionKey(phone, purpose);
+  async clearOtpTransactionReqId(email: string, purpose: OtpPurpose): Promise<void> {
+    const key = this.otpTransactionKey(email, purpose);
     await this.tryRedisSet(
       key,
       () => this.redisService.del(key),
@@ -184,12 +184,12 @@ export class AuthStateStore implements OnModuleInit {
     );
   }
 
-  private otpAttemptsKey(phone: string, purpose: OtpPurpose): string {
-    return `otp_attempts:${phone}:${purpose}`;
+  private otpAttemptsKey(email: string, purpose: OtpPurpose): string {
+    return `otp_attempts:${email}:${purpose}`;
   }
 
-  private otpTransactionKey(phone: string, purpose: OtpPurpose): string {
-    return `otp:tx:${purpose}:${phone}`;
+  private otpTransactionKey(email: string, purpose: OtpPurpose): string {
+    return `otp:tx:${purpose}:${email}`;
   }
 
   private async tryRedisSet(key: string, op: () => Promise<void>, action: string): Promise<void> {

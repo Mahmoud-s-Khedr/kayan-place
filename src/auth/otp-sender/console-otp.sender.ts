@@ -29,12 +29,12 @@ export class ConsoleOtpSender implements OtpVerificationProvider {
     const otpHash = this.hashOtp(otp, salt);
 
     await this.databaseService.query(
-      `INSERT INTO auth_otps (user_id, phone, code_hash, salt, purpose, expires_at)
+      `INSERT INTO auth_otps (user_id, email, code_hash, salt, purpose, expires_at)
        VALUES ($1, $2, $3, $4, $5, NOW() + ($6::text || ' minutes')::interval)`,
-      [payload.userId, payload.phone, otpHash, salt, payload.purpose, this.appConfig.otpTtlMinutes],
+      [payload.userId, payload.email, otpHash, salt, payload.purpose, this.appConfig.otpTtlMinutes],
     );
 
-    this.logger.log(`OTP (${payload.purpose}) for ${payload.phone}: ${otp}`);
+    this.logger.log(`OTP (${payload.purpose}) for ${payload.email}: ${otp}`);
 
     return {
       ...(this.appConfig.otpDevMode ? { otp } : {}),
@@ -51,10 +51,10 @@ export class ConsoleOtpSender implements OtpVerificationProvider {
     }>(
       `SELECT id, code_hash, salt, expires_at, used_at
        FROM auth_otps
-       WHERE phone = $1 AND purpose = $2
+       WHERE email = $1 AND purpose = $2
        ORDER BY created_at DESC
        LIMIT 1`,
-      [payload.phone, payload.purpose],
+      [payload.email, payload.purpose],
     );
 
     if (!otpQuery.rowCount) {
@@ -71,7 +71,7 @@ export class ConsoleOtpSender implements OtpVerificationProvider {
     }
     if (this.hashOtp(payload.code, otpRow.salt) !== otpRow.code_hash) {
       const result = await this.authStateStore.incrementOtpAttempts(
-        payload.phone,
+        payload.email,
         payload.purpose,
         OTP_MAX_ATTEMPTS,
         OTP_ATTEMPTS_TTL_SECONDS,
@@ -82,7 +82,7 @@ export class ConsoleOtpSender implements OtpVerificationProvider {
       throw new BadRequestException('Invalid OTP');
     }
 
-    await this.authStateStore.clearOtpAttempts(payload.phone, payload.purpose);
+    await this.authStateStore.clearOtpAttempts(payload.email, payload.purpose);
 
     return { localOtpId: otpRow.id };
   }

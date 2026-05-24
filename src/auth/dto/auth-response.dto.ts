@@ -5,8 +5,8 @@ export class AuthUserDto {
   @ApiProperty({ example: 1 })
   id!: number;
 
-  @ApiProperty({ example: '+201012345678' })
-  phone!: string;
+  @ApiProperty({ example: 'user@example.com' })
+  email!: string;
 }
 
 export class TokenDataDto {

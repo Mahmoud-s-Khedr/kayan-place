@@ -5,6 +5,7 @@ export type AppUser = {
   ssn: string | null;
   name: string;
   phone: string;
+  email: string;
   profileState: string | null;
 };
 
@@ -16,6 +17,7 @@ export function mapToAppUser(source: AppUserSource): AppUser {
     ssn: asNullableString(source.ssn),
     name: asString(source.name),
     phone: asString(source.phone),
+    email: asString(source.email),
     profileState,
   };
 }

@@ -1,27 +1,19 @@
 export type OtpPurpose = 'registration' | 'password_reset';
 
 export type StartVerificationPayload = {
-  phone: string;
+  email: string;
   purpose: OtpPurpose;
   userId: number | null;
-  endUserIp?: string;
-  powSolution?: {
-    challengeToken: string;
-    nonce: string | number;
-  };
-  turnstileToken?: string;
 };
 
 export type StartVerificationResult = {
   otp?: string;
-  transactionReqID?: string;
 };
 
 export type CheckVerificationPayload = {
-  phone: string;
+  email: string;
   code: string;
   purpose: OtpPurpose;
-  transactionReqID?: string;
 };
 
 export type CheckVerificationResult = {

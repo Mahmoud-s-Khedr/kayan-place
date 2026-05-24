@@ -1,27 +1,27 @@
 import { resolveOtpVerificationProvider } from './otp-sender.provider';
 
 describe('resolveOtpVerificationProvider', () => {
-  it('returns akedly sender when provider is akedly', () => {
+  it('returns resend sender when provider is resend', () => {
     const consoleSender = { startVerification: jest.fn(), checkVerification: jest.fn() };
-    const akedlySender = { startVerification: jest.fn(), checkVerification: jest.fn() };
+    const resendSender = { startVerification: jest.fn(), checkVerification: jest.fn() };
 
     const sender = resolveOtpVerificationProvider(
-      { otpProvider: 'akedly' } as any,
+      { otpProvider: 'resend' } as any,
       consoleSender as any,
-      akedlySender as any,
+      resendSender as any,
     );
 
-    expect(sender).toBe(akedlySender);
+    expect(sender).toBe(resendSender);
   });
 
   it('returns console sender when provider is console', () => {
     const consoleSender = { startVerification: jest.fn(), checkVerification: jest.fn() };
-    const akedlySender = { startVerification: jest.fn(), checkVerification: jest.fn() };
+    const resendSender = { startVerification: jest.fn(), checkVerification: jest.fn() };
 
     const sender = resolveOtpVerificationProvider(
       { otpProvider: 'console' } as any,
       consoleSender as any,
-      akedlySender as any,
+      resendSender as any,
     );
 
     expect(sender).toBe(consoleSender);

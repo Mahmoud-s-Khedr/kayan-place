@@ -21,9 +21,9 @@ export class AuthController {
 
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Register and request a verification OTP via SMS' })
+  @ApiOperation({ summary: 'Register with name/email/phone/password and request a verification OTP via email' })
   @ApiResponse({ status: 201, description: 'OTP sent successfully', type: OtpSentResponseDto })
-  @ApiResponse({ status: 409, description: 'Phone or SSN already exists', type: ErrorResponseDto })
+  @ApiResponse({ status: 409, description: 'Email, phone, or SSN already exists', type: ErrorResponseDto })
   requestRegistrationOtp(@Body() dto: RequestRegistrationOtpDto): Promise<Record<string, unknown>> {
     return this.authService.requestRegistrationOtp(dto);
   }
@@ -32,7 +32,7 @@ export class AuthController {
   @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({ summary: 'Resend registration OTP to an existing pending registration' })
   @ApiResponse({ status: 201, description: 'OTP resent successfully', type: OtpSentResponseDto })
-  @ApiResponse({ status: 404, description: 'No pending registration found for this phone', type: ErrorResponseDto })
+  @ApiResponse({ status: 404, description: 'No pending registration found for this email', type: ErrorResponseDto })
   resendRegistrationOtp(@Body() dto: ResendRegistrationOtpDto): Promise<Record<string, unknown>> {
     return this.authService.resendRegistrationOtp(dto);
   }
@@ -47,7 +47,7 @@ export class AuthController {
 
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Login with phone and password' })
+  @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({ status: 201, description: 'Returns access + refresh tokens', type: TokenResponseDto })
   @ApiResponse({ status: 401, description: 'Invalid credentials', type: ErrorResponseDto })
   login(@Body() dto: LoginDto): Promise<Record<string, unknown>> {
@@ -56,8 +56,8 @@ export class AuthController {
 
   @Post('password/request-otp')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Request a password-reset OTP via SMS' })
-  @ApiResponse({ status: 201, description: 'OTP sent (or silently ignored if phone not found)', type: OtpSentResponseDto })
+  @ApiOperation({ summary: 'Request a password-reset OTP via email' })
+  @ApiResponse({ status: 201, description: 'OTP sent (or silently ignored if email not found)', type: OtpSentResponseDto })
   requestPasswordResetOtp(
     @Body() dto: RequestPasswordResetOtpDto,
   ): Promise<Record<string, unknown>> {

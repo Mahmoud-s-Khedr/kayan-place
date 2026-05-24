@@ -26,6 +26,8 @@
     "seed:dev": "ts-node --transpile-only scripts/seed-dev.ts",
     "seed:dev:prod": "node dist/scripts/seed-dev.js",
     "simulate": "ts-node --transpile-only scripts/simulate-flows.ts",
+    "test:auth:cli": "ts-node --transpile-only scripts/test-auth.ts",
+    "test:auth:e2e": "jest --config test/jest-e2e.json --runInBand test/auth.e2e-spec.ts",
     "simulate:chat": "ts-node --transpile-only scripts/chat-socket-test.ts",
     "fetch:images": "ts-node --transpile-only scripts/fetch-images.ts"
   },

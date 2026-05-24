@@ -1,126 +1,88 @@
 # Backend Development Environment
 
-This project includes a Docker Compose stack for local backend testing with:
-- PostgreSQL
-- Redis
-- NestJS backend
-- Nginx reverse proxy
+This project provides separate compose files for local development and production-style deployment.
 
-## 1) Start the dev stack
+- `docker-compose.dev.yml`: self-contained local stack (`app`, `nginx`, `redis`, `postgres`)
+- `docker-compose.prod.yml`: production stack (`app`, `nginx`, `redis`) with external PostgreSQL
+
+## 1) Start local dev stack
 
 ```bash
-cp .env.example .env
-docker compose up --build
+cp .env.dev.example .env
+docker compose -f docker-compose.dev.yml up --build
 ```
-
-The main app runs behind Nginx on port `80`.
 
 ## 2) Run migrations
 
-Migrations run automatically during app container startup (`npm run db:migrate` is executed before Nest boots).
+Migrations run automatically during app startup (`npm run db:migrate` before Nest boots).
 
-Manual migration is still available for recovery/debug/idempotency checks:
+Manual run:
 
 ```bash
-docker compose exec -T app npm run db:migrate
+docker compose -f docker-compose.dev.yml exec -T app npm run db:migrate
 ```
 
 ## 3) Access endpoints
 
-- API base (via Nginx): `http://localhost:800`
+- API base: `http://localhost:800`
 - Health (live): `http://localhost:800/health/live`
 - Health (ready): `http://localhost:800/health/ready`
 - Swagger: `http://localhost:800/api/docs`
-- Swagger JSON (Postman import): `http://localhost:800/api/docs-json` `curl http://165.227.138.228:800/api/docs-json -o openapi.json`
+- Swagger JSON: `http://localhost:800/api/docs-json`
 
 ## 4) Storage behavior
 
-- Storage provider is `cloudinary` in app config.
-- Configure Cloudinary credentials in `.env`:
+- Storage provider is `cloudinary`.
+- Configure in `.env`:
   - `CLOUDINARY_CLOUD_NAME`
   - `CLOUDINARY_API_KEY`
   - `CLOUDINARY_API_SECRET`
 
-## 5) Notes
-
-- To reset everything (including Postgres volume):
+## 5) Reset local stack
 
 ```bash
-docker compose down -v
+docker compose -f docker-compose.dev.yml down -v
 ```
 
-## 6) Dev Seeder (API-driven)
+## 6) Troubleshooting
 
-The dev seeder creates deterministic, idempotent test data using live API endpoints.
+- Migration startup fails with DB connection refused:
+  - Ensure you are using `.env.dev.example` values (`DATABASE_URL` should point to `postgres:5432` in dev compose).
+  - Check postgres health: `docker compose -f docker-compose.dev.yml ps`.
+- `DATABASE_URL must start with ...` or wrong host:
+  - Recreate `.env` from the correct template and restart stack.
+- Frequent `429` in heavy tests:
+  - For local-only simulation, set `THROTTLE_DEV_BYPASS=true`.
+
+## 7) Auth Test Script (Registration + Authentication)
+
+Use the dedicated auth test runner against the live API URL.
 
 ### Prerequisites
 
-1. App is running and reachable (default `BASE_URL=http://localhost:800`)
-2. Migrations are applied (automatic at app startup in Docker)
-3. Admin user is seeded (`npm run seed:admin`)
-4. Server has `OTP_DEV_MODE=true` (required for registration OTP visibility; console OTP is fixed to `000000`)
+1. Backend is reachable (`BASE_URL`, default `http://localhost:3000`)
+2. Backend runs with `OTP_DEV_MODE=true` for deterministic OTP automation
 
-### Run
+### Environment variables
 
-```bash
-npm run seed:dev
-```
+- `BASE_URL` (default `http://localhost:3000`)
+- `AUTH_TEST_PASSWORD` (default `AuthPass123`)
+- `AUTH_TEST_TIMEOUT_MS` (default `15000`)
 
-Production build equivalent:
+### Run CLI script
 
 ```bash
-npm run seed:dev:prod
+OTP_DEV_MODE=true BASE_URL=http://localhost:800 npm run test:auth:cli
 ```
 
-### Seeder env vars
-
-- `BASE_URL` (default `http://localhost:800`)
-- `SEED_PROFILE` (must be `medium` in v1)
-- `SEED_TIMEOUT_MS` (default `12000`)
-
-### Behavior
-
-- Upsert-only: no truncation or destructive cleanup
-- Fixed seed keys for users/categories/products/reports/messages
-- Re-running updates or reuses seeded records when possible
-- Artifacts are written to `logs/dev-seed-<timestamp>/`
-
-### Troubleshooting
-
-- `Admin login failed`: run `npm run seed:admin` and verify admin credentials
-- `OTP_DEV_MODE check failed`: set `OTP_DEV_MODE=true` on the running server
-- Frequent `429`/`5xx`: rerun; the seeder already retries with backoff
-
-## 7) Full flow simulation with concurrent chat users
-
-The simulator (`npm run simulate`) includes concurrent user registration and chat pairs.
-In development, `/auth/register` is intentionally throttled, which can reduce eligible chat users.
-
-For deterministic simulation runs, start the server with:
+Verbose mode:
 
 ```bash
-NODE_ENV=development OTP_DEV_MODE=true THROTTLE_DEV_BYPASS=true npm run start:dev
+OTP_DEV_MODE=true BASE_URL=http://localhost:800 npm run test:auth:cli -- --verbose
 ```
 
-Then run the simulator:
+### Run Jest e2e wrapper
 
 ```bash
-NODE_ENV=development OTP_DEV_MODE=true npm run simulate
+OTP_DEV_MODE=true BASE_URL=http://localhost:800 npm run test:auth:e2e
 ```
-
-`THROTTLE_DEV_BYPASS` is ignored outside development mode.
-
-## 8) Logging
-
-Logs are emitted as JSON lines to stdout using a shared app log schema that includes
-`correlationId` / `requestId` for traceability across HTTP and WebSocket flows.
-
-- `LOG_LEVEL`: `error|warn|log|debug|verbose` (default `log`)
-- `LOG_PRETTY`: pretty-print JSON logs (default `false`)
-- `LOG_HTTP_BODY`: include sanitized HTTP request body in start logs (default `false`)
-- `LOG_WS_PAYLOAD`: include sanitized websocket payload in ws error logs (default `false`)
-
-Troubleshooting flow:
-1. Start from the `correlationId` in an error line.
-2. Trace matching HTTP `routeOrEvent` entries (`... started` -> `... completed` / `... failed`).
-3. For chat issues, follow matching websocket `routeOrEvent` entries (`conversation.join`, `message.send`, `message.read`).

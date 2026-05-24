@@ -39,20 +39,20 @@ describe('configuration', () => {
     expect(config.logWsPayload).toBe(false);
   });
 
-  it('requires akedly credentials when otp provider is akedly', () => {
-    process.env.OTP_PROVIDER = 'akedly';
-    delete process.env.AKEDLY_API_KEY;
-    delete process.env.AKEDLY_PIPELINE_ID;
+  it('requires resend credentials when otp provider is resend', () => {
+    process.env.OTP_PROVIDER = 'resend';
+    delete process.env.RESEND_API_KEY;
+    delete process.env.RESEND_FROM_EMAIL;
 
-    expect(() => configuration()).toThrow('AKEDLY_API_KEY is required when OTP_PROVIDER=akedly');
+    expect(() => configuration()).toThrow('RESEND_API_KEY is required when OTP_PROVIDER=resend');
   });
 
-  it('requires akedly pipeline id when otp provider is akedly', () => {
-    process.env.OTP_PROVIDER = 'akedly';
-    process.env.AKEDLY_API_KEY = 'key';
-    delete process.env.AKEDLY_PIPELINE_ID;
+  it('requires resend sender when otp provider is resend', () => {
+    process.env.OTP_PROVIDER = 'resend';
+    process.env.RESEND_API_KEY = 'key';
+    delete process.env.RESEND_FROM_EMAIL;
 
-    expect(() => configuration()).toThrow('AKEDLY_PIPELINE_ID is required when OTP_PROVIDER=akedly');
+    expect(() => configuration()).toThrow('RESEND_FROM_EMAIL is required when OTP_PROVIDER=resend');
   });
 
   it('requires cloudinary settings', () => {

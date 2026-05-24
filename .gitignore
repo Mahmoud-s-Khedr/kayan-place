@@ -12,3 +12,4 @@ src/**/*.d.ts
 logs/
 *.log
 Market Place API/
+.keys

@@ -32,7 +32,7 @@ describe('ConsoleOtpSender.startVerification', () => {
 
     const result = await sender.startVerification({
       userId: null,
-      phone: '+201000000001',
+      email: 'user@example.com',
       purpose: 'registration',
     });
 
@@ -54,7 +54,7 @@ describe('ConsoleOtpSender.startVerification', () => {
 
     const result = await sender.startVerification({
       userId: null,
-      phone: '+201000000001',
+      email: 'user@example.com',
       purpose: 'registration',
     });
 

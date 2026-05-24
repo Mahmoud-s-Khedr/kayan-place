@@ -134,6 +134,24 @@ The default limit is **120 requests per 60 seconds** per IP. Individual endpoint
 
 Access tokens expire in **15 minutes**. Refresh tokens expire in **30 days**. Use the refresh endpoint to obtain new tokens without re-authentication.
 
+### Auth Module Test Script
+
+For backend integration checks of authentication/registration only, use:
+
+```bash
+OTP_DEV_MODE=true BASE_URL=http://localhost:800 npm run test:auth:cli
+```
+
+Jest e2e wrapper:
+
+```bash
+OTP_DEV_MODE=true BASE_URL=http://localhost:800 npm run test:auth:e2e
+```
+
+Notes:
+- Script expects `OTP_DEV_MODE=true` so OTP values are present in API responses.
+- It covers happy path plus core negatives (duplicate registration, wrong OTP, wrong password, reset mismatch, invalid refresh token).
+
 ### TypeScript Interfaces
 
 ```typescript

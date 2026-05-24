@@ -3,8 +3,6 @@ import {
   ConflictException,
   Inject,
   Injectable,
-  Logger,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -28,7 +26,6 @@ import {
 } from './otp-sender/otp-sender.interface';
 import { AuthStateStore } from './auth-state.store';
 import { LogoutDto } from './dto/logout.dto';
-import { AkedlySendOtpDto } from './dto/akedly-auth.dto';
 import {
   BCRYPT_ROUNDS,
   REFRESH_TTL_FALLBACK_SECONDS,
@@ -39,15 +36,14 @@ type UserRow = {
   id: number;
   ssn: string | null;
   name: string;
-  phone: string;
+  phone: string | null;
+  email: string;
   password_hash: string;
   status: 'active' | 'paused' | 'banned';
 };
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
-
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly jwtService: JwtService,
@@ -58,79 +54,62 @@ export class AuthService {
 
   async requestRegistrationOtp(dto: RequestRegistrationOtpDto): Promise<Record<string, unknown>> {
     const existingUser = await this.databaseService.query(
-      'SELECT id FROM users WHERE phone = $1 OR ssn = $2 LIMIT 1',
-      [dto.phone, dto.ssn],
+      'SELECT id FROM users WHERE LOWER(email) = LOWER($1) OR phone = $2 OR ssn = $3 LIMIT 1',
+      [dto.email, dto.phone, dto.ssn],
     );
     if (existingUser.rowCount && existingUser.rowCount > 0) {
-      throw new ConflictException('Phone or SSN already exists');
+      throw new ConflictException('Email, phone, or SSN already exists');
     }
 
-    const existingPending = await this.databaseService.query<{ phone: string; ssn: string }>(
-      'SELECT phone, ssn FROM pending_registrations WHERE phone = $1 OR ssn = $2 LIMIT 1',
-      [dto.phone, dto.ssn],
+    const existingPending = await this.databaseService.query<{ email: string; phone: string; ssn: string }>(
+      'SELECT email, phone, ssn FROM pending_registrations WHERE LOWER(email) = LOWER($1) OR phone = $2 OR ssn = $3 LIMIT 1',
+      [dto.email, dto.phone, dto.ssn],
     );
     if (existingPending.rowCount && existingPending.rowCount > 0) {
       const row = existingPending.rows[0];
-      // Allow re-registration for the same phone (resend scenario via this endpoint).
-      // Reject if the SSN belongs to a different phone's pending registration.
-      if (row.ssn === dto.ssn && row.phone !== dto.phone) {
-        throw new ConflictException('Phone or SSN already exists');
+      if (row.email.toLowerCase() !== dto.email.toLowerCase()) {
+        throw new ConflictException('Email, phone, or SSN already exists');
       }
     }
 
     const passwordHash = await hash(dto.password, BCRYPT_ROUNDS);
 
-    const pendingResult = await this.databaseService.query<{ id: number }>(
-      `INSERT INTO pending_registrations (phone, ssn, name, password_hash, expires_at)
-       VALUES ($1, $2, $3, $4, NOW() + ($5::text || ' minutes')::interval)
-       ON CONFLICT (phone) DO UPDATE
-         SET ssn           = EXCLUDED.ssn,
-             name          = EXCLUDED.name,
-             password_hash = EXCLUDED.password_hash,
-             expires_at    = EXCLUDED.expires_at,
-             created_at    = NOW()
-       RETURNING id`,
-      [dto.phone, dto.ssn, dto.name, passwordHash, this.appConfig.otpTtlMinutes],
-    );
-    const pendingId = pendingResult.rows[0].id;
-
-    if (this.appConfig.otpProvider === 'akedly') {
-      return { message: 'Registration pending. Complete Shield flow then call /auth/akedly/send.' };
-    }
-
     try {
-      const verificationResult = await this.otpVerificationProvider.startVerification({
-        phone: dto.phone,
-        purpose: 'registration',
-        userId: null,
-      });
-      return this.buildOtpSentResponse(verificationResult);
-    } catch (error) {
-      try {
-        await this.databaseService.query('DELETE FROM pending_registrations WHERE id = $1', [pendingId]);
-      } catch (cleanupError) {
-        const msg = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
-        this.logger.error(`Failed to cleanup pending_registration row ${pendingId}: ${msg}`);
-      }
-      throw error;
+      await this.databaseService.query(
+        `INSERT INTO pending_registrations (email, phone, ssn, name, password_hash, expires_at)
+         VALUES (LOWER($1), $2, $3, $4, $5, NOW() + ($6::text || ' minutes')::interval)
+         ON CONFLICT (email) DO UPDATE
+           SET phone         = EXCLUDED.phone,
+               ssn           = EXCLUDED.ssn,
+               name          = EXCLUDED.name,
+               password_hash = EXCLUDED.password_hash,
+               expires_at    = EXCLUDED.expires_at,
+               created_at    = NOW()`,
+        [dto.email, dto.phone, dto.ssn, dto.name, passwordHash, this.appConfig.otpTtlMinutes],
+      );
+    } catch {
+      throw new ConflictException('Email, phone, or SSN already exists');
     }
+
+    const verificationResult = await this.otpVerificationProvider.startVerification({
+      email: dto.email,
+      purpose: 'registration',
+      userId: null,
+    });
+    return this.buildOtpSentResponse(verificationResult);
   }
 
   async resendRegistrationOtp(dto: ResendRegistrationOtpDto): Promise<Record<string, unknown>> {
     const pending = await this.databaseService.query(
-      `SELECT id FROM pending_registrations WHERE phone = $1 AND expires_at > NOW()`,
-      [dto.phone],
+      `SELECT id FROM pending_registrations WHERE LOWER(email) = LOWER($1) AND expires_at > NOW()`,
+      [dto.email],
     );
     if (!pending.rowCount) {
-      throw new NotFoundException('No pending registration found for this phone');
-    }
-
-    if (this.appConfig.otpProvider === 'akedly') {
-      return { message: 'Pending registration found. Complete Shield flow then call /auth/akedly/send.' };
+      throw new BadRequestException('No pending registration found for this email');
     }
 
     const verificationResult = await this.otpVerificationProvider.startVerification({
-      phone: dto.phone,
+      email: dto.email,
       purpose: 'registration',
       userId: null,
     });
@@ -138,24 +117,19 @@ export class AuthService {
   }
 
   async verifyRegistrationOtp(dto: VerifyRegistrationOtpDto): Promise<Record<string, unknown>> {
-    const transactionReqID = dto.transactionReqID
-      ?? await this.authStateStore.getOtpTransactionReqId(dto.phone, 'registration')
-      ?? undefined;
-
-    const verificationResult = await this.otpVerificationProvider.checkVerification({
-      phone: dto.phone,
+    await this.otpVerificationProvider.checkVerification({
+      email: dto.email,
       code: dto.otp,
       purpose: 'registration',
-      transactionReqID,
     });
 
     return this.databaseService.withTransaction(async (client) => {
-      const pendingQuery = await client.query<{ name: string; ssn: string; password_hash: string }>(
-        `SELECT name, ssn, password_hash
+      const pendingQuery = await client.query<{ name: string; phone: string; ssn: string; password_hash: string; email: string }>(
+        `SELECT name, phone, ssn, password_hash, email
          FROM pending_registrations
-         WHERE phone = $1 AND expires_at > NOW()
+         WHERE LOWER(email) = LOWER($1) AND expires_at > NOW()
          FOR UPDATE`,
-        [dto.phone],
+        [dto.email],
       );
 
       if (!pendingQuery.rowCount) {
@@ -164,32 +138,29 @@ export class AuthService {
 
       const pending = pendingQuery.rows[0];
 
-      let createdUser!: { id: number; ssn: string | null; name: string; phone: string; status: string };
+      let createdUser!: { id: number; ssn: string | null; name: string; phone: string | null; email: string; status: string };
       try {
         const insertUser = await client.query<{
           id: number;
           ssn: string | null;
           name: string;
-          phone: string;
+          phone: string | null;
+          email: string;
           status: string;
         }>(
-          `INSERT INTO users (name, ssn, phone, password_hash)
-           VALUES ($1, $2, $3, $4)
-           RETURNING id, ssn, name, phone, status`,
-          [pending.name, pending.ssn, dto.phone, pending.password_hash],
+          `INSERT INTO users (name, ssn, phone, email, password_hash)
+           VALUES ($1, $2, $3, LOWER($4), $5)
+           RETURNING id, ssn, name, phone, email, status`,
+          [pending.name, pending.ssn, pending.phone, pending.email, pending.password_hash],
         );
         createdUser = insertUser.rows[0];
       } catch {
-        throw new ConflictException('Phone or SSN already exists');
+        throw new ConflictException('Email, phone, or SSN already exists');
       }
 
-      if (verificationResult.localOtpId) {
-        await client.query('UPDATE auth_otps SET used_at = NOW() WHERE id = $1', [verificationResult.localOtpId]);
-      }
-      await this.authStateStore.clearOtpTransactionReqId(dto.phone, 'registration');
-      await client.query('DELETE FROM pending_registrations WHERE phone = $1', [dto.phone]);
+      await client.query('DELETE FROM pending_registrations WHERE LOWER(email) = LOWER($1)', [dto.email]);
 
-      const tokens = await this.generateTokens(createdUser.id, dto.phone, false, 0, client);
+      const tokens = await this.generateTokens(createdUser.id, createdUser.email, false, 0, client);
 
       return { user: mapToAppUser(createdUser),
         ...tokens,
@@ -199,8 +170,8 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<Record<string, unknown>> {
     const query = await this.databaseService.query<UserRow & { is_admin: boolean; token_version: number }>(
-      'SELECT id, ssn, name, phone, password_hash, status, is_admin, token_version FROM users WHERE phone = $1 AND deleted_at IS NULL LIMIT 1',
-      [dto.phone],
+      'SELECT id, ssn, name, phone, email, password_hash, status, is_admin, token_version FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL LIMIT 1',
+      [dto.email],
     );
 
     if (!query.rowCount) {
@@ -218,7 +189,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const tokens = await this.generateTokens(user.id, user.phone, user.is_admin, user.token_version);
+    const tokens = await this.generateTokens(user.id, user.email, user.is_admin, user.token_version);
     return { user: mapToAppUser(user),
       ...tokens,
     };
@@ -226,20 +197,16 @@ export class AuthService {
 
   async requestPasswordResetOtp(dto: RequestPasswordResetOtpDto): Promise<Record<string, unknown>> {
     const userQuery = await this.databaseService.query<{ id: number }>(
-      'SELECT id FROM users WHERE phone = $1 AND deleted_at IS NULL LIMIT 1',
-      [dto.phone],
+      'SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL LIMIT 1',
+      [dto.email],
     );
 
     if (!userQuery.rowCount) {
-      return { message: 'If this number is registered, an OTP has been sent' };
-    }
-
-    if (this.appConfig.otpProvider === 'akedly') {
-      return { message: 'If this number is registered, complete Shield flow then call /auth/akedly/send' };
+      return { message: 'If this email is registered, an OTP has been sent' };
     }
 
     const verificationResult = await this.otpVerificationProvider.startVerification({
-      phone: dto.phone,
+      email: dto.email,
       purpose: 'password_reset',
       userId: userQuery.rows[0].id,
     });
@@ -251,21 +218,16 @@ export class AuthService {
       throw new BadRequestException('Passwords do not match');
     }
 
-    const transactionReqID = dto.transactionReqID
-      ?? await this.authStateStore.getOtpTransactionReqId(dto.phone, 'password_reset')
-      ?? undefined;
-
-    const verificationResult = await this.otpVerificationProvider.checkVerification({
-      phone: dto.phone,
+    await this.otpVerificationProvider.checkVerification({
+      email: dto.email,
       code: dto.otp,
       purpose: 'password_reset',
-      transactionReqID,
     });
 
     return this.databaseService.withTransaction(async (client) => {
-      const account = await client.query<{ id: number; phone: string; status: UserRow['status']; is_admin: boolean; token_version: number }>(
-        'SELECT id, phone, status, is_admin, token_version FROM users WHERE phone = $1 AND deleted_at IS NULL LIMIT 1',
-        [dto.phone],
+      const account = await client.query<{ id: number; email: string; status: UserRow['status']; is_admin: boolean; token_version: number }>(
+        'SELECT id, email, status, is_admin, token_version FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL LIMIT 1',
+        [dto.email],
       );
 
       if (!account.rowCount) {
@@ -278,11 +240,11 @@ export class AuthService {
       }
 
       const passwordHash = await hash(dto.newPassword, BCRYPT_ROUNDS);
-      const updatedUser = await client.query<{ id: number; phone: string }>(
+      const updatedUser = await client.query<{ id: number; email: string }>(
         `UPDATE users
          SET password_hash = $1, updated_at = NOW()
          WHERE id = $2
-         RETURNING id, phone`,
+         RETURNING id, email`,
         [passwordHash, user.id],
       );
 
@@ -290,14 +252,9 @@ export class AuthService {
         throw new BadRequestException('User not found');
       }
 
-      if (verificationResult.localOtpId) {
-        await client.query('UPDATE auth_otps SET used_at = NOW() WHERE id = $1', [verificationResult.localOtpId]);
-      }
-      await this.authStateStore.clearOtpTransactionReqId(dto.phone, 'password_reset');
-
       const tokens = await this.generateTokens(
         updatedUser.rows[0].id,
-        updatedUser.rows[0].phone,
+        updatedUser.rows[0].email,
         user.is_admin,
         user.token_version,
         client,
@@ -309,7 +266,7 @@ export class AuthService {
   }
 
   async refresh(dto: RefreshTokenDto): Promise<Record<string, unknown>> {
-    let payload: { sub: number; phone: string; isAdmin: boolean; tokenVersion: number; jti: string };
+    let payload: { sub: number; email: string; isAdmin: boolean; tokenVersion: number; jti: string };
     try {
       payload = await this.jwtService.verifyAsync(dto.refreshToken, {
         secret: this.appConfig.jwtRefreshSecret,
@@ -322,8 +279,8 @@ export class AuthService {
     const storedUserId = await this.authStateStore.consumeRefreshTokenJti(payload.jti);
     if (!storedUserId || storedUserId !== payload.sub) throw new UnauthorizedException('Invalid refresh token');
 
-    const user = await this.databaseService.query<{ id: number; phone: string; status: UserRow['status']; is_admin: boolean; token_version: number }>(
-      'SELECT id, phone, status, is_admin, token_version FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1',
+    const user = await this.databaseService.query<{ id: number; email: string; status: UserRow['status']; is_admin: boolean; token_version: number }>(
+      'SELECT id, email, status, is_admin, token_version FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1',
       [payload.sub],
     );
 
@@ -333,7 +290,7 @@ export class AuthService {
 
     const tokens = await this.generateTokens(
       user.rows[0].id,
-      user.rows[0].phone,
+      user.rows[0].email,
       user.rows[0].is_admin,
       user.rows[0].token_version,
     );
@@ -354,63 +311,6 @@ export class AuthService {
     return {};
   }
 
-  async getAkedlyChallenge(): Promise<Record<string, unknown>> {
-    if (this.appConfig.otpProvider !== 'akedly') {
-      throw new BadRequestException('AKEDLY is not enabled');
-    }
-    const response = await fetch(
-      `${this.appConfig.akedlyBaseUrl}/api/v1.2/transactions/challenge?APIKey=${encodeURIComponent(this.appConfig.akedlyApiKey ?? '')}&pipelineID=${encodeURIComponent(this.appConfig.akedlyPipelineId ?? '')}`,
-    );
-    const payload = await this.safeParseJson(response);
-    if (!response.ok) {
-      throw new BadRequestException(payload?.message ?? 'Failed to fetch challenge');
-    }
-    return payload ?? {};
-  }
-
-  async sendAkedlyOtp(dto: AkedlySendOtpDto, endUserIp: string): Promise<Record<string, unknown>> {
-    if (this.appConfig.otpProvider !== 'akedly') {
-      throw new BadRequestException('AKEDLY is not enabled');
-    }
-    if (dto.purpose === 'registration') {
-      const pending = await this.databaseService.query(
-        `SELECT id FROM pending_registrations WHERE phone = $1 AND expires_at > NOW()`,
-        [dto.phoneNumber],
-      );
-      if (!pending.rowCount) {
-        throw new NotFoundException('No pending registration found for this phone');
-      }
-    } else {
-      const userQuery = await this.databaseService.query<{ id: number }>(
-        'SELECT id FROM users WHERE phone = $1 AND deleted_at IS NULL LIMIT 1',
-        [dto.phoneNumber],
-      );
-      if (!userQuery.rowCount) {
-        return { message: 'If this number is registered, an OTP has been sent' };
-      }
-    }
-
-    const verificationResult = await this.otpVerificationProvider.startVerification({
-      phone: dto.phoneNumber,
-      purpose: dto.purpose,
-      userId: null,
-      endUserIp,
-      powSolution: dto.powSolution,
-      turnstileToken: dto.turnstileToken,
-    });
-
-    if (verificationResult.transactionReqID) {
-      await this.authStateStore.saveOtpTransactionReqId(
-        dto.phoneNumber,
-        dto.purpose,
-        verificationResult.transactionReqID,
-        this.appConfig.otpTtlMinutes * 60,
-      );
-    }
-
-    return this.buildOtpSentResponse(verificationResult);
-  }
-
   private get appConfig(): AppConfig {
     return this.configService.get('app', { infer: true });
   }
@@ -421,17 +321,9 @@ export class AuthService {
     };
   }
 
-  private async safeParseJson(response: Response): Promise<Record<string, unknown> | undefined> {
-    try {
-      return (await response.json()) as Record<string, unknown>;
-    } catch {
-      return undefined;
-    }
-  }
-
   private parseTtlSeconds(ttl: string): number {
     const match = ttl.match(/^(\d+)([smhd])$/);
-    if (!match) return REFRESH_TTL_FALLBACK_SECONDS; // fallback: 30d
+    if (!match) return REFRESH_TTL_FALLBACK_SECONDS;
     const val = parseInt(match[1], 10);
     const units: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
     return val * units[match[2]];
@@ -439,13 +331,13 @@ export class AuthService {
 
   private async generateTokens(
     userId: number,
-    phone: string,
+    email: string,
     isAdmin: boolean,
     tokenVersion: number,
     queryRunner?: PoolClient,
   ): Promise<Record<string, string>> {
     const jti = randomBytes(16).toString('hex');
-    const basePayload = { sub: userId, phone, isAdmin, tokenVersion };
+    const basePayload = { sub: userId, email, isAdmin, tokenVersion };
     const refreshPayload = { ...basePayload, jti };
 
     const [accessToken, refreshToken] = await Promise.all([

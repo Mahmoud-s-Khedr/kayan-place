@@ -8,7 +8,7 @@ import { DatabaseService } from '../database/database.service';
 
 type JwtPayload = {
   sub: number | string;
-  phone: string;
+  email: string;
   isAdmin: boolean;
   tokenVersion?: number;
 };
@@ -37,8 +37,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid token');
     }
 
-    const user = await this.databaseService.query<{ id: number; phone: string; token_version: number }>(
-      'SELECT id, phone, token_version FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1',
+    const user = await this.databaseService.query<{ id: number; email: string; token_version: number }>(
+      'SELECT id, email, token_version FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1',
       [normalizedSub],
     );
 
@@ -48,7 +48,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     return {
       sub: normalizedSub,
-      phone: user.rows[0].phone,
+      email: user.rows[0].email,
       isAdmin: payload.isAdmin,
       tokenVersion: user.rows[0].token_version,
     };

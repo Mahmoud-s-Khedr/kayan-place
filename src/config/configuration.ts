@@ -14,12 +14,12 @@ export type AppConfig = {
   /** @deprecated Use users.is_admin as source of truth. */
   adminPhones: string[];
   otpSigningSecret: string;
-  otpProvider: 'console' | 'akedly';
+  otpProvider: 'console' | 'resend';
   otpTtlMinutes: number;
   otpDevMode: boolean;
-  akedlyApiKey?: string;
-  akedlyPipelineId?: string;
-  akedlyBaseUrl: string;
+  resendApiKey?: string;
+  resendFromEmail?: string;
+  resendOtpSubject: string;
   storageProvider: 'cloudinary';
   storageBucket: string;
   storagePublicBaseUrl: string;
@@ -62,9 +62,8 @@ export default (): AppConfig => {
   const otpSigningSecret = process.env.OTP_SIGNING_SECRET;
   const otpProvider = (process.env.OTP_PROVIDER ?? 'console').toLowerCase();
   const storageProvider = (process.env.STORAGE_PROVIDER ?? 'cloudinary').toLowerCase();
-  const akedlyApiKey = process.env.AKEDLY_API_KEY;
-  const akedlyPipelineId = process.env.AKEDLY_PIPELINE_ID;
-  const akedlyBaseUrl = process.env.AKEDLY_BASE_URL ?? 'https://api.akedly.io';
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const resendFromEmail = process.env.RESEND_FROM_EMAIL;
   const cloudinaryCloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const cloudinaryApiKey = process.env.CLOUDINARY_API_KEY;
   const cloudinaryApiSecret = process.env.CLOUDINARY_API_SECRET;
@@ -74,18 +73,16 @@ export default (): AppConfig => {
   if (!jwtRefreshSecret) throw new Error('JWT_REFRESH_SECRET is required');
   if (!storageSigningSecret) throw new Error('STORAGE_SIGNING_SECRET is required');
   if (!otpSigningSecret) throw new Error('OTP_SIGNING_SECRET is required');
-  if (otpProvider !== 'console' && otpProvider !== 'akedly') {
-    throw new Error('OTP_PROVIDER must be either "console" or "akedly"');
+  if (otpProvider !== 'console' && otpProvider !== 'resend') {
+    throw new Error('OTP_PROVIDER must be either "console" or "resend"');
   }
   if (storageProvider !== 'cloudinary') {
     throw new Error('STORAGE_PROVIDER currently supports only "cloudinary"');
   }
 
-  if (otpProvider === 'akedly') {
-    if (!akedlyApiKey) throw new Error('AKEDLY_API_KEY is required when OTP_PROVIDER=akedly');
-    if (!akedlyPipelineId) {
-      throw new Error('AKEDLY_PIPELINE_ID is required when OTP_PROVIDER=akedly');
-    }
+  if (otpProvider === 'resend') {
+    if (!resendApiKey) throw new Error('RESEND_API_KEY is required when OTP_PROVIDER=resend');
+    if (!resendFromEmail) throw new Error('RESEND_FROM_EMAIL is required when OTP_PROVIDER=resend');
   }
 
   if (!cloudinaryCloudName) {
@@ -122,9 +119,9 @@ export default (): AppConfig => {
     otpProvider,
     otpTtlMinutes: parseNumber(process.env.OTP_TTL_MINUTES, 10),
     otpDevMode: parseBoolean(process.env.OTP_DEV_MODE, false),
-    akedlyApiKey,
-    akedlyPipelineId,
-    akedlyBaseUrl,
+    resendApiKey,
+    resendFromEmail,
+    resendOtpSubject: process.env.RESEND_OTP_SUBJECT ?? 'Your verification code',
     storageProvider,
     storageBucket: process.env.STORAGE_BUCKET ?? 'market-media',
     storagePublicBaseUrl: process.env.STORAGE_PUBLIC_BASE_URL ?? 'https://cdn.example.com',

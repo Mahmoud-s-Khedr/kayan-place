@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Length, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Length, Matches } from 'class-validator';
 
 export class RequestRegistrationOtpDto {
   @ApiProperty({ description: 'Full name (2–150 chars)', example: 'Ahmed Ali', minLength: 2, maxLength: 150 })
@@ -14,8 +14,14 @@ export class RequestRegistrationOtpDto {
   @Length(8, 32)
   ssn!: string;
 
-  @ApiProperty({ description: 'Phone number (E.164 format)', example: '+201234567890' })
-  @Matches(/^\+?[1-9]\d{7,15}$/)
+  @ApiProperty({ description: 'Email address', example: 'user@example.com' })
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty({ description: 'Phone number (7–32 chars)', example: '+201001234567', minLength: 7, maxLength: 32 })
+  @IsString()
+  @IsNotEmpty()
+  @Length(7, 32)
   phone!: string;
 
   @ApiProperty({ description: 'Password — must contain letters and numbers (8–64 chars)', example: 'Secret123', minLength: 8, maxLength: 64 })

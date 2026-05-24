@@ -17,7 +17,8 @@ CREATE TABLE users (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
     ssn VARCHAR(32) NOT NULL UNIQUE,
-    phone VARCHAR(32) NOT NULL UNIQUE,
+    phone VARCHAR(32) UNIQUE,
+    email TEXT,
     password_hash TEXT NOT NULL,
     -- New canonical relation to files table.
     avatar_file_id BIGINT,
@@ -32,10 +33,14 @@ CREATE TABLE users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE UNIQUE INDEX users_email_unique_idx
+    ON users (LOWER(email))
+    WHERE email IS NOT NULL AND deleted_at IS NULL;
+
 CREATE TABLE auth_otps (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
-    phone VARCHAR(32) NOT NULL,
+    email TEXT NOT NULL,
     code_hash TEXT NOT NULL,
     salt TEXT NOT NULL DEFAULT '',
     purpose TEXT NOT NULL CHECK (purpose IN ('registration', 'password_reset')),
@@ -44,16 +49,16 @@ CREATE TABLE auth_otps (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX auth_otps_phone_purpose_created_idx
-    ON auth_otps (phone, purpose, created_at DESC);
+CREATE INDEX auth_otps_email_purpose_created_idx
+    ON auth_otps (LOWER(email), purpose, created_at DESC);
 
 CREATE TABLE auth_otp_attempts (
-    phone VARCHAR(32) NOT NULL,
+    email TEXT NOT NULL,
     purpose TEXT NOT NULL CHECK (purpose IN ('registration', 'password_reset')),
     attempts INTEGER NOT NULL CHECK (attempts >= 0),
     expires_at TIMESTAMPTZ NOT NULL,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (phone, purpose)
+    PRIMARY KEY (email, purpose)
 );
 
 CREATE INDEX auth_otp_attempts_expires_idx
@@ -76,7 +81,8 @@ CREATE INDEX auth_refresh_tokens_expires_idx
 -- Rows are promoted to users on verify, or swept by cleanup task on expiry.
 CREATE TABLE pending_registrations (
     id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    phone         VARCHAR(32)  NOT NULL,
+    email         TEXT         NOT NULL,
+    phone         VARCHAR(32),
     ssn           VARCHAR(32)  NOT NULL,
     name          VARCHAR(150) NOT NULL,
     password_hash TEXT         NOT NULL,
@@ -84,11 +90,15 @@ CREATE TABLE pending_registrations (
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX pending_registrations_phone_idx
-    ON pending_registrations (phone, expires_at DESC);
+CREATE INDEX pending_registrations_email_expires_idx
+    ON pending_registrations (email, expires_at DESC);
+
+CREATE UNIQUE INDEX pending_registrations_email_unique_plain_idx
+    ON pending_registrations (email);
 
 CREATE UNIQUE INDEX pending_registrations_phone_unique_idx
-    ON pending_registrations (phone);
+    ON pending_registrations (phone)
+    WHERE phone IS NOT NULL;
 
 CREATE UNIQUE INDEX pending_registrations_ssn_unique_idx
     ON pending_registrations (ssn);

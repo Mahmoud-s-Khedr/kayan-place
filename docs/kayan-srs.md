@@ -43,12 +43,32 @@ Status legend: `Completed` = implemented, `Partial` = implemented with scope/con
 
 | Use Case        | Main Actor | Description                                                  | Priority  | Status |
 | --------------- | ---------- | ------------------------------------------------------------ | --------- | ------ |
-| Login           | User       | Users enter their email and password. The system checks that the email and password fields are not empty, validates the email format, verifies credentials, and shows error messages when needed. | Mandatory | Partial |
-| Registration    | User       | Users enter their name, email, phone, and password. The system sends an OTP. The user verifies the OTP. The system creates the account. | Mandatory | Partial |
-| Forgot Password | User       | The system sends validation to the user. The user validates the account. The system checks the user, shows errors if needed, asks the user to enter a new password and confirm it, validates password strength, checks that both passwords match, and redirects the user back to the login screen. | Mandatory | Partial |
+| Login           | User       | Users enter their email and password. The system validates required fields, validates email format, verifies credentials, and returns access and refresh tokens on success. | Mandatory | Completed |
+| Registration    | User       | Users enter their name, email, phone, and password. The system sends an OTP. The user verifies the OTP using email. The system creates the account. | Mandatory | Completed |
+| Forgot Password | User       | Users request a reset OTP using email. The system sends OTP to email (or returns a generic success response when account does not exist). Users submit OTP, new password, and confirm password to complete reset and receive new tokens. | Mandatory | Completed |
+
+**Implementation Notes (Current Backend Contract)**
+
+- Registration flow endpoints:
+  - `POST /auth/register`
+  - `POST /auth/register/resend-otp`
+  - `POST /auth/register/verify`
+- Login endpoint: `POST /auth/login`
+- Forgot-password endpoints:
+  - `POST /auth/password/request-otp`
+  - `POST /auth/password/reset`
+- Session endpoints:
+  - `POST /auth/refresh`
+  - `POST /auth/logout`
+- Key expected auth errors:
+  - `400` invalid/expired OTP or invalid request payload
+  - `401` invalid credentials or invalid refresh token
+  - `409` duplicate email/phone/SSN on registration
+  - `429` throttling on guarded endpoints
+
+For frontend and mobile implementation guidance, see [Module 1 Auth Integration Guide](./module-1-auth-integration.md).
 
 ---
-
 ## 3.2 Profile
 
 **Module Price:** 3000 EGP
@@ -257,7 +277,7 @@ Define what each role can access.
 ## 8. Open Questions
 
 1. Will the system support online payment, cash on delivery, or no payment integration? not at this stage
-2. Should users verify both email and phone number, or only one of them? email we will use resend to send emails
+2. Should users verify both email and phone number, or only one of them? Only email OTP verification is currently implemented.
 3. What OTP provider will be used? we will use resend to send emails
 4. What file types and maximum file sizes are allowed for product files, report images, step images, and gallery images? leave it open
 5. Can users edit a product order after placing it, or only the delivery address? none of these 
@@ -288,7 +308,7 @@ Define what each role can access.
 - The user cannot register with missing required fields.
 - The system sends OTP after valid registration input.
 - The account is created only after successful OTP verification.
-- Duplicate email/phone values are rejected.
+- Duplicate email values are rejected (and SSN uniqueness is also enforced in registration flows).
 
 ### Product Ordering
 
