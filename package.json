@@ -29,7 +29,8 @@
     "test:auth:cli": "ts-node --transpile-only scripts/test-auth.ts",
     "test:auth:e2e": "jest --config test/jest-e2e.json --runInBand test/auth.e2e-spec.ts",
     "simulate:chat": "ts-node --transpile-only scripts/chat-socket-test.ts",
-    "fetch:images": "ts-node --transpile-only scripts/fetch-images.ts"
+    "fetch:images": "ts-node --transpile-only scripts/fetch-images.ts",
+    "test:profile:cli": "ts-node --transpile-only scripts/test-profile.ts"
   },
   "engines": {
     "node": ">=20"

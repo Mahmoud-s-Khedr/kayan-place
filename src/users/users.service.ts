@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -28,6 +29,7 @@ export class UsersService {
       ssn: string | null;
       name: string;
       phone: string;
+      email: string;
       status: string;
       rate: string;
       avatar_file_id: number | null;
@@ -43,6 +45,7 @@ export class UsersService {
               u.ssn,
               u.name,
               u.phone,
+              u.email,
               u.status,
               u.avatar_file_id,
               f.object_key AS avatar_object_key,
@@ -200,10 +203,21 @@ export class UsersService {
 
   async updateMe(user: AuthUser, dto: UpdateProfileDto): Promise<Record<string, unknown>> {
     const hasName = dto.name !== undefined;
-    const hasAvatarFileId = Object.prototype.hasOwnProperty.call(dto, 'avatarFileId');
-    const hasContactInfo = Object.prototype.hasOwnProperty.call(dto, 'contactInfo');
-    if (!hasName && !hasAvatarFileId && !hasContactInfo) {
+    const hasAvatarFileId = dto.avatarFileId !== undefined;
+    const hasContactInfo = dto.contactInfo !== undefined;
+    const hasPhone = dto.phone !== undefined;
+    if (!hasName && !hasAvatarFileId && !hasContactInfo && !hasPhone) {
       throw new BadRequestException('Nothing to update');
+    }
+
+    if (hasPhone) {
+      const existingPhone = await this.databaseService.query<{ id: number }>(
+        'SELECT id FROM users WHERE phone = $1 AND id <> $2 AND deleted_at IS NULL LIMIT 1',
+        [dto.phone, user.sub],
+      );
+      if (existingPhone.rowCount) {
+        throw new ConflictException('Phone already exists');
+      }
     }
 
     if (typeof dto.avatarFileId === 'number') {
@@ -231,15 +245,23 @@ export class UsersService {
 
     const avatarFileIdParam = hasAvatarFileId ? dto.avatarFileId ?? null : null;
     const contactInfoParam = hasContactInfo ? dto.contactInfo ?? null : null;
-    await this.databaseService.query(
-      `UPDATE users
-       SET name = CASE WHEN $1::text IS NULL THEN name ELSE $1 END,
-           avatar_file_id = CASE WHEN $2::boolean THEN $3::bigint ELSE avatar_file_id END,
-           contact_info = CASE WHEN $5::boolean THEN $6::text ELSE contact_info END,
-           updated_at = NOW()
-       WHERE id = $4 AND deleted_at IS NULL`,
-      [dto.name ?? null, hasAvatarFileId, avatarFileIdParam, user.sub, hasContactInfo, contactInfoParam],
-    );
+    try {
+      await this.databaseService.query(
+        `UPDATE users
+         SET name = CASE WHEN $1::text IS NULL THEN name ELSE $1 END,
+             avatar_file_id = CASE WHEN $2::boolean THEN $3::bigint ELSE avatar_file_id END,
+             contact_info = CASE WHEN $5::boolean THEN $6::text ELSE contact_info END,
+             phone = CASE WHEN $7::boolean THEN $8::varchar(32) ELSE phone END,
+             updated_at = NOW()
+         WHERE id = $4 AND deleted_at IS NULL`,
+        [dto.name ?? null, hasAvatarFileId, avatarFileIdParam, user.sub, hasContactInfo, contactInfoParam, hasPhone, dto.phone ?? null],
+      );
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: string }).code === '23505') {
+        throw new ConflictException('Phone already exists');
+      }
+      throw error;
+    }
 
     return this.getMe(user);
   }

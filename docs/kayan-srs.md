@@ -75,9 +75,22 @@ For frontend and mobile implementation guidance, see [Module 1 Auth Integration 
 
 | Use Case          | Main Actor | Description                                                  | Priority  | Status |
 | ----------------- | ---------- | ------------------------------------------------------------ | --------- | ------ |
-| Show User Details | System     | The system shows the user's details, including ID, email, phone, name, and contact information. | Mandatory | Partial |
+| Show User Details | System     | The system shows the user's details, including ID, email, phone, name, and contact information. | Mandatory | Completed |
 | Edit User Details | User       | Users can edit their name, phone, and contact information.   | Mandatory | Completed |
 | Change Password   | User       | Users enter their old password and new password. The system verifies the old password, checks the strength level of the new password, shows error messages when needed, and resets the password successfully. | Mandatory | Completed |
+
+**Implementation Notes (Current Backend Contract)**
+
+- Profile endpoints:
+  - `GET /me`
+  - `PATCH /me`
+  - `PATCH /me/password`
+- Key expected profile errors:
+  - `400` invalid payload, empty profile update payload, or invalid old password in current implementation
+  - `401` invalid/missing bearer token
+  - `409` duplicate phone on profile update
+
+For frontend and mobile implementation guidance, see [Module 2 Profile Integration Guide](./module-2-profile-integration.md).
 
 ---
 

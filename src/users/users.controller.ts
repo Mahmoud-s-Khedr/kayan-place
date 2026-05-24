@@ -36,6 +36,8 @@ export class UsersController {
   @Patch()
   @ApiOperation({ summary: 'Update current user profile' })
   @ApiResponse({ status: 200, description: 'Profile updated', type: UserProfileResponseDto })
+  @ApiResponse({ status: 400, description: 'Invalid request payload', type: ErrorResponseDto })
+  @ApiResponse({ status: 409, description: 'Phone already exists', type: ErrorResponseDto })
   updateMe(
     @CurrentUser() user: AuthUser,
     @Body() dto: UpdateProfileDto,

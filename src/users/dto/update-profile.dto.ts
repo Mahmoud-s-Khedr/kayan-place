@@ -18,4 +18,10 @@ export class UpdateProfileDto {
   @IsString()
   @Length(1, 255)
   contactInfo?: string | null;
+
+  @ApiPropertyOptional({ description: 'Phone number (7–32 chars)', example: '+201001234567', minLength: 7, maxLength: 32 })
+  @IsOptional()
+  @IsString()
+  @Length(7, 32)
+  phone?: string;
 }

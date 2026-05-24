@@ -10,6 +10,9 @@ export class UserDto {
   @ApiProperty({ example: 'Ahmed Mohamed' })
   name!: string;
 
+  @ApiProperty({ example: 'user@example.com' })
+  email!: string;
+
   @ApiProperty({ example: '+201012345678' })
   phone!: string;
 

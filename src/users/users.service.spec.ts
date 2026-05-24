@@ -1,5 +1,6 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 describe('UsersService', () => {
   const databaseService = {
@@ -27,6 +28,7 @@ describe('UsersService', () => {
           ssn: 'SSN-1',
           name: 'Alice',
           phone: '+201000000001',
+          email: 'alice@example.com',
           status: 'active',
           rate: '4.50',
           avatar_file_id: 7,
@@ -44,6 +46,7 @@ describe('UsersService', () => {
 
       expect(result).toMatchObject({
         user: expect.objectContaining({
+          email: 'alice@example.com',
           contactInfo: '+201000000001',
           avatar: expect.objectContaining({
             id: 7,
@@ -58,7 +61,7 @@ describe('UsersService', () => {
       databaseService.query.mockResolvedValue({
         rowCount: 1,
         rows: [{
-          id: 1, ssn: 'SSN-2', name: 'Bob', phone: '+201000000002', status: 'active', rate: '0.00',
+          id: 1, ssn: 'SSN-2', name: 'Bob', phone: '+201000000002', email: 'bob@example.com', status: 'active', rate: '0.00',
           avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
           avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: null,
         }],
@@ -79,6 +82,11 @@ describe('UsersService', () => {
   describe('updateMe', () => {
     it('throws BadRequestException when nothing to update', async () => {
       await expect(service.updateMe(user, {})).rejects.toThrow(BadRequestException);
+    });
+
+    it('throws BadRequestException for empty UpdateProfileDto instance', async () => {
+      const dto = new UpdateProfileDto();
+      await expect(service.updateMe(user, dto)).rejects.toThrow(BadRequestException);
     });
 
     it('throws NotFoundException when avatar file does not exist', async () => {
@@ -115,7 +123,7 @@ describe('UsersService', () => {
         .mockResolvedValueOnce({
           rowCount: 1,
           rows: [{
-            id: 1, ssn: 'SSN-1', name: 'Alice', phone: '+201000000001', status: 'active', rate: '4.50',
+            id: 1, ssn: 'SSN-1', name: 'Alice', phone: '+201000000001', email: 'alice@example.com', status: 'active', rate: '4.50',
             avatar_file_id: 99, avatar_object_key: 'users/1/avatar.jpg', avatar_mime_type: 'image/jpeg',
             avatar_purpose: 'avatar', avatar_status: 'uploaded',
             avatar_created_at: '2026-01-01T00:00:00.000Z', avatar_uploaded_at: '2026-01-01T00:00:00.000Z',
@@ -147,7 +155,7 @@ describe('UsersService', () => {
         .mockResolvedValueOnce({
           rowCount: 1,
           rows: [{
-            id: 1, ssn: 'SSN-1', name: 'Alice', phone: '+201000000001', status: 'active', rate: '4.50',
+            id: 1, ssn: 'SSN-1', name: 'Alice', phone: '+201000000001', email: 'alice@example.com', status: 'active', rate: '4.50',
             avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
             avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: null,
           }],
@@ -164,7 +172,7 @@ describe('UsersService', () => {
         .mockResolvedValueOnce({
           rowCount: 1,
           rows: [{
-            id: 1, ssn: 'SSN-1', name: 'Alice', phone: '+201000000001', status: 'active', rate: '4.50',
+            id: 1, ssn: 'SSN-1', name: 'Alice', phone: '+201000000001', email: 'alice@example.com', status: 'active', rate: '4.50',
             avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
             avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: '+201111111111',
           }],
@@ -175,6 +183,65 @@ describe('UsersService', () => {
       expect(result).toMatchObject({
         user: expect.objectContaining({
           contactInfo: '+201111111111',
+        }),
+      });
+    });
+
+    it('updates phone when provided', async () => {
+      databaseService.query
+        .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{
+            id: 1, ssn: 'SSN-1', name: 'Alice', phone: '+201222222222', email: 'alice@example.com', status: 'active', rate: '4.50',
+            avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
+            avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: null,
+          }],
+        });
+
+      const result = await service.updateMe(user, { phone: '+201222222222' });
+
+      expect(result).toMatchObject({
+        user: expect.objectContaining({
+          phone: '+201222222222',
+        }),
+      });
+    });
+
+    it('throws ConflictException when phone already exists', async () => {
+      databaseService.query.mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ id: 2 }],
+      });
+
+      await expect(service.updateMe(user, { phone: '+201333333333' })).rejects.toThrow(ConflictException);
+    });
+
+    it('updates name + phone + contactInfo together', async () => {
+      databaseService.query
+        .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{
+            id: 1, ssn: 'SSN-1', name: 'Alice Updated', phone: '+201444444444', email: 'alice@example.com', status: 'active', rate: '4.75',
+            avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
+            avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: '+201555555555',
+          }],
+        });
+
+      const result = await service.updateMe(user, {
+        name: 'Alice Updated',
+        phone: '+201444444444',
+        contactInfo: '+201555555555',
+      });
+
+      expect(result).toMatchObject({
+        user: expect.objectContaining({
+          name: 'Alice Updated',
+          phone: '+201444444444',
+          contactInfo: '+201555555555',
         }),
       });
     });
