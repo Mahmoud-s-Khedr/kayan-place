@@ -325,6 +325,11 @@ export class KayanAdminController {
     return this.kayanService.adminDeleteFollowupStep(stepId);
   }
 
+  @Get('gallery')
+  listGallery(): Promise<Record<string, unknown>> {
+    return this.kayanService.adminListGallery();
+  }
+
   @Post('gallery')
   createGalleryItem(@CurrentUser() admin: AuthUser, @Body() dto: CreateGalleryItemDto): Promise<Record<string, unknown>> {
     return this.kayanService.adminCreateGalleryItem(admin, dto);

@@ -50,6 +50,16 @@ type ProductAssetRow = {
   status: string | null;
 };
 
+type GalleryAssetRow = {
+  gallery_item_id: number | string;
+  file_id: number | string;
+  sort_order: number;
+  object_key: string | null;
+  original_filename: string | null;
+  mime_type: string | null;
+  status: string | null;
+};
+
 @Injectable()
 export class KayanService {
   constructor(private readonly db: DatabaseService) {}
@@ -493,11 +503,11 @@ export class KayanService {
   }
 
   async listGallery(): Promise<Record<string, unknown>> {
-    const q = await this.db.query(
-      `SELECT id, title, description, is_active, created_at::text AS created_at
-       FROM gallery_items WHERE deleted_at IS NULL AND is_active = true ORDER BY created_at DESC`,
-    );
-    return { items: q.rows };
+    return this.listGalleryItems(true);
+  }
+
+  async adminListGallery(): Promise<Record<string, unknown>> {
+    return this.listGalleryItems(false);
   }
 
   async adminCreateGalleryItem(admin: AuthUser, dto: CreateGalleryItemDto): Promise<Record<string, unknown>> {
@@ -506,9 +516,12 @@ export class KayanService {
         `INSERT INTO gallery_items(title, description, created_by, updated_by) VALUES($1,$2,$3,$3) RETURNING id`,
         [dto.title, dto.description, admin.sub],
       );
-      const id = created.rows[0].id;
+      const id = created.rows[0]?.id;
+      if (id === undefined || id === null) {
+        throw new NotFoundException('Failed to create gallery item');
+      }
       await this.syncGalleryAssets(client, id, dto.imageFileIds ?? []);
-      return this.getGalleryItem(id);
+      return this.getGalleryItemWithExecutor(client, id);
     });
   }
 
@@ -522,7 +535,7 @@ export class KayanService {
       );
       if (!q.rowCount) throw new NotFoundException('Gallery item not found');
       if (dto.imageFileIds) await this.syncGalleryAssets(client, galleryId, dto.imageFileIds);
-      return this.getGalleryItem(galleryId);
+      return this.getGalleryItemWithExecutor(client, galleryId);
     });
   }
 
@@ -536,17 +549,18 @@ export class KayanService {
   }
 
   async getGalleryItem(galleryId: number): Promise<Record<string, unknown>> {
-    const q = await this.db.query(
+    return this.getGalleryItemWithExecutor(this.db, galleryId);
+  }
+
+  private async getGalleryItemWithExecutor(executor: SqlExecutor, galleryId: number): Promise<Record<string, unknown>> {
+    const q = await executor.query(
       `SELECT id, title, description, is_active, created_at::text AS created_at
        FROM gallery_items WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
       [galleryId],
     );
     if (!q.rowCount) throw new NotFoundException('Gallery item not found');
-    const assets = await this.db.query(
-      `SELECT file_id, sort_order FROM gallery_assets WHERE gallery_item_id = $1 ORDER BY sort_order ASC, id ASC`,
-      [galleryId],
-    );
-    return { item: { ...q.rows[0], images: assets.rows } };
+    const [item] = await this.attachGalleryAssets(executor, q.rows as Array<Record<string, unknown>>);
+    return { item };
   }
 
   async createItemRating(user: AuthUser, dto: CreateItemRatingDto): Promise<Record<string, unknown>> {
@@ -730,6 +744,54 @@ export class KayanService {
       const related = byProductId.get(Number(product.id)) ?? { images: [], files: [] };
       return { ...product, images: related.images, files: related.files };
     });
+  }
+
+  private async listGalleryItems(activeOnly: boolean): Promise<Record<string, unknown>> {
+    const conditions = ['deleted_at IS NULL'];
+    if (activeOnly) conditions.push('is_active = true');
+
+    const q = await this.db.query(
+      `SELECT id, title, description, is_active, created_at::text AS created_at
+       FROM gallery_items
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY created_at DESC, id DESC`,
+    );
+
+    return { items: await this.attachGalleryAssets(this.db, q.rows as Array<Record<string, unknown>>) };
+  }
+
+  private async attachGalleryAssets(executor: SqlExecutor, galleryItems: Array<Record<string, unknown>>): Promise<Array<Record<string, unknown>>> {
+    if (!galleryItems.length) return galleryItems;
+
+    const galleryItemIds = galleryItems.map((item) => Number(item.id));
+    const assets = await executor.query(
+      `SELECT ga.gallery_item_id, ga.file_id, ga.sort_order, f.object_key, f.original_filename, f.mime_type, f.status
+       FROM gallery_assets ga
+       LEFT JOIN files f ON f.id = ga.file_id
+       WHERE ga.gallery_item_id = ANY($1::bigint[])
+       ORDER BY ga.gallery_item_id ASC, ga.sort_order ASC, ga.id ASC`,
+      [galleryItemIds],
+    );
+
+    const byGalleryItemId = new Map<number, Record<string, unknown>[]>();
+    for (const asset of assets.rows as GalleryAssetRow[]) {
+      const galleryItemId = Number(asset.gallery_item_id);
+      const bucket = byGalleryItemId.get(galleryItemId) ?? [];
+      bucket.push({
+        file_id: Number(asset.file_id),
+        sort_order: asset.sort_order,
+        object_key: asset.object_key,
+        original_filename: asset.original_filename,
+        mime_type: asset.mime_type,
+        status: asset.status,
+      });
+      byGalleryItemId.set(galleryItemId, bucket);
+    }
+
+    return galleryItems.map((item) => ({
+      ...item,
+      images: byGalleryItemId.get(Number(item.id)) ?? [],
+    }));
   }
 
   private async createOrderRecord(

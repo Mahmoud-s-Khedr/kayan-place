@@ -214,6 +214,25 @@ For frontend and mobile implementation guidance, see [Module 3 Products Integrat
 | Delete Item | Admin      | Admins can delete a gallery item.                            | Desirable | Completed |
 | Update Item | Admin      | Admins can update gallery item details.                      | Desirable | Completed |
 
+Implementation notes:
+- Public gallery listing endpoint:
+  - `GET /v2/gallery`
+  - Returns active items only (`is_active=true`) and excludes soft-deleted items.
+- Admin gallery listing endpoint:
+  - `GET /v2/admin/gallery`
+  - Returns active and inactive items, excluding soft-deleted items.
+- Admin gallery management endpoints:
+  - `POST /v2/admin/gallery`
+  - `PATCH /v2/admin/gallery/:id`
+  - `DELETE /v2/admin/gallery/:id` (soft delete via `deleted_at`)
+- Gallery item response contract includes:
+  - `title`
+  - `description`
+  - `images`
+- Gallery `images` payload uses rich file metadata objects (not only file IDs), to support direct client rendering.
+
+For frontend and mobile implementation guidance, see [Module 7 Gallery Integration Guide](./module-7-gallery-integration.md).
+
 ---
 
 ## 4. Priority Summary

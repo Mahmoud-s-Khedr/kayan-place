@@ -315,4 +315,209 @@ describe('KayanService', () => {
       ),
     ).rejects.toThrow(BadRequestException);
   });
+
+  it('lists public gallery items as active-only with rich images', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 1, title: 'Living Room', description: 'Modern', is_active: true, created_at: '2026-05-01T00:00:00.000Z' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            gallery_item_id: 1,
+            file_id: 101,
+            sort_order: 0,
+            object_key: 'gallery/1/a.jpg',
+            original_filename: 'a.jpg',
+            mime_type: 'image/jpeg',
+            status: 'uploaded',
+          },
+        ],
+      });
+
+    const result = await service.listGallery();
+
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          id: 1,
+          title: 'Living Room',
+          images: [
+            expect.objectContaining({
+              file_id: 101,
+              object_key: 'gallery/1/a.jpg',
+              mime_type: 'image/jpeg',
+            }),
+          ],
+        }),
+      ],
+    });
+    expect(databaseService.query.mock.calls[0][0]).toContain('is_active = true');
+  });
+
+  it('lists admin gallery items including inactive entries', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 2, title: 'Kitchen', description: 'Wood', is_active: false, created_at: '2026-05-02T00:00:00.000Z' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            gallery_item_id: 2,
+            file_id: 202,
+            sort_order: 0,
+            object_key: 'gallery/2/a.jpg',
+            original_filename: 'k.jpg',
+            mime_type: 'image/jpeg',
+            status: 'uploaded',
+          },
+        ],
+      });
+
+    const result = await service.adminListGallery();
+
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          id: 2,
+          is_active: false,
+          images: [expect.objectContaining({ file_id: 202 })],
+        }),
+      ],
+    });
+    expect(databaseService.query.mock.calls[0][0]).not.toContain('is_active = true');
+    expect(databaseService.query.mock.calls[0][0]).toContain('deleted_at IS NULL');
+  });
+
+  it('creates a gallery item and returns rich images', async () => {
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ id: 9 }] }) // insert gallery item
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // delete gallery assets
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // insert gallery asset #1
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // insert gallery asset #2
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ id: 9, title: 'Hall', description: 'Bright', is_active: true, created_at: '2026-05-03T00:00:00.000Z' }],
+        }) // select gallery item (same tx)
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              gallery_item_id: 9,
+              file_id: 301,
+              sort_order: 0,
+              object_key: 'gallery/9/hall.jpg',
+              original_filename: 'hall.jpg',
+              mime_type: 'image/jpeg',
+              status: 'uploaded',
+            },
+          ],
+        }), // select gallery assets (same tx)
+    };
+    databaseService.withTransaction.mockImplementationOnce((callback: any) => callback(client));
+
+    const result = await service.adminCreateGalleryItem(
+      { sub: 1, phone: '+201000000001', isAdmin: true },
+      { title: 'Hall', description: 'Bright', imageFileIds: [301, 302] },
+    );
+
+    expect(result).toEqual({
+      item: expect.objectContaining({
+        id: 9,
+        images: [expect.objectContaining({ file_id: 301, object_key: 'gallery/9/hall.jpg' })],
+      }),
+    });
+    expect(databaseService.query).not.toHaveBeenCalled();
+  });
+
+  it('updates a gallery item and returns rich images', async () => {
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 11 }] }) // update gallery item
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // delete gallery assets
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // insert gallery asset
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ id: 11, title: 'Before', description: 'Desc', is_active: true, created_at: '2026-05-04T00:00:00.000Z' }],
+        }) // select gallery item (same tx)
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              gallery_item_id: 11,
+              file_id: 401,
+              sort_order: 0,
+              object_key: 'gallery/11/after.jpg',
+              original_filename: 'after.jpg',
+              mime_type: 'image/jpeg',
+              status: 'uploaded',
+            },
+          ],
+        }), // select gallery assets (same tx)
+    };
+    databaseService.withTransaction.mockImplementationOnce((callback: any) => callback(client));
+
+    const result = await service.adminUpdateGalleryItem(
+      { sub: 1, phone: '+201000000001', isAdmin: true },
+      11,
+      { title: 'After', imageFileIds: [401] },
+    );
+
+    expect(result).toEqual({
+      item: expect.objectContaining({
+        id: 11,
+        images: [expect.objectContaining({ file_id: 401 })],
+      }),
+    });
+    expect(databaseService.query).not.toHaveBeenCalled();
+  });
+
+  it('regression: create uses transaction visibility when pool-level read would miss row', async () => {
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ id: 15 }] })
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{ id: 15, title: 'Tx Item', description: 'Visible in tx', is_active: true, created_at: '2026-05-05T00:00:00.000Z' }],
+        })
+        .mockResolvedValueOnce({ rows: [] }),
+    };
+    databaseService.withTransaction.mockImplementationOnce((callback: any) => callback(client));
+
+    const result = await service.adminCreateGalleryItem(
+      { sub: 1, phone: '+201000000001', isAdmin: true },
+      { title: 'Tx Item', description: 'Visible in tx', imageFileIds: [] },
+    );
+
+    expect(result).toEqual({
+      item: expect.objectContaining({
+        id: 15,
+        title: 'Tx Item',
+        images: [],
+      }),
+    });
+  });
+
+  it('soft deletes gallery item and hides it from subsequent list', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 12 }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const deletion = await service.adminDeleteGalleryItem(
+      { sub: 1, phone: '+201000000001', isAdmin: true },
+      12,
+    );
+    const listed = await service.listGallery();
+
+    expect(deletion).toEqual({ message: 'Gallery item deleted' });
+    expect(listed).toEqual({ items: [] });
+    expect(databaseService.query.mock.calls[0][0]).toContain('SET deleted_at = NOW()');
+  });
 });
