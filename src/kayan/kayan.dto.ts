@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 
 export enum OrderStatus {
   RECEIVED = 'received',
@@ -44,6 +44,26 @@ export enum ItemType {
   SERVICE = 'service',
 }
 
+export enum ProductAvailabilityFilter {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  ALL = 'all',
+}
+
+export enum SortDirection {
+  ASC = 'asc',
+  DESC = 'desc',
+}
+
+export enum ProductSortBy {
+  CREATED_AT = 'createdAt',
+  PRICE = 'price',
+}
+
+export enum OrderSortBy {
+  CREATED_AT = 'createdAt',
+}
+
 export class ProductItemDto {
   @IsInt() @Min(1) productId!: number;
   @IsInt() @Min(1) quantity!: number;
@@ -70,6 +90,17 @@ export class AdminUpdateProductDto {
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
 
+export class ListProductsQueryDto {
+  @IsOptional() @IsString() @IsNotEmpty() query?: string;
+  @IsOptional() @Type(() => Number) @Min(0) minPrice?: number;
+  @IsOptional() @Type(() => Number) @Min(0) maxPrice?: number;
+  @IsOptional() @IsDateString() fromDate?: string;
+  @IsOptional() @IsDateString() toDate?: string;
+  @IsOptional() @IsEnum(ProductAvailabilityFilter) availability?: ProductAvailabilityFilter;
+  @IsOptional() @IsEnum(ProductSortBy) sortBy?: ProductSortBy;
+  @IsOptional() @IsEnum(SortDirection) sortDirection?: SortDirection;
+}
+
 export class CreateOrderDto {
   @IsString() @IsNotEmpty() deliveryAddress!: string;
   @IsArray() @ValidateNested({ each: true }) @Type(() => ProductItemDto) items!: ProductItemDto[];
@@ -81,6 +112,27 @@ export class UpdateOrderAddressDto {
 
 export class AdminUpdateOrderStatusDto {
   @IsEnum(OrderStatus) status!: OrderStatus;
+}
+
+export class ListOrdersQueryDto {
+  @IsOptional() @IsEnum(OrderStatus) status?: OrderStatus;
+  @IsOptional() @IsDateString() fromDate?: string;
+  @IsOptional() @IsDateString() toDate?: string;
+  @IsOptional() @IsEnum(OrderSortBy) sortBy?: OrderSortBy;
+  @IsOptional() @IsEnum(SortDirection) sortDirection?: SortDirection;
+}
+
+export class CreateCartItemDto {
+  @IsInt() @Min(1) productId!: number;
+  @IsInt() @Min(1) quantity!: number;
+}
+
+export class UpdateCartItemDto {
+  @IsInt() @Min(1) quantity!: number;
+}
+
+export class CheckoutCartDto {
+  @IsString() @IsNotEmpty() deliveryAddress!: string;
 }
 
 export class CreateFaultDto {
@@ -146,7 +198,12 @@ export class UpdateGalleryItemDto {
 
 export class CreateItemRatingDto {
   @IsEnum(ItemType) itemType!: ItemType;
-  @IsInt() @Min(1) itemId!: number;
+  @ValidateIf((dto: CreateItemRatingDto) => dto.itemType !== ItemType.ORDER)
+  @IsInt() @Min(1) itemId?: number;
+  @ValidateIf((dto: CreateItemRatingDto) => dto.itemType === ItemType.ORDER)
+  @IsInt() @Min(1) orderId?: number;
+  @ValidateIf((dto: CreateItemRatingDto) => dto.itemType === ItemType.ORDER)
+  @IsInt() @Min(1) productId?: number;
   @IsInt() @Min(1) @Max(5) ratingValue!: number;
 }
 

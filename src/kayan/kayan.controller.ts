@@ -11,6 +11,8 @@ import {
   AdminUpdateOrderStatusDto,
   AdminUpdateProductDto,
   AdminUpdateServiceStatusDto,
+  CheckoutCartDto,
+  CreateCartItemDto,
   CreateFaultDto,
   CreateFollowupConversationDto,
   CreateFollowupStepDto,
@@ -19,10 +21,13 @@ import {
   CreateOrderDto,
   CreateServiceOrderDto,
   ItemType,
+  ListOrdersQueryDto,
+  ListProductsQueryDto,
   SendFollowupMessageDto,
   UpdateFaultDto,
   UpdateFollowupStepDto,
   UpdateGalleryItemDto,
+  UpdateCartItemDto,
   UpdateOrderAddressDto,
   UpdateServiceOrderDto,
 } from './kayan.dto';
@@ -35,8 +40,8 @@ export class KayanController {
 
   @Get('products')
   @UseGuards(OptionalJwtAuthGuard)
-  listProducts(): Promise<Record<string, unknown>> {
-    return this.kayanService.listProducts();
+  listProducts(@Query() query: ListProductsQueryDto): Promise<Record<string, unknown>> {
+    return this.kayanService.listProducts(query);
   }
 
   @Get('products/:id')
@@ -52,11 +57,50 @@ export class KayanController {
     return this.kayanService.createOrder(user, dto);
   }
 
+  @Get('cart')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  listCart(@CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
+    return this.kayanService.listCart(user);
+  }
+
+  @Post('cart/items')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  addCartItem(@CurrentUser() user: AuthUser, @Body() dto: CreateCartItemDto): Promise<Record<string, unknown>> {
+    return this.kayanService.addCartItem(user, dto);
+  }
+
+  @Patch('cart/items/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  updateCartItem(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) cartItemId: number,
+    @Body() dto: UpdateCartItemDto,
+  ): Promise<Record<string, unknown>> {
+    return this.kayanService.updateCartItem(user, cartItemId, dto);
+  }
+
+  @Delete('cart/items/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  deleteCartItem(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) cartItemId: number): Promise<Record<string, unknown>> {
+    return this.kayanService.deleteCartItem(user, cartItemId);
+  }
+
+  @Post('cart/checkout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  checkoutCart(@CurrentUser() user: AuthUser, @Body() dto: CheckoutCartDto): Promise<Record<string, unknown>> {
+    return this.kayanService.checkoutCart(user, dto);
+  }
+
   @Get('orders/me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  listMyOrders(@CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
-    return this.kayanService.listMyOrders(user);
+  listMyOrders(@CurrentUser() user: AuthUser, @Query() query: ListOrdersQueryDto): Promise<Record<string, unknown>> {
+    return this.kayanService.listMyOrders(user, query);
   }
 
   @Get('orders/:id')

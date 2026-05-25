@@ -57,6 +57,7 @@ describe('AdminService', () => {
         ssn: 'SSN-12',
         name: 'Counted User',
         phone: '+201000000012',
+        email: '',
         profileState: 'active',
         is_admin: false,
         published_products_count: 7,
@@ -92,6 +93,7 @@ describe('AdminService', () => {
         ssn: 'SSN-13',
         name: 'Zero Counts User',
         phone: '+201000000013',
+        email: '',
         profileState: 'active',
         is_admin: false,
         published_products_count: 0,
@@ -120,7 +122,7 @@ describe('AdminService', () => {
     const result = await service.listAdmins({});
 
     expect(result).toEqual({
-      admins: [{ id: 2, ssn: 'SSN-2', name: 'Admin', phone: '+201000000002', profileState: 'active', is_admin: true, created_at: '2026-01-05T00:00:00.000Z', updated_at: '2026-01-06T00:00:00.000Z' }],
+      admins: [{ id: 2, ssn: 'SSN-2', name: 'Admin', phone: '+201000000002', email: '', profileState: 'active', is_admin: true, created_at: '2026-01-05T00:00:00.000Z', updated_at: '2026-01-06T00:00:00.000Z' }],
     });
   });
 
@@ -154,6 +156,7 @@ describe('AdminService', () => {
         ssn: 'SSN-7',
         name: 'User',
         phone: '+201000000007',
+        email: '',
         profileState: 'active',
         is_admin: true,
         token_version: 1,
@@ -207,6 +210,7 @@ describe('AdminService', () => {
         ssn: 'SSN-8',
         name: 'Other Admin',
         phone: '+201000000008',
+        email: '',
         profileState: 'active',
         is_admin: false,
         token_version: 4,
@@ -240,6 +244,7 @@ describe('AdminService', () => {
         ssn: 'SSN-5',
         name: 'Target User',
         phone: '+201000000005',
+        email: '',
         profileState: 'active',
         status: 'active',
         avatar_file_id: 10,

@@ -9,17 +9,17 @@ async function main(): Promise<void> {
     throw new Error('DATABASE_URL is required');
   }
 
-  const { phone, password } = parseAdminSeedInput(process.env);
+  const { email, phone, password } = parseAdminSeedInput(process.env);
   const passwordHash = await hash(password, BCRYPT_ROUNDS);
   const pool = new Pool({ connectionString: databaseUrl });
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
-    const result = await seedAdminUser(client, phone, passwordHash);
+    const result = await seedAdminUser(client, { email, phone }, passwordHash);
     await client.query('COMMIT');
     const action = result.created ? 'created' : 'updated';
-    console.log(`Admin seed completed: ${action} admin user ${result.phone} (id=${result.id})`);
+    console.log(`Admin seed completed: ${action} admin user email=${result.email} phone=${result.phone ?? 'null'} (id=${result.id})`);
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

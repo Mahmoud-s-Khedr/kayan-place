@@ -7,6 +7,8 @@ import {
   AdminUpdateOrderStatusDto,
   AdminUpdateProductDto,
   AdminUpdateServiceStatusDto,
+  CheckoutCartDto,
+  CreateCartItemDto,
   CreateFaultDto,
   CreateFollowupConversationDto,
   CreateFollowupStepDto,
@@ -16,36 +18,90 @@ import {
   CreateServiceOrderDto,
   FaultStatus,
   ItemType,
+  ListOrdersQueryDto,
+  ListProductsQueryDto,
+  OrderSortBy,
   OrderStatus,
+  ProductAvailabilityFilter,
+  ProductSortBy,
   SendFollowupMessageDto,
   ServiceStatus,
+  SortDirection,
   UpdateFaultDto,
+  UpdateCartItemDto,
   UpdateFollowupStepDto,
   UpdateGalleryItemDto,
   UpdateOrderAddressDto,
   UpdateServiceOrderDto,
 } from './kayan.dto';
 
+type SqlExecutor = {
+  query: (text: string, values?: unknown[]) => Promise<{ rowCount?: number | null; rows: any[] }>;
+};
+
+type ProductAssetRow = {
+  product_id: number | string;
+  file_id: number | string;
+  asset_type: 'image' | 'file';
+  sort_order: number;
+  object_key: string | null;
+  original_filename: string | null;
+  mime_type: string | null;
+  status: string | null;
+};
+
 @Injectable()
 export class KayanService {
   constructor(private readonly db: DatabaseService) {}
 
-  async listProducts(): Promise<Record<string, unknown>> {
+  async listProducts(query: ListProductsQueryDto = {}): Promise<Record<string, unknown>> {
+    const conditions = ['deleted_at IS NULL'];
+    const params: unknown[] = [];
+
+    if (query.availability === ProductAvailabilityFilter.ACTIVE || !query.availability) {
+      conditions.push('is_active = true');
+    } else if (query.availability === ProductAvailabilityFilter.INACTIVE) {
+      conditions.push('is_active = false');
+    }
+
+    if (query.query) {
+      params.push(`%${this.escapeLike(query.query)}%`);
+      conditions.push(`(title ILIKE $${params.length} ESCAPE '\\' OR description ILIKE $${params.length} ESCAPE '\\')`);
+    }
+    if (query.minPrice !== undefined) {
+      params.push(query.minPrice);
+      conditions.push(`price >= $${params.length}`);
+    }
+    if (query.maxPrice !== undefined) {
+      params.push(query.maxPrice);
+      conditions.push(`price <= $${params.length}`);
+    }
+    if (query.fromDate) {
+      params.push(query.fromDate);
+      conditions.push(`created_at >= $${params.length}`);
+    }
+    if (query.toDate) {
+      params.push(query.toDate);
+      conditions.push(`created_at <= $${params.length}`);
+    }
+
+    const sortBy = query.sortBy ?? ProductSortBy.CREATED_AT;
+    const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
+    const orderColumn = sortBy === ProductSortBy.PRICE ? 'price' : 'created_at';
+
     const q = await this.db.query(
-      `SELECT id, title, description, amount, price, details, is_active, created_at::text AS created_at
-       FROM catalog_products WHERE deleted_at IS NULL AND is_active = true ORDER BY created_at DESC`,
+      `SELECT id, title, description, amount, price, details, is_active, created_at::text AS created_at, updated_at::text AS updated_at
+       FROM catalog_products
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY ${orderColumn} ${sortDirection}, id DESC`,
+      params,
     );
-    return { items: q.rows };
+
+    return { items: await this.attachProductAssets(this.db, q.rows as Array<Record<string, unknown>>) };
   }
 
   async getProduct(productId: number): Promise<Record<string, unknown>> {
-    const q = await this.db.query(
-      `SELECT id, title, description, amount, price, details, is_active, created_at::text AS created_at
-       FROM catalog_products WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
-      [productId],
-    );
-    if (!q.rowCount) throw new NotFoundException('Product not found');
-    return { product: q.rows[0] };
+    return this.getProductWithAssets(this.db, productId);
   }
 
   async adminCreateProduct(admin: AuthUser, dto: AdminCreateProductDto): Promise<Record<string, unknown>> {
@@ -55,10 +111,10 @@ export class KayanService {
          VALUES ($1,$2,$3,$4,$5,$6,$6) RETURNING id`,
         [dto.title, dto.description, dto.amount, dto.price, dto.details ?? null, admin.sub],
       );
-      const productId = created.rows[0].id;
+      const productId = Number(created.rows[0].id);
       await this.syncProductAssets(client, productId, dto.imageFileIds ?? [], 'image');
       await this.syncProductAssets(client, productId, dto.fileIds ?? [], 'file');
-      return this.getProduct(productId);
+      return this.getProductWithAssets(client, productId);
     });
   }
 
@@ -80,7 +136,7 @@ export class KayanService {
       if (!u.rowCount) throw new NotFoundException('Product not found');
       if (dto.imageFileIds) await this.syncProductAssets(client, productId, dto.imageFileIds, 'image');
       if (dto.fileIds) await this.syncProductAssets(client, productId, dto.fileIds, 'file');
-      return this.getProduct(productId);
+      return this.getProductWithAssets(client, productId);
     });
   }
 
@@ -95,54 +151,142 @@ export class KayanService {
 
   async createOrder(user: AuthUser, dto: CreateOrderDto): Promise<Record<string, unknown>> {
     if (!dto.items.length) throw new BadRequestException('Order items are required');
-    return this.db.withTransaction(async (client) => {
-      const order = await client.query<{ id: number }>(
-        `INSERT INTO product_orders(user_id, delivery_address) VALUES($1,$2) RETURNING id`,
-        [user.sub, dto.deliveryAddress],
-      );
-      const orderId = order.rows[0].id;
-      for (const item of dto.items) {
-        const product = await client.query<{ id: number; amount: number; price: string; is_active: boolean }>(
-          `SELECT id, amount, price::text, is_active FROM catalog_products WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
-          [item.productId],
-        );
-        if (!product.rowCount || !product.rows[0].is_active) throw new BadRequestException(`Invalid product ${item.productId}`);
-        if (product.rows[0].amount < item.quantity) throw new BadRequestException(`Insufficient product amount for ${item.productId}`);
+    return this.db.withTransaction(async (client) => this.createOrderRecord(client, user, dto.deliveryAddress, dto.items));
+  }
 
-        await client.query(
-          `INSERT INTO order_items(order_id, product_id, quantity, unit_price) VALUES($1,$2,$3,$4)`,
-          [orderId, item.productId, item.quantity, product.rows[0].price],
-        );
-        await client.query(`UPDATE catalog_products SET amount = amount - $1, updated_at = NOW() WHERE id = $2`, [item.quantity, item.productId]);
-      }
-      await client.query(`INSERT INTO order_status_history(order_id, status, changed_by) VALUES($1,$2,$3)`, [orderId, OrderStatus.RECEIVED, user.sub]);
-      return this.getOrderForUser(user.sub, orderId, true);
+  async listCart(user: AuthUser): Promise<Record<string, unknown>> {
+    const q = await this.db.query(
+      `SELECT ci.id, ci.product_id, ci.quantity, ci.created_at::text AS created_at, ci.updated_at::text AS updated_at,
+              cp.title, cp.description, cp.amount, cp.price, cp.is_active
+       FROM cart_items ci
+       JOIN catalog_products cp ON cp.id = ci.product_id
+       WHERE ci.user_id = $1 AND cp.deleted_at IS NULL
+       ORDER BY ci.created_at DESC, ci.id DESC`,
+      [user.sub],
+    );
+    const products = await this.attachProductAssets(
+      this.db,
+      q.rows.map((row) => ({
+        id: row.product_id,
+        title: row.title,
+        description: row.description,
+        amount: row.amount,
+        price: row.price,
+        is_active: row.is_active,
+      })),
+    );
+    const productById = new Map(products.map((product) => [Number(product.id), product]));
+
+    return {
+      items: q.rows.map((row) => ({
+        id: row.id,
+        product_id: row.product_id,
+        quantity: row.quantity,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        product: {
+          ...(productById.get(Number(row.product_id)) ?? {}),
+        },
+      })),
+    };
+  }
+
+  async addCartItem(user: AuthUser, dto: CreateCartItemDto): Promise<Record<string, unknown>> {
+    await this.assertCartProductState(dto.productId, dto.quantity);
+    await this.db.query(
+      `INSERT INTO cart_items(user_id, product_id, quantity)
+       VALUES($1,$2,$3)
+       ON CONFLICT(user_id, product_id)
+       DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity, updated_at = NOW()`,
+      [user.sub, dto.productId, dto.quantity],
+    );
+    return this.listCart(user);
+  }
+
+  async updateCartItem(user: AuthUser, cartItemId: number, dto: UpdateCartItemDto): Promise<Record<string, unknown>> {
+    const existing = await this.db.query<{ product_id: number }>(
+      `SELECT product_id FROM cart_items WHERE id = $1 AND user_id = $2 LIMIT 1`,
+      [cartItemId, user.sub],
+    );
+    if (!existing.rowCount) throw new NotFoundException('Cart item not found');
+    await this.assertCartProductState(Number(existing.rows[0].product_id), dto.quantity);
+    await this.db.query(`UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2`, [dto.quantity, cartItemId]);
+    return this.listCart(user);
+  }
+
+  async deleteCartItem(user: AuthUser, cartItemId: number): Promise<Record<string, unknown>> {
+    const q = await this.db.query(`DELETE FROM cart_items WHERE id = $1 AND user_id = $2 RETURNING id`, [cartItemId, user.sub]);
+    if (!q.rowCount) throw new NotFoundException('Cart item not found');
+    return { message: 'Cart item deleted' };
+  }
+
+  async checkoutCart(user: AuthUser, dto: CheckoutCartDto): Promise<Record<string, unknown>> {
+    return this.db.withTransaction(async (client) => {
+      const cart = await client.query<{ product_id: number; quantity: number }>(
+        `SELECT id, product_id, quantity FROM cart_items WHERE user_id = $1 ORDER BY created_at ASC, id ASC FOR UPDATE`,
+        [user.sub],
+      );
+      if (!cart.rowCount) throw new BadRequestException('Cart is empty');
+
+      const order = await this.createOrderRecord(
+        client,
+        user,
+        dto.deliveryAddress,
+        cart.rows.map((item) => ({ productId: Number(item.product_id), quantity: Number(item.quantity) })),
+      );
+
+      await client.query(`DELETE FROM cart_items WHERE user_id = $1`, [user.sub]);
+      return order;
     });
   }
 
-  async listMyOrders(user: AuthUser): Promise<Record<string, unknown>> {
+  async listMyOrders(user: AuthUser, query: ListOrdersQueryDto = {}): Promise<Record<string, unknown>> {
+    const conditions = ['po.user_id = $1'];
+    const params: unknown[] = [user.sub];
+
+    if (query.status) {
+      params.push(query.status);
+      conditions.push(`po.status = $${params.length}`);
+    }
+    if (query.fromDate) {
+      params.push(query.fromDate);
+      conditions.push(`po.created_at >= $${params.length}`);
+    }
+    if (query.toDate) {
+      params.push(query.toDate);
+      conditions.push(`po.created_at <= $${params.length}`);
+    }
+
+    const sortBy = query.sortBy ?? OrderSortBy.CREATED_AT;
+    const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
+    const orderColumn = sortBy === OrderSortBy.CREATED_AT ? 'po.created_at' : 'po.created_at';
+
     const q = await this.db.query(
-      `SELECT id, delivery_address, status, created_at::text AS created_at, updated_at::text AS updated_at
-       FROM product_orders WHERE user_id = $1 ORDER BY created_at DESC`,
-      [user.sub],
+      `SELECT po.id, po.user_id, po.delivery_address, po.status, po.created_at::text AS created_at, po.updated_at::text AS updated_at
+       FROM product_orders po
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY ${orderColumn} ${sortDirection}, po.id DESC`,
+      params,
     );
-    return { items: q.rows };
+    return { items: await this.attachOrderItems(this.db, q.rows as Array<Record<string, unknown>>, false) };
   }
 
   async getOrderForUser(userId: number, orderId: number, allowAdmin = false): Promise<Record<string, unknown>> {
     const q = await this.db.query(
-      `SELECT id, user_id, delivery_address, status, created_at::text AS created_at, updated_at::text AS updated_at
-       FROM product_orders WHERE id = $1 LIMIT 1`,
+      `SELECT po.id, po.user_id, po.delivery_address, po.status, po.created_at::text AS created_at, po.updated_at::text AS updated_at,
+              u.name AS user_name, u.email AS user_email, u.phone AS user_phone
+       FROM product_orders po
+       LEFT JOIN users u ON u.id = po.user_id
+       WHERE po.id = $1
+       LIMIT 1`,
       [orderId],
     );
     if (!q.rowCount) throw new NotFoundException('Order not found');
     const order = q.rows[0] as { user_id: number } & Record<string, unknown>;
     if (!allowAdmin && Number(order.user_id) !== userId) throw new ForbiddenException('Not allowed');
-    const items = await this.db.query(
-      `SELECT id, product_id, quantity, unit_price FROM order_items WHERE order_id = $1 ORDER BY id ASC`,
-      [orderId],
-    );
-    return { order: { ...q.rows[0], items: items.rows } };
+
+    const [expanded] = await this.attachOrderItems(this.db, [q.rows[0] as Record<string, unknown>], true);
+    return { order: expanded };
   }
 
   async updateOrderAddress(user: AuthUser, orderId: number, dto: UpdateOrderAddressDto): Promise<Record<string, unknown>> {
@@ -170,10 +314,13 @@ export class KayanService {
 
   async adminListOrders(): Promise<Record<string, unknown>> {
     const q = await this.db.query(
-      `SELECT id, user_id, delivery_address, status, created_at::text AS created_at, updated_at::text AS updated_at
-       FROM product_orders ORDER BY created_at DESC`,
+      `SELECT po.id, po.user_id, po.delivery_address, po.status, po.created_at::text AS created_at, po.updated_at::text AS updated_at,
+              u.name AS user_name, u.email AS user_email, u.phone AS user_phone
+       FROM product_orders po
+       LEFT JOIN users u ON u.id = po.user_id
+       ORDER BY po.created_at DESC, po.id DESC`,
     );
-    return { items: q.rows };
+    return { items: await this.attachOrderItems(this.db, q.rows as Array<Record<string, unknown>>, true) };
   }
 
   async adminUpdateOrderStatus(admin: AuthUser, orderId: number, dto: AdminUpdateOrderStatusDto): Promise<Record<string, unknown>> {
@@ -403,13 +550,31 @@ export class KayanService {
   }
 
   async createItemRating(user: AuthUser, dto: CreateItemRatingDto): Promise<Record<string, unknown>> {
-    await this.assertRateableItem(user.sub, dto.itemType, dto.itemId);
-    const q = await this.db.query(
-      `INSERT INTO item_ratings(user_id, item_type, item_id, rating_value)
-       VALUES($1,$2,$3,$4) RETURNING *`,
-      [user.sub, dto.itemType, dto.itemId, dto.ratingValue],
-    );
-    return { rating: q.rows[0] };
+    try {
+      if (dto.itemType === ItemType.ORDER) {
+        await this.assertRateableProduct(user.sub, dto.orderId!, dto.productId!);
+        const q = await this.db.query(
+          `INSERT INTO product_ratings(user_id, order_id, product_id, rating_value)
+           VALUES($1,$2,$3,$4)
+           RETURNING id, user_id, order_id, product_id, rating_value, created_at::text AS created_at`,
+          [user.sub, dto.orderId, dto.productId, dto.ratingValue],
+        );
+        return { rating: q.rows[0] };
+      }
+
+      await this.assertRateableItem(user.sub, dto.itemType, dto.itemId!);
+      const q = await this.db.query(
+        `INSERT INTO item_ratings(user_id, item_type, item_id, rating_value)
+         VALUES($1,$2,$3,$4) RETURNING *`,
+        [user.sub, dto.itemType, dto.itemId, dto.ratingValue],
+      );
+      return { rating: q.rows[0] };
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') {
+        throw new BadRequestException('Rating already exists');
+      }
+      throw error;
+    }
   }
 
   async createFollowupConversation(user: AuthUser, dto: CreateFollowupConversationDto): Promise<Record<string, unknown>> {
@@ -491,6 +656,22 @@ export class KayanService {
     if (q.rows[0].status !== ServiceStatus.FINISHED) throw new BadRequestException('Rating allowed only after completion');
   }
 
+  private async assertRateableProduct(userId: number, orderId: number, productId: number): Promise<void> {
+    const q = await this.db.query<{ user_id: number; status: OrderStatus }>(
+      `SELECT user_id, status FROM product_orders WHERE id = $1 LIMIT 1`,
+      [orderId],
+    );
+    if (!q.rowCount) throw new NotFoundException('Order not found');
+    if (Number(q.rows[0].user_id) !== userId) throw new ForbiddenException('Not allowed');
+    if (q.rows[0].status !== OrderStatus.DELIVERED) throw new BadRequestException('Rating allowed only after delivery');
+
+    const item = await this.db.query<{ id: number }>(
+      `SELECT id FROM order_items WHERE order_id = $1 AND product_id = $2 LIMIT 1`,
+      [orderId, productId],
+    );
+    if (!item.rowCount) throw new BadRequestException('Product was not ordered in this order');
+  }
+
   private async assertFollowupConversationAccess(user: AuthUser, conversationId: number): Promise<void> {
     const q = await this.db.query<{ user_id: number; admin_id: number }>(
       `SELECT user_id, admin_id FROM followup_conversations WHERE id = $1 LIMIT 1`,
@@ -499,6 +680,181 @@ export class KayanService {
     if (!q.rowCount) throw new NotFoundException('Conversation not found');
     const row = q.rows[0];
     if (Number(row.user_id) !== user.sub && Number(row.admin_id) !== user.sub) throw new ForbiddenException('Not allowed');
+  }
+
+  private async getProductWithAssets(executor: SqlExecutor, productId: number): Promise<Record<string, unknown>> {
+    const q = await executor.query(
+      `SELECT id, title, description, amount, price, details, is_active, created_at::text AS created_at, updated_at::text AS updated_at
+       FROM catalog_products WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [productId],
+    );
+    if (!q.rowCount) throw new NotFoundException('Product not found');
+    const [product] = await this.attachProductAssets(executor, q.rows as Array<Record<string, unknown>>);
+    return { product };
+  }
+
+  private async attachProductAssets(executor: SqlExecutor, products: Array<Record<string, unknown>>): Promise<Array<Record<string, unknown>>> {
+    if (!products.length) return products;
+
+    const productIds = products.map((product) => Number(product.id));
+    const assets = await executor.query(
+      `SELECT pa.product_id, pa.file_id, pa.asset_type, pa.sort_order, f.object_key, f.original_filename, f.mime_type, f.status
+       FROM product_assets pa
+       LEFT JOIN files f ON f.id = pa.file_id
+       WHERE pa.product_id = ANY($1::bigint[])
+       ORDER BY pa.product_id ASC, pa.asset_type ASC, pa.sort_order ASC, pa.id ASC`,
+      [productIds],
+    );
+
+    const byProductId = new Map<number, { images: Record<string, unknown>[]; files: Record<string, unknown>[] }>();
+    for (const asset of assets.rows as ProductAssetRow[]) {
+      const productId = Number(asset.product_id);
+      const bucket = byProductId.get(productId) ?? { images: [], files: [] };
+      const payload = {
+        file_id: Number(asset.file_id),
+        sort_order: asset.sort_order,
+        object_key: asset.object_key,
+        original_filename: asset.original_filename,
+        mime_type: asset.mime_type,
+        status: asset.status,
+      };
+      if (asset.asset_type === 'image') {
+        bucket.images.push(payload);
+      } else {
+        bucket.files.push(payload);
+      }
+      byProductId.set(productId, bucket);
+    }
+
+    return products.map((product) => {
+      const related = byProductId.get(Number(product.id)) ?? { images: [], files: [] };
+      return { ...product, images: related.images, files: related.files };
+    });
+  }
+
+  private async createOrderRecord(
+    client: SqlExecutor,
+    user: AuthUser,
+    deliveryAddress: string,
+    items: Array<{ productId: number; quantity: number }>,
+  ): Promise<Record<string, unknown>> {
+    const order = await client.query(
+      `INSERT INTO product_orders(user_id, delivery_address) VALUES($1,$2) RETURNING id`,
+      [user.sub, deliveryAddress],
+    );
+    const orderId = Number((order.rows[0] as { id: number }).id);
+
+    for (const item of items) {
+      const product = await client.query(
+        `SELECT id, amount, price::text, is_active FROM catalog_products WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
+        [item.productId],
+      );
+      const productRow = product.rows[0] as { id: number; amount: number; price: string; is_active: boolean } | undefined;
+      if (!product.rowCount || !productRow?.is_active) throw new BadRequestException(`Invalid product ${item.productId}`);
+      if (Number(productRow.amount) < item.quantity) {
+        throw new BadRequestException(`Insufficient product amount for ${item.productId}`);
+      }
+
+      await client.query(
+        `INSERT INTO order_items(order_id, product_id, quantity, unit_price) VALUES($1,$2,$3,$4)`,
+        [orderId, item.productId, item.quantity, productRow.price],
+      );
+      await client.query(`UPDATE catalog_products SET amount = amount - $1, updated_at = NOW() WHERE id = $2`, [item.quantity, item.productId]);
+    }
+
+    await client.query(`INSERT INTO order_status_history(order_id, status, changed_by) VALUES($1,$2,$3)`, [orderId, OrderStatus.RECEIVED, user.sub]);
+    const [fullOrder] = await this.attachOrderItems(
+      client,
+      [{
+        id: orderId,
+        user_id: user.sub,
+        delivery_address: deliveryAddress,
+        status: OrderStatus.RECEIVED,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }],
+      false,
+    );
+    return { order: fullOrder };
+  }
+
+  private async attachOrderItems(
+    executor: SqlExecutor,
+    orders: Array<Record<string, unknown>>,
+    includeUser: boolean,
+  ): Promise<Array<Record<string, unknown>>> {
+    if (!orders.length) return orders;
+
+    const orderIds = orders.map((order) => Number(order.id));
+    const items = await executor.query(
+      `SELECT oi.order_id, oi.id, oi.product_id, oi.quantity, oi.unit_price::text AS unit_price, cp.title, cp.is_active
+       FROM order_items oi
+       LEFT JOIN catalog_products cp ON cp.id = oi.product_id
+       WHERE oi.order_id = ANY($1::bigint[])
+       ORDER BY oi.order_id ASC, oi.id ASC`,
+      [orderIds],
+    );
+
+    const itemsByOrderId = new Map<number, Record<string, unknown>[]>();
+    for (const item of items.rows as Array<{
+      order_id: number;
+      id: number;
+      product_id: number;
+      quantity: number;
+      unit_price: string;
+      title: string;
+      is_active: boolean;
+    }>) {
+      const orderId = Number(item.order_id);
+      const bucket = itemsByOrderId.get(orderId) ?? [];
+      bucket.push({
+        id: Number(item.id),
+        product_id: Number(item.product_id),
+        quantity: Number(item.quantity),
+        unit_price: item.unit_price,
+        product: {
+          id: Number(item.product_id),
+          title: item.title,
+          is_active: item.is_active,
+        },
+      });
+      itemsByOrderId.set(orderId, bucket);
+    }
+
+    return orders.map((order) => {
+      const orderId = Number(order.id);
+      const orderItems = itemsByOrderId.get(orderId) ?? [];
+      const enriched: Record<string, unknown> = {
+        ...order,
+        item_count: orderItems.length,
+        items: orderItems,
+      };
+      if (includeUser) {
+        enriched.user = {
+          id: Number(order.user_id),
+          name: order.user_name,
+          email: order.user_email,
+          phone: order.user_phone,
+        };
+      }
+      delete enriched.user_name;
+      delete enriched.user_email;
+      delete enriched.user_phone;
+      return enriched;
+    });
+  }
+
+  private async assertCartProductState(productId: number, quantity: number): Promise<void> {
+    const q = await this.db.query<{ amount: number; is_active: boolean }>(
+      `SELECT amount, is_active FROM catalog_products WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [productId],
+    );
+    if (!q.rowCount || !q.rows[0].is_active) throw new BadRequestException(`Invalid product ${productId}`);
+    if (Number(q.rows[0].amount) < quantity) throw new BadRequestException(`Insufficient product amount for ${productId}`);
+  }
+
+  private escapeLike(value: string): string {
+    return value.replace(/[\\%_]/g, '\\$&');
   }
 
   private async syncProductAssets(client: { query: (text: string, values?: unknown[]) => Promise<unknown> }, productId: number, fileIds: number[], assetType: 'image' | 'file'): Promise<void> {

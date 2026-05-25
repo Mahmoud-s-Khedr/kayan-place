@@ -18,11 +18,12 @@ describe('prod-seeder', () => {
 
   it('reuses admin env parsing rules', () => {
     const input = parseProdSeedInput({
+      ADMIN_EMAIL: 'admin@example.com',
       ADMIN_PHONE: '+201000000000',
       ADMIN_PASSWORD: 'Secret123',
     });
 
-    expect(input).toEqual({ phone: '+201000000000', password: 'Secret123' });
+    expect(input).toEqual({ email: 'admin@example.com', phone: '+201000000000', password: 'Secret123' });
   });
 
   it('seeds categories idempotently', async () => {
@@ -64,7 +65,7 @@ describe('prod-seeder', () => {
   });
 
   it('runs admin step before categories and returns summary', async () => {
-    (seedAdminUser as jest.Mock).mockResolvedValue({ id: 7, phone: '+201000000000', created: true });
+    (seedAdminUser as jest.Mock).mockResolvedValue({ id: 7, email: 'admin@example.com', phone: '+201000000000', created: true });
 
     const query = jest
       .fn()
@@ -78,13 +79,14 @@ describe('prod-seeder', () => {
         return Promise.resolve({ rowCount: 1, rows: [] });
       });
 
-    const summary = await runProdSeed({ query } as any, { phone: '+201000000000', password: 'Secret123' });
+    const summary = await runProdSeed({ query } as any, { email: 'admin@example.com', phone: '+201000000000', password: 'Secret123' });
 
     expect(seedAdminUser).toHaveBeenCalledTimes(1);
     expect(query).toHaveBeenCalled();
     expect(summary.admin).toEqual({
       action: 'created',
       id: 7,
+      email: 'admin@example.com',
       phone: '+201000000000',
     });
     expect(summary.categories.created + summary.categories.reused).toBeGreaterThan(0);
@@ -94,7 +96,7 @@ describe('prod-seeder', () => {
     (seedAdminUser as jest.Mock).mockRejectedValue(new Error('admin failure'));
 
     await expect(
-      runProdSeed({ query: jest.fn() } as any, { phone: '+201000000000', password: 'Secret123' }),
+      runProdSeed({ query: jest.fn() } as any, { email: 'admin@example.com', phone: '+201000000000', password: 'Secret123' }),
     ).rejects.toThrow('admin failure');
   });
 });

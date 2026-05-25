@@ -16,7 +16,7 @@ cp .env.prod.example .env
 # set CLOUDINARY_* values
 npm ci
 npm run build
-npm run seed:admin
+ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=ChangeMe123 ADMIN_PHONE=+201000000000 npm run seed:admin
 ```
 
 ## Start production compose
@@ -48,5 +48,12 @@ bash scripts/deploy.sh
 ```bash
 docker compose -f docker-compose.prod.yml exec -T app npm run db:migrate
 docker compose -f docker-compose.prod.yml exec -T app npm run db:validate
+docker compose -f docker-compose.prod.yml exec -T app sh -lc 'ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=ChangeMe123 ADMIN_PHONE=+201000000000 npm run seed:admin:prod'
 bash scripts/smoke-test.sh
 ```
+
+## Admin seeding notes
+
+- `ADMIN_EMAIL` and `ADMIN_PASSWORD` are required for the current auth contract.
+- `ADMIN_PHONE` is optional but recommended.
+- Inside production containers, use `seed:admin:prod` (compiled JS). `seed:admin` depends on `ts-node` and is intended for local TypeScript environments.

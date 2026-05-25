@@ -51,6 +51,13 @@ docker compose -f docker-compose.dev.yml down -v
   - Check postgres health: `docker compose -f docker-compose.dev.yml ps`.
 - `DATABASE_URL must start with ...` or wrong host:
   - Recreate `.env` from the correct template and restart stack.
+- `docker compose exec -T app npm run seed:admin` fails with `ts-node: not found`:
+  - Production/runtime images do not include dev dependencies.
+  - Use compiled command in container:
+    `docker compose -f docker-compose.dev.yml exec -T app sh -lc 'ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=ChangeMe123 ADMIN_PHONE=+201000000000 npm run seed:admin:prod'`
+- Admin cannot login after seed:
+  - Ensure `ADMIN_EMAIL` is set and valid during seeding (email login contract).
+  - Re-run admin seed with explicit `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 - Frequent `429` in heavy tests:
   - For local-only simulation, set `THROTTLE_DEV_BYPASS=true`.
 

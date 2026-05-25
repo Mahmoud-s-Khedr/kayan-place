@@ -16,7 +16,8 @@ export type ProdSeedSummary = {
   admin: {
     action: 'created' | 'updated';
     id: number;
-    phone: string;
+    email: string;
+    phone: string | null;
   };
   categories: {
     created: number;
@@ -166,13 +167,14 @@ export async function seedCategories(client: Queryable): Promise<{ created: numb
 
 export async function runProdSeed(client: Queryable, input: ProdSeedInput): Promise<ProdSeedSummary> {
   const passwordHash = await hash(input.password, BCRYPT_ROUNDS);
-  const admin = await seedAdminUser(client, input.phone, passwordHash);
+  const admin = await seedAdminUser(client, { email: input.email, phone: input.phone }, passwordHash);
   const categories = await seedCategories(client);
 
   return {
     admin: {
       action: admin.created ? 'created' : 'updated',
       id: admin.id,
+      email: admin.email,
       phone: admin.phone,
     },
     categories,

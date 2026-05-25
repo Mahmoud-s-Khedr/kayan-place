@@ -4,7 +4,7 @@
 |---|---|---|---|
 | List/Search Products | `GET /v2/products`, `GET /v2/products/:id` | `catalog_products`, `product_assets` | Implemented |
 | Admin Add/Update/Delete Product | `POST/PATCH/DELETE /v2/admin/products*` | `catalog_products`, `product_assets` | Implemented |
-| Order Product | `POST /v2/orders` | `product_orders`, `order_items`, `order_status_history` | Implemented |
+| Order Product | `POST /v2/orders`, `GET/POST/PATCH/DELETE /v2/cart*`, `POST /v2/cart/checkout` | `product_orders`, `order_items`, `order_status_history`, `cart_items` | Implemented |
 | My Orders / Details | `GET /v2/orders/me`, `GET /v2/orders/:id` | `product_orders`, `order_items` | Implemented |
 | Cancel Order (before processing) | `POST /v2/orders/:id/cancel` | `product_orders`, `order_status_history` | Implemented |
 | Update Order Address (before processing) | `PATCH /v2/orders/:id/address` | `product_orders` | Implemented |
@@ -22,7 +22,7 @@
 | Item Chat (optional) | `POST /v2/followup/chat/conversations`, `GET/POST /v2/followup/chat/conversations/:id/messages` | `followup_conversations`, `followup_messages` | Implemented |
 | Gallery List | `GET /v2/gallery` | `gallery_items`, `gallery_assets` | Implemented |
 | Gallery Admin CRUD | `POST/PATCH/DELETE /v2/admin/gallery*` | `gallery_items`, `gallery_assets` | Implemented |
-| Rating after completion | `POST /v2/ratings` | `item_ratings` | Implemented |
+| Rating after completion | `POST /v2/ratings` | `item_ratings`, `product_ratings` | Implemented |
 
 ## Notes
 - Auth/Profile remains under existing modules and was not broken by this migration.

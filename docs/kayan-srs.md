@@ -103,14 +103,56 @@ For frontend and mobile implementation guidance, see [Module 2 Profile Integrati
 | Add Product                 | Admin      | Admins can add a product to the system. A product includes title, description, amount, price, details, images, and files. | Mandatory | Completed |
 | Update Product              | Admin      | Admins can update product details.                           | Mandatory | Completed |
 | Delete Product              | Admin      | Admins can delete or deactivate a product.                   | Mandatory | Completed |
-| List and Search Products    | All        | Admins and users can list all products in the system, search products by query, filter products by price range, date range, and availability, and sort results by price or creation date in ascending or descending order. | Mandatory | Partial |
+| List and Search Products    | All        | Admins and users can list all products in the system, search products by query, filter products by price range, date range, and availability, and sort results by price or creation date in ascending or descending order. | Mandatory | Completed |
 | Order Product               | User       | Users can order a product, insert a delivery address, and add products to the cart. | Mandatory | Completed |
 | View All Orders             | Admin      | Admins can see all orders. Each order includes products, the user who ordered the product, and the delivery address. | Mandatory | Completed |
 | Update Order Status         | Admin      | Admins can update the order status. Product order statuses include: received, ready to ship, on the way, cancelled, and delivered. | Mandatory | Completed |
 | Cancel Order                | All        | Users can cancel an order. Admins can cancel an order by setting its status to cancelled. | Mandatory | Completed |
-| My Orders                   | User       | Users can see their orders. Orders can be sorted and filtered like products. | Mandatory | Partial |
+| My Orders                   | User       | Users can see their orders. Orders can be sorted and filtered like products. | Mandatory | Completed |
 | Order Details and Follow-Up | User       | Users can see order details, including order date, status, products, and delivery address. Users can update the delivery address. | Mandatory | Completed |
 | Rate Product                | User       | Users can rate a delivered product one time only.            | Mandatory | Completed |
+
+**Implementation Notes (Current Backend Contract)**
+
+- Product endpoints:
+  - `GET /v2/products`
+  - `GET /v2/products/:id`
+  - `POST /v2/admin/products`
+  - `PATCH /v2/admin/products/:id`
+  - `DELETE /v2/admin/products/:id`
+- Cart endpoints:
+  - `GET /v2/cart`
+  - `POST /v2/cart/items`
+  - `PATCH /v2/cart/items/:id`
+  - `DELETE /v2/cart/items/:id`
+  - `POST /v2/cart/checkout`
+- Order endpoints:
+  - `POST /v2/orders` (direct order creation)
+  - `GET /v2/orders/me`
+  - `GET /v2/orders/:id`
+  - `PATCH /v2/orders/:id/address`
+  - `POST /v2/orders/:id/cancel`
+  - `GET /v2/admin/orders`
+  - `PATCH /v2/admin/orders/:id/status`
+- Product rating endpoint:
+  - `POST /v2/ratings`
+  - Product rating uses: `itemType=order`, `orderId`, `productId`, `ratingValue`
+- Product response contract:
+  - `GET /v2/products` and `GET /v2/products/:id` include product assets split into `images` and `files`.
+- `GET /v2/orders/me` query shape:
+  - `status`
+  - `fromDate`, `toDate`
+  - `sortBy` (currently `createdAt`)
+  - `sortDirection` (`asc`, `desc`)
+- Supported order statuses:
+  - `received`, `ready_to_ship`, `on_the_way`, `cancelled`, `delivered`
+- Key expected errors in module flows:
+  - `400` invalid payload, invalid product, insufficient stock, or business-rule validation failure
+  - `401` invalid/missing bearer token
+  - `403` trying to access/update resources outside current user scope, or policy/permission rejection in guarded flows
+  - `404` product/order/cart item not found
+
+For frontend and mobile implementation guidance, see [Module 3 Products Integration Guide](./module-3-products-integration.md).
 
 ---
 

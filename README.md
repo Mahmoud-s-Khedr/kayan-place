@@ -108,9 +108,21 @@ npm run seed:admin
 npm run seed:dev
 ```
 
+Admin seed requirements (local/dev TS path):
+- `ADMIN_EMAIL` is required.
+- `ADMIN_PASSWORD` is required.
+- `ADMIN_PHONE` is optional but recommended for backward compatibility and contact identity.
+
+Admin seed in Docker/production image:
+- Use compiled script (`seed:admin:prod`) because `ts-node` is not installed in the runtime image.
+
+```bash
+docker compose exec -T app sh -lc 'ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=ChangeMe123 ADMIN_PHONE=+201000000000 npm run seed:admin:prod'
+```
+
 `seed:dev` requirements:
 - Server is running and reachable at `BASE_URL` (defaults to `http://localhost`)
-- `ADMIN_PHONE` and `ADMIN_PASSWORD` are set and valid
+- `ADMIN_EMAIL`, `ADMIN_PASSWORD` are set and valid (`ADMIN_PHONE` optional)
 - `OTP_DEV_MODE=true` is enabled on the server so registration responses include OTP (`000000` for console provider)
 
 ## Environment Configuration
@@ -145,8 +157,12 @@ NODE_ENV=development OTP_DEV_MODE=true npm run simulate
 If simulation fails at `POST /auth/login (admin)` with `401 Invalid credentials`, seed admin in the same active DB environment, then rerun:
 
 ```bash
-docker compose exec -T app npm run seed:prod
+docker compose exec -T app sh -lc 'ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=ChangeMe123 ADMIN_PHONE=+201000000000 npm run seed:admin:prod'
 ```
+
+If Docker app startup fails with DB host resolution errors:
+- This compose stack uses external Postgres via `DATABASE_URL`.
+- For local host Postgres, use `host.docker.internal` (for example `postgres://postgres:postgres@host.docker.internal:5432/market_place_db`).
 
 ## Testing and Quality
 
