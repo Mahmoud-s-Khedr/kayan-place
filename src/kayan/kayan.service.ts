@@ -17,7 +17,9 @@ import {
   CreateOrderDto,
   CreateServiceOrderDto,
   FaultStatus,
+  FaultSortBy,
   ItemType,
+  ListMyFaultsQueryDto,
   ListOrdersQueryDto,
   ListProductsQueryDto,
   OrderSortBy,
@@ -52,6 +54,16 @@ type ProductAssetRow = {
 
 type GalleryAssetRow = {
   gallery_item_id: number | string;
+  file_id: number | string;
+  sort_order: number;
+  object_key: string | null;
+  original_filename: string | null;
+  mime_type: string | null;
+  status: string | null;
+};
+
+type FaultAssetRow = {
+  fault_id: number | string;
   file_id: number | string;
   sort_order: number;
   object_key: string | null;
@@ -350,7 +362,7 @@ export class KayanService {
       const faultId = created.rows[0].id;
       await this.syncFaultAssets(client, faultId, dto.imageFileIds ?? []);
       await client.query(`INSERT INTO fault_status_history(fault_id, status, changed_by) VALUES($1,$2,$3)`, [faultId, FaultStatus.RECEIVED, user.sub]);
-      return this.getFaultForUser(user.sub, faultId, true);
+      return this.getFaultForUserWithExecutor(client, user.sub, faultId, true);
     });
   }
 
@@ -369,17 +381,43 @@ export class KayanService {
         [dto.title ?? null, dto.description ?? null, dto.severity ?? null, dto.address ?? null, faultId],
       );
       if (dto.imageFileIds) await this.syncFaultAssets(client, faultId, dto.imageFileIds);
-      return this.getFaultForUser(user.sub, faultId, true);
+      return this.getFaultForUserWithExecutor(client, user.sub, faultId, true);
     });
   }
 
-  async listMyFaults(user: AuthUser): Promise<Record<string, unknown>> {
+  async listMyFaults(user: AuthUser, query: ListMyFaultsQueryDto = {}): Promise<Record<string, unknown>> {
+    const conditions = ['fr.user_id = $1'];
+    const params: unknown[] = [user.sub];
+
+    if (query.status) {
+      params.push(query.status);
+      conditions.push(`fr.status = $${params.length}`);
+    }
+    if (query.severity) {
+      params.push(query.severity);
+      conditions.push(`fr.severity = $${params.length}`);
+    }
+    if (query.fromDate) {
+      params.push(query.fromDate);
+      conditions.push(`fr.created_at >= $${params.length}`);
+    }
+    if (query.toDate) {
+      params.push(query.toDate);
+      conditions.push(`fr.created_at <= $${params.length}`);
+    }
+
+    const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
+    const orderClause = this.buildFaultOrderClause(query.sortBy ?? FaultSortBy.CREATED_AT, sortDirection);
+
     const q = await this.db.query(
-      `SELECT id, title, description, severity, address, status, created_at::text AS created_at
-       FROM fault_reports WHERE user_id = $1 ORDER BY created_at DESC`,
-      [user.sub],
+      `SELECT fr.id, fr.user_id, fr.title, fr.description, fr.severity, fr.address, fr.status, fr.cancelled_at::text AS cancelled_at,
+              fr.created_at::text AS created_at, fr.updated_at::text AS updated_at
+       FROM fault_reports fr
+       WHERE ${conditions.join(' AND ')}
+       ${orderClause}`,
+      params,
     );
-    return { items: q.rows };
+    return { items: await this.attachFaultAssets(this.db, q.rows as Array<Record<string, unknown>>) };
   }
 
   async cancelFault(user: AuthUser, faultId: number): Promise<Record<string, unknown>> {
@@ -392,21 +430,56 @@ export class KayanService {
   }
 
   async getFaultForUser(userId: number, faultId: number, allowAdmin = false): Promise<Record<string, unknown>> {
-    const q = await this.db.query(`SELECT * FROM fault_reports WHERE id = $1 LIMIT 1`, [faultId]);
+    return this.getFaultForUserWithExecutor(this.db, userId, faultId, allowAdmin);
+  }
+
+  private async getFaultForUserWithExecutor(
+    executor: SqlExecutor,
+    userId: number,
+    faultId: number,
+    allowAdmin = false,
+  ): Promise<Record<string, unknown>> {
+    const q = await executor.query(
+      `SELECT id, user_id, title, description, severity, address, status, cancelled_at::text AS cancelled_at,
+              created_at::text AS created_at, updated_at::text AS updated_at
+       FROM fault_reports WHERE id = $1 LIMIT 1`,
+      [faultId],
+    );
     if (!q.rowCount) throw new NotFoundException('Fault not found');
     const fault = q.rows[0] as { user_id: number } & Record<string, unknown>;
     if (!allowAdmin && Number(fault.user_id) !== userId) throw new ForbiddenException('Not allowed');
-    return { fault };
+    const [withAssets] = await this.attachFaultAssets(executor, [fault]);
+    return { fault: withAssets };
   }
 
   async adminListFaults(): Promise<Record<string, unknown>> {
-    const q = await this.db.query(`SELECT * FROM fault_reports ORDER BY created_at DESC`);
-    return { items: q.rows };
+    const q = await this.db.query(
+      `SELECT fr.id, fr.user_id, fr.title, fr.description, fr.severity, fr.address, fr.status, fr.cancelled_at::text AS cancelled_at,
+              fr.created_at::text AS created_at, fr.updated_at::text AS updated_at,
+              u.name AS user_name, u.email AS user_email, u.phone AS user_phone
+       FROM fault_reports fr
+       LEFT JOIN users u ON u.id = fr.user_id
+       ORDER BY fr.created_at DESC, fr.id DESC`,
+    );
+    const items = await this.attachFaultAssets(this.db, q.rows as Array<Record<string, unknown>>);
+    return {
+      items: items.map((item) => ({
+        ...item,
+        user: {
+          id: Number(item.user_id),
+          name: item.user_name ?? null,
+          email: item.user_email ?? null,
+          phone: item.user_phone ?? null,
+        },
+      })),
+    };
   }
 
   async adminUpdateFaultStatus(admin: AuthUser, faultId: number, dto: AdminUpdateFaultStatusDto): Promise<Record<string, unknown>> {
+    const current = await this.db.query<{ status: FaultStatus }>(`SELECT status FROM fault_reports WHERE id = $1 LIMIT 1`, [faultId]);
+    if (!current.rowCount) throw new NotFoundException('Fault not found');
+    this.assertValidFaultTransition(current.rows[0].status, dto.status);
     const q = await this.db.query(`UPDATE fault_reports SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id`, [dto.status, faultId]);
-    if (!q.rowCount) throw new NotFoundException('Fault not found');
     await this.db.query(`INSERT INTO fault_status_history(fault_id, status, changed_by) VALUES($1,$2,$3)`, [faultId, dto.status, admin.sub]);
     return this.getFaultForUser(0, faultId, true);
   }
@@ -930,9 +1003,84 @@ export class KayanService {
   }
 
   private async syncFaultAssets(client: { query: (text: string, values?: unknown[]) => Promise<unknown> }, faultId: number, fileIds: number[]): Promise<void> {
+    await this.assertValidFaultImageFiles(client, fileIds);
     await client.query(`DELETE FROM fault_assets WHERE fault_id = $1`, [faultId]);
     for (let i = 0; i < fileIds.length; i += 1) {
       await client.query(`INSERT INTO fault_assets(fault_id, file_id, sort_order) VALUES($1,$2,$3)`, [faultId, fileIds[i], i]);
+    }
+  }
+
+  private buildFaultOrderClause(sortBy: FaultSortBy, sortDirection: string): string {
+    if (sortBy === FaultSortBy.SEVERITY) {
+      return `ORDER BY CASE fr.severity
+              WHEN 'normal' THEN 1
+              WHEN 'high' THEN 2
+              WHEN 'urgent' THEN 3
+              WHEN 'emergent' THEN 4
+              ELSE 999
+            END ${sortDirection}, fr.created_at DESC, fr.id DESC`;
+    }
+    return `ORDER BY fr.created_at ${sortDirection}, fr.id DESC`;
+  }
+
+  private assertValidFaultTransition(current: FaultStatus, next: FaultStatus): void {
+    if (current === next) return;
+    const transitions: Record<FaultStatus, FaultStatus[]> = {
+      [FaultStatus.RECEIVED]: [FaultStatus.ASSIGNED, FaultStatus.CANCELLED],
+      [FaultStatus.ASSIGNED]: [FaultStatus.ON_THE_WAY, FaultStatus.CANCELLED],
+      [FaultStatus.ON_THE_WAY]: [FaultStatus.IN_PROGRESS, FaultStatus.CANCELLED],
+      [FaultStatus.IN_PROGRESS]: [FaultStatus.FINISHED, FaultStatus.CANCELLED],
+      [FaultStatus.FINISHED]: [],
+      [FaultStatus.CANCELLED]: [],
+    };
+    if (!transitions[current].includes(next)) {
+      throw new BadRequestException(`Invalid fault status transition from ${current} to ${next}`);
+    }
+  }
+
+  private async attachFaultAssets(executor: SqlExecutor, faults: Array<Record<string, unknown>>): Promise<Array<Record<string, unknown>>> {
+    if (!faults.length) return faults;
+    const faultIds = faults.map((fault) => Number(fault.id));
+    const assets = await executor.query(
+      `SELECT fa.fault_id, fa.file_id, fa.sort_order, f.object_key, f.original_filename, f.mime_type, f.status
+       FROM fault_assets fa
+       LEFT JOIN files f ON f.id = fa.file_id
+       WHERE fa.fault_id = ANY($1::bigint[])
+       ORDER BY fa.fault_id ASC, fa.sort_order ASC, fa.id ASC`,
+      [faultIds],
+    );
+    const byFaultId = new Map<number, Array<Record<string, unknown>>>();
+    for (const row of assets.rows as FaultAssetRow[]) {
+      const faultId = Number(row.fault_id);
+      const bucket = byFaultId.get(faultId) ?? [];
+      bucket.push({
+        file_id: Number(row.file_id),
+        sort_order: row.sort_order,
+        object_key: row.object_key,
+        original_filename: row.original_filename,
+        mime_type: row.mime_type,
+        status: row.status,
+      });
+      byFaultId.set(faultId, bucket);
+    }
+    return faults.map((fault) => ({ ...fault, images: byFaultId.get(Number(fault.id)) ?? [] }));
+  }
+
+  private async assertValidFaultImageFiles(client: { query: (text: string, values?: unknown[]) => Promise<unknown> }, fileIds: number[]): Promise<void> {
+    if (!fileIds.length) return;
+    const uniqueIds = [...new Set(fileIds)];
+    const placeholders = uniqueIds.map((_, index) => `$${index + 1}`).join(', ');
+    const q = await client.query(
+      `SELECT id, purpose, status, mime_type FROM files WHERE id IN (${placeholders})`,
+      uniqueIds,
+    ) as { rows: Array<{ id: number; purpose: string; status: string; mime_type: string | null }> };
+    const filesById = new Map(q.rows.map((row) => [Number(row.id), row]));
+    for (const fileId of uniqueIds) {
+      const file = filesById.get(Number(fileId));
+      if (!file) throw new BadRequestException(`File ${fileId} not found`);
+      if (file.status !== 'uploaded') throw new BadRequestException(`File ${fileId} must be uploaded before fault association`);
+      if (file.purpose !== 'product_image') throw new BadRequestException(`File ${fileId} must have purpose product_image`);
+      if (!file.mime_type || !file.mime_type.startsWith('image/')) throw new BadRequestException(`File ${fileId} must be an image`);
     }
   }
 

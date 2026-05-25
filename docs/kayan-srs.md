@@ -166,9 +166,39 @@ For frontend and mobile implementation guidance, see [Module 3 Products Integrat
 | Update Report       | User       | Users can update fault report details.                       | Mandatory | Completed |
 | List All Faults     | Admin      | Admins can see all fault reports in the system. Each report includes details and the related user. | Mandatory | Completed |
 | Update Fault Status | Admin      | Admins can set the fault status. Status values include: received, assigned, on the way, in progress, finished, and cancelled. | Mandatory | Completed |
-| My Reports          | User       | Users can see their reports. Reports can be filtered and sorted by date and severity. | Mandatory | Partial |
+| My Reports          | User       | Users can see their reports. Reports can be filtered and sorted by date and severity. | Mandatory | Completed |
 | Cancel Report       | All        | Users can cancel a report. Admins can cancel a report using its status. | Mandatory | Completed |
 | Rate Fault Report   | User       | Users can rate a finished report one time only.              | Mandatory | Completed |
+
+**Implementation Notes (Current Backend Contract)**
+
+- Fault user endpoints:
+  - `POST /v2/faults`
+  - `PATCH /v2/faults/:id`
+  - `GET /v2/faults/me`
+  - `POST /v2/faults/:id/cancel`
+- Fault admin endpoints:
+  - `GET /v2/admin/faults`
+  - `PATCH /v2/admin/faults/:id/status`
+- Fault rating endpoint:
+  - `POST /v2/ratings`
+  - Fault rating uses: `itemType=fault`, `itemId`, `ratingValue`
+- Supported fault severities:
+  - `normal`, `high`, `urgent`, `emergent`
+- Supported fault statuses:
+  - `received`, `assigned`, `on_the_way`, `in_progress`, `finished`, `cancelled`
+- `GET /v2/faults/me` query shape:
+  - `status`
+  - `severity`
+  - `fromDate`, `toDate`
+  - `sortBy` (`createdAt`, `severity`)
+  - `sortDirection` (`asc`, `desc`)
+- Business rules:
+  - Users can update/cancel only before processing starts (`received`).
+  - Fault rating is allowed only after `finished` and only once per user per fault.
+  - Admin fault-status updates follow constrained workflow transitions.
+
+For frontend and mobile implementation guidance, see [Module 4 Faults Integration Guide](./module-4-faults-integration.md).
 
 ---
 

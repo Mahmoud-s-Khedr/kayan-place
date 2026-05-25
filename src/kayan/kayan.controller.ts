@@ -22,6 +22,7 @@ import {
   CreateServiceOrderDto,
   ItemType,
   ListOrdersQueryDto,
+  ListMyFaultsQueryDto,
   ListProductsQueryDto,
   SendFollowupMessageDto,
   UpdateFaultDto,
@@ -149,8 +150,8 @@ export class KayanController {
   @Get('faults/me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  listMyFaults(@CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
-    return this.kayanService.listMyFaults(user);
+  listMyFaults(@CurrentUser() user: AuthUser, @Query() query: ListMyFaultsQueryDto): Promise<Record<string, unknown>> {
+    return this.kayanService.listMyFaults(user, query);
   }
 
   @Post('faults/:id/cancel')

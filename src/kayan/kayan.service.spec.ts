@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { KayanService } from './kayan.service';
-import { ItemType, OrderStatus } from './kayan.dto';
+import { FaultStatus, ItemType, OrderStatus } from './kayan.dto';
 
 describe('KayanService', () => {
   const databaseService = {
@@ -314,6 +314,245 @@ describe('KayanService', () => {
         { itemType: ItemType.ORDER, orderId: 6, productId: 2, ratingValue: 5 },
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('lists my faults with filters, severity sorting, and assets', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 31,
+            user_id: 5,
+            title: 'Leak',
+            description: 'Ceiling leak',
+            severity: 'urgent',
+            address: 'Cairo',
+            status: 'assigned',
+            cancelled_at: null,
+            created_at: '2026-02-01T00:00:00.000Z',
+            updated_at: '2026-02-01T00:00:00.000Z',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            fault_id: 31,
+            file_id: 901,
+            sort_order: 0,
+            object_key: 'faults/31/a.jpg',
+            original_filename: 'a.jpg',
+            mime_type: 'image/jpeg',
+            status: 'uploaded',
+          },
+        ],
+      });
+
+    const result = await service.listMyFaults(
+      { sub: 5, phone: '+201000000005', isAdmin: false },
+      { status: FaultStatus.ASSIGNED, severity: 'urgent' as any, fromDate: '2026-01-01', sortBy: 'severity' as any, sortDirection: 'asc' as any },
+    );
+
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          id: 31,
+          severity: 'urgent',
+          images: [expect.objectContaining({ file_id: 901 })],
+        }),
+      ],
+    });
+    const [queryText, params] = databaseService.query.mock.calls[0];
+    expect(queryText).toContain('fr.status = $2');
+    expect(queryText).toContain('fr.severity = $3');
+    expect(queryText).toContain('fr.created_at >= $4');
+    expect(queryText).toContain("WHEN 'normal' THEN 1");
+    expect(queryText).toContain('END ASC');
+    expect(params).toEqual([5, FaultStatus.ASSIGNED, 'urgent', '2026-01-01']);
+  });
+
+  it('enriches admin fault list with user and images', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 41,
+            user_id: 11,
+            title: 'No power',
+            description: 'Street outage',
+            severity: 'high',
+            address: 'Giza',
+            status: 'received',
+            cancelled_at: null,
+            created_at: '2026-03-01T00:00:00.000Z',
+            updated_at: '2026-03-01T00:00:00.000Z',
+            user_name: 'Mona',
+            user_email: 'mona@example.com',
+            user_phone: '+201000000011',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ fault_id: 41, file_id: 902, sort_order: 0, object_key: 'faults/41/a.jpg', original_filename: 'a.jpg', mime_type: 'image/jpeg', status: 'uploaded' }],
+      });
+
+    const result = await service.adminListFaults();
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          id: 41,
+          user: expect.objectContaining({ id: 11, name: 'Mona' }),
+          images: [expect.objectContaining({ file_id: 902 })],
+        }),
+      ],
+    });
+  });
+
+  it('rejects invalid admin fault status transitions', async () => {
+    databaseService.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ status: FaultStatus.RECEIVED }] });
+    await expect(
+      service.adminUpdateFaultStatus(
+        { sub: 1, phone: '+201000000001', isAdmin: true },
+        42,
+        { status: FaultStatus.FINISHED },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('accepts valid admin fault status transition and records history', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ status: FaultStatus.RECEIVED }] }) // current
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 42 }] }) // update status
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // insert history
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          id: 42,
+          user_id: 7,
+          title: 'Road issue',
+          description: 'Pothole',
+          severity: 'normal',
+          address: 'Nasr City',
+          status: 'assigned',
+          cancelled_at: null,
+          created_at: '2026-03-05T00:00:00.000Z',
+          updated_at: '2026-03-06T00:00:00.000Z',
+        }],
+      }) // getFaultForUser
+      .mockResolvedValueOnce({ rows: [] }); // attachFaultAssets
+
+    const result = await service.adminUpdateFaultStatus(
+      { sub: 1, phone: '+201000000001', isAdmin: true },
+      42,
+      { status: FaultStatus.ASSIGNED },
+    );
+    expect(result).toEqual({
+      fault: expect.objectContaining({ id: 42, status: 'assigned' }),
+    });
+  });
+
+  it('rejects invalid fault image files on create', async () => {
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ id: 777 }] }) // insert fault
+        .mockResolvedValueOnce({ rows: [{ id: 10, purpose: 'document', status: 'uploaded', mime_type: 'application/pdf' }] }), // files check
+    };
+    databaseService.withTransaction.mockImplementationOnce((callback: any) => callback(client));
+
+    await expect(
+      service.createFault(
+        { sub: 2, phone: '+201000000002', isAdmin: false },
+        { title: 'Broken tile', description: 'Kitchen', severity: 'normal' as any, address: 'Maadi', imageFileIds: [10] },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('regression: create fault uses transaction visibility for read-back', async () => {
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ id: 778 }] }) // insert fault
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // delete fault assets
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // insert status history
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{
+            id: 778,
+            user_id: 2,
+            title: 'Leak',
+            description: 'Bathroom leak',
+            severity: 'normal',
+            address: 'Cairo',
+            status: 'received',
+            cancelled_at: null,
+            created_at: '2026-05-01T00:00:00.000Z',
+            updated_at: '2026-05-01T00:00:00.000Z',
+          }],
+        }) // select fault in tx
+        .mockResolvedValueOnce({ rows: [] }), // fault assets in tx
+    };
+    databaseService.withTransaction.mockImplementationOnce((callback: any) => callback(client));
+
+    const result = await service.createFault(
+      { sub: 2, phone: '+201000000002', isAdmin: false },
+      { title: 'Leak', description: 'Bathroom leak', severity: 'normal' as any, address: 'Cairo', imageFileIds: [] },
+    );
+
+    expect(result).toEqual({
+      fault: expect.objectContaining({
+        id: 778,
+        status: 'received',
+        images: [],
+      }),
+    });
+    expect(databaseService.query).not.toHaveBeenCalled();
+  });
+
+  it('regression: update fault uses transaction visibility for read-back', async () => {
+    const client = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ status: 'received' }] }) // select current
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] }) // update fault
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{
+            id: 779,
+            user_id: 2,
+            title: 'Leak updated',
+            description: 'Updated desc',
+            severity: 'high',
+            address: 'Giza',
+            status: 'received',
+            cancelled_at: null,
+            created_at: '2026-05-02T00:00:00.000Z',
+            updated_at: '2026-05-02T01:00:00.000Z',
+          }],
+        }) // select updated fault in tx
+        .mockResolvedValueOnce({ rows: [] }), // fault assets in tx
+    };
+    databaseService.withTransaction.mockImplementationOnce((callback: any) => callback(client));
+
+    const result = await service.updateFault(
+      { sub: 2, phone: '+201000000002', isAdmin: false },
+      779,
+      { title: 'Leak updated', description: 'Updated desc', severity: 'high' as any, address: 'Giza' },
+    );
+
+    expect(result).toEqual({
+      fault: expect.objectContaining({
+        id: 779,
+        title: 'Leak updated',
+        images: [],
+      }),
+    });
+    expect(databaseService.query).not.toHaveBeenCalled();
+  });
+
+  it('getFaultForUser returns not found for missing fault', async () => {
+    databaseService.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    await expect(service.getFaultForUser(2, 999999, false)).rejects.toThrow('Fault not found');
   });
 
   it('lists public gallery items as active-only with rich images', async () => {
