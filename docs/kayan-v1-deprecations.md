@@ -19,8 +19,8 @@ These v1 flows are now legacy and should be replaced by `/v2` Kayan flows:
 - Catalog + ordering: `/v2/products`, `/v2/orders`, `/v2/admin/orders`
 - Faults: `/v2/faults`, `/v2/admin/faults`
 - Services: `/v2/services`, `/v2/admin/services`
-- Follow-up steps: `/v2/followup/steps`, `/v2/admin/followup-steps`
-- Item chat: `/v2/followup/chat/*`
+- Follow-up steps: `/v2/followups/:itemType/:itemId/steps`, `/v2/admin/followups/:itemType/:itemId/steps*`
+- Item chat: `/v2/followups/:itemType/:itemId/chat/*`
 - Gallery: `/v2/gallery`, `/v2/admin/gallery`
 - Completion-based item ratings: `/v2/ratings`
 

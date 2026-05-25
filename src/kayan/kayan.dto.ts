@@ -203,6 +203,12 @@ export class CreateFollowupStepDto {
   @IsOptional() @IsInt() @Min(0) sortOrder?: number;
 }
 
+export class CreateFollowupStepBodyDto {
+  @IsString() @IsNotEmpty() title!: string;
+  @IsOptional() @IsInt() @Min(1) stepImageFileId?: number;
+  @IsOptional() @IsInt() @Min(0) sortOrder?: number;
+}
+
 export class UpdateFollowupStepDto {
   @IsOptional() @IsString() @IsNotEmpty() title?: string;
   @IsOptional() @IsInt() @Min(1) stepImageFileId?: number;
@@ -236,6 +242,10 @@ export class CreateItemRatingDto {
 export class CreateFollowupConversationDto {
   @IsEnum(ItemType) itemType!: ItemType;
   @IsInt() @Min(1) itemId!: number;
+  @IsOptional() @IsInt() @Min(1) adminId?: number;
+}
+
+export class CreateFollowupConversationBodyDto {
   @IsOptional() @IsInt() @Min(1) adminId?: number;
 }
 

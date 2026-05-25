@@ -159,6 +159,8 @@ describe('ChatGateway', () => {
       const result = await gateway.sendMessage(client as any, { conversationId: 5, text: 'Hello' });
 
       expect(chatService.sendMessage).toHaveBeenCalledWith(1, 5, 'Hello');
+      expect(client.join).toHaveBeenCalledWith('conversation:5');
+      expect(gateway.server.to).toHaveBeenCalledWith('conversation:5');
       expect(fkExpansionService.expand).toHaveBeenCalledWith({ success: true, ...response });
       expect(result).toEqual({
         success: true,
@@ -207,6 +209,8 @@ describe('ChatGateway', () => {
       const result = await gateway.markRead(client as any, { messageId: 22 });
 
       expect(chatService.markRead).toHaveBeenCalledWith(1, 22);
+      expect(client.join).toHaveBeenCalledWith('conversation:5');
+      expect(gateway.server.to).toHaveBeenCalledWith('conversation:5');
       expect(result).toEqual({ success: true, ...response });
       expect(appLogger.log).toHaveBeenCalledWith(expect.objectContaining({
         routeOrEvent: 'message.read',

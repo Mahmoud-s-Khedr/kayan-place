@@ -38,7 +38,11 @@
     "test:auth:e2e": "jest --config test/jest-e2e.json --runInBand test/auth.e2e-spec.ts",
     "simulate:chat": "ts-node --transpile-only scripts/chat-socket-test.ts",
     "fetch:images": "ts-node --transpile-only scripts/fetch-images.ts",
-    "test:profile:cli": "ts-node --transpile-only scripts/test-profile.ts"
+    "test:profile:cli": "ts-node --transpile-only scripts/test-profile.ts",
+    "test:followup-chat": "jest --runInBand src/kayan/kayan.service.spec.ts src/kayan/kayan.controller.spec.ts src/chat/chat.service.spec.ts src/chat/chat.controller.spec.ts src/chat/chat.gateway.spec.ts",
+    "ci:followup-chat": "npm run test:followup-chat",
+    "simulate:kayan:followup": "ts-node --transpile-only scripts/simulate-kayan-followup-flows.ts",
+    "test:kayan:followup:cli": "ts-node --transpile-only scripts/simulate-kayan-followup-flows.ts"
   },
   "engines": {
     "node": ">=20"

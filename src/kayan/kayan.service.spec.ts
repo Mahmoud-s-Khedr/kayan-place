@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { KayanService } from './kayan.service';
 import { FaultStatus, ItemType, OrderStatus, ServiceStatus, ServiceType } from './kayan.dto';
 
@@ -704,6 +704,184 @@ describe('KayanService', () => {
   it('getFaultForUser returns not found for missing fault', async () => {
     databaseService.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
     await expect(service.getFaultForUser(2, 999999, false)).rejects.toThrow('Fault not found');
+  });
+
+  it('lists followup steps for item owner ordered by sort_order then id', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 2, item_type: 'order', item_id: 50, title: 'Delivered', sort_order: 1, created_at: '2026-05-01T00:00:00.000Z' },
+          { id: 3, item_type: 'order', item_id: 50, title: 'Installed', sort_order: 2, created_at: '2026-05-01T01:00:00.000Z' },
+        ],
+      });
+
+    const result = await service.listFollowupSteps(
+      { sub: 7, phone: '+201000000007', isAdmin: false },
+      ItemType.ORDER,
+      50,
+    );
+
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({ id: 2, sort_order: 1 }),
+        expect.objectContaining({ id: 3, sort_order: 2 }),
+      ],
+    });
+    expect(databaseService.query.mock.calls[1][0]).toContain('ORDER BY sort_order ASC, id ASC');
+  });
+
+  it('rejects followup steps listing for non-owner user', async () => {
+    databaseService.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 9 }] });
+
+    await expect(
+      service.listFollowupSteps(
+        { sub: 7, phone: '+201000000007', isAdmin: false },
+        ItemType.ORDER,
+        50,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects followup steps listing when item does not exist even for admin', async () => {
+    databaseService.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(
+      service.listFollowupSteps(
+        { sub: 1, phone: '+201000000001', isAdmin: true },
+        ItemType.ORDER,
+        999,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('creates followup step for valid item', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
+      .mockResolvedValueOnce({
+        rows: [{ id: 70, item_type: 'order', item_id: 50, title: 'Packed', step_image_file_id: 11, sort_order: 0 }],
+      });
+
+    const result = await service.adminCreateFollowupStep(
+      { sub: 1, phone: '+201000000001', isAdmin: true },
+      { itemType: ItemType.ORDER, itemId: 50, title: 'Packed', stepImageFileId: 11 },
+    );
+
+    expect(result).toEqual({
+      step: expect.objectContaining({ id: 70, title: 'Packed' }),
+    });
+  });
+
+  it('rejects followup step creation when target item is missing', async () => {
+    databaseService.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(
+      service.adminCreateFollowupStep(
+        { sub: 1, phone: '+201000000001', isAdmin: true },
+        { itemType: ItemType.ORDER, itemId: 404, title: 'Packed' },
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('creates followup conversation with fallback admin when requester owns item', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 2 }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 2 }] })
+      .mockResolvedValueOnce({ rows: [{ id: 81, item_type: 'order', item_id: 50, user_id: 7, admin_id: 2 }] });
+
+    const result = await service.createFollowupConversation(
+      { sub: 7, phone: '+201000000007', isAdmin: false },
+      { itemType: ItemType.ORDER, itemId: 50 },
+    );
+
+    expect(result).toEqual({
+      conversation: expect.objectContaining({ id: 81, admin_id: 2 }),
+    });
+  });
+
+  it('rejects followup conversation when provided adminId is not an active admin', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(
+      service.createFollowupConversation(
+        { sub: 7, phone: '+201000000007', isAdmin: false },
+        { itemType: ItemType.ORDER, itemId: 50, adminId: 77 },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects followup conversation when no admin account is available', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(
+      service.createFollowupConversation(
+        { sub: 7, phone: '+201000000007', isAdmin: false },
+        { itemType: ItemType.ORDER, itemId: 50 },
+      ),
+    ).rejects.toThrow('No admin account available');
+  });
+
+  it('lists followup messages only for participants', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7, admin_id: 2 }] })
+      .mockResolvedValueOnce({ rows: [{ id: 1, conversation_id: 81, sender_id: 7, message_text: 'Ping', sent_at: '2026-05-01T10:00:00.000Z' }] });
+
+    const result = await service.listFollowupMessages(
+      { sub: 7, phone: '+201000000007', isAdmin: false },
+      81,
+    );
+
+    expect(result).toEqual({
+      items: [expect.objectContaining({ id: 1, message_text: 'Ping' })],
+    });
+  });
+
+  it('rejects sending followup messages for non-participants', async () => {
+    databaseService.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7, admin_id: 2 }] });
+
+    await expect(
+      service.sendFollowupMessage(
+        { sub: 99, phone: '+201000000099', isAdmin: false },
+        81,
+        { messageText: 'Ping' },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects listing followup messages when route item scope does not match conversation scope', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7, admin_id: 2 }] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(
+      service.listFollowupMessages(
+        { sub: 7, phone: '+201000000007', isAdmin: false },
+        81,
+        ItemType.ORDER,
+        500,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rejects sending followup message when route item scope does not match conversation scope', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7, admin_id: 2 }] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(
+      service.sendFollowupMessage(
+        { sub: 7, phone: '+201000000007', isAdmin: false },
+        81,
+        { messageText: 'Ping' },
+        ItemType.ORDER,
+        500,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('lists public gallery items as active-only with rich images', async () => {

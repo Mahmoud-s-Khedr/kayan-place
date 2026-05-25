@@ -253,11 +253,41 @@ For frontend and mobile implementation guidance, see [Module 5 Services Integrat
 | Use Case       | Main Actor | Description                                                  | Priority  | Status |
 | -------------- | ---------- | ------------------------------------------------------------ | --------- | ------ |
 | Item Follow-Up | User       | Users can follow up the progress steps of their items. Items include products, faults, and services. | Mandatory | Completed |
-| List Steps     | All        | Users and admins can see all item steps.                     | Mandatory | Partial |
+| List Steps     | All        | Users and admins can see all item steps.                     | Mandatory | Completed |
 | Add Step       | Admin      | Admins can add a new step to an item. A step includes title and image. | Mandatory | Completed |
 | Delete Step    | Admin      | Admins can delete a step.                                    | Mandatory | Completed |
 | Update Step    | Admin      | Admins can update a step title and image.                    | Mandatory | Completed |
 | Item Chat      | All        | Users can chat with admins inside the item follow-up page.   | Optional  | Completed |
+
+**Implementation Notes (Current Backend Contract)**
+
+- Follow-up step endpoints:
+  - `GET /v2/followups/:itemType/:itemId/steps`
+  - `POST /v2/admin/followups/:itemType/:itemId/steps`
+  - `PATCH /v2/admin/followups/:itemType/:itemId/steps/:stepId`
+  - `DELETE /v2/admin/followups/:itemType/:itemId/steps/:stepId`
+- Step rules:
+  - Follow-up steps are scoped to a valid item.
+  - Users can read steps for their own item only; admins can read steps for any existing item.
+  - Step list ordering is deterministic: `sort_order ASC`, then `id ASC`.
+- Follow-up chat REST endpoints:
+  - `POST /v2/followups/:itemType/:itemId/chat/conversations`
+  - `GET /v2/followups/:itemType/:itemId/chat/conversations/:conversationId/messages`
+  - `POST /v2/followups/:itemType/:itemId/chat/conversations/:conversationId/messages`
+- Chat rules:
+  - Requester must own the target item unless requester is admin.
+  - One conversation per `(itemType, itemId, userId)`; repeated create is idempotent.
+  - `adminId` is optional on create; when omitted, backend assigns the first active admin by ascending id.
+  - Only conversation participants (`user_id`, `admin_id`) can list/send messages.
+- Deprecated alias routes remain available during transition window:
+  - `/v2/followup/*` and `/v2/admin/followup-steps*`
+  - Sunset date: `2026-12-31`
+- Key expected errors in module flows:
+  - `401` invalid/missing bearer token
+  - `403` trying to access steps/chat outside ownership or participant scope
+  - `404` item, step, or conversation not found
+
+For frontend and mobile implementation guidance, see [Module 6 Follow-Up Integration Guide](./module-6-followup-integration.md).
 
 ---
 
@@ -416,7 +446,7 @@ Define what each role can access.
 6. Can users cancel orders/reports/services at any status, or only before processing starts? before processing starts
 7. Should admins be able to assign fault reports/service orders to workers or technicians? no
 8. Should the system send notifications when status changes? 
-9. Should item chat support images/files, or text only?
+9. Should item chat support images/files, or text only? text-only in the current backend contract
 10. Should the gallery be public, user-only, or admin-only?
 11. What does `5000 + 10000 EGP` mean for the Follow-Up module? 5k for the Mandatory and 10k for the optional
 12. Should ratings include only stars, or stars plus written review? it will be a number in the backend the frontend is not my concern
@@ -472,6 +502,17 @@ Define what each role can access.
 - Admins can add, update, and delete steps for products, faults, and services.
 - Users can view the steps for their own items.
 - Users cannot manage steps unless they are admins.
+
+### Follow-Up Verification Report (2026-05-26)
+
+| Use Case | Status | Evidence |
+| --- | --- | --- |
+| Item Follow-Up | Implemented and verified | `GET /v2/followups/:itemType/:itemId/steps` ownership + not-found enforcement for `order/fault/service`, covered in `src/kayan/kayan.service.spec.ts`. |
+| List Steps | Implemented and verified | Deterministic ordering (`sort_order`, `id`) and owner/admin authorization covered in `src/kayan/kayan.service.spec.ts` and `src/kayan/kayan.controller.spec.ts`. |
+| Add Step | Implemented and verified | Admin create now validates target item exists before insert; covered in `src/kayan/kayan.service.spec.ts` and controller forwarding tests. |
+| Delete Step | Implemented and verified | Not-found handling and admin path covered in existing and follow-up controller/service tests. |
+| Update Step | Implemented and verified | Not-found handling and admin path covered in existing and follow-up controller/service tests. |
+| Item Chat | Implemented and verified | Follow-up REST chat coverage expanded in `src/kayan/kayan.service.spec.ts`/`src/kayan/kayan.controller.spec.ts`; Socket.io path coverage expanded in `src/chat/chat.gateway.spec.ts`, `src/chat/chat.service.spec.ts`, `src/chat/chat.controller.spec.ts`. |
 
 ### Gallery
 

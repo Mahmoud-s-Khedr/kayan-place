@@ -17,14 +17,16 @@
 | Update/Cancel Service | `PATCH /v2/services/:id`, `POST /v2/services/:id/cancel` | `service_orders`, `service_status_history` | Implemented |
 | My Services | `GET /v2/services/me` | `service_orders` | Implemented |
 | Admin List/Update Services | `GET /v2/admin/services`, `PATCH /v2/admin/services/:id/status` | `service_orders`, `service_status_history` | Implemented |
-| Follow-up Steps (read) | `GET /v2/followup/steps` | `followup_steps` | Implemented |
-| Follow-up Steps Admin CRUD | `POST/PATCH/DELETE /v2/admin/followup-steps*` | `followup_steps` | Implemented |
-| Item Chat (optional) | `POST /v2/followup/chat/conversations`, `GET/POST /v2/followup/chat/conversations/:id/messages` | `followup_conversations`, `followup_messages` | Implemented |
+| Follow-up Steps (read) | `GET /v2/followups/:itemType/:itemId/steps` | `followup_steps` | Implemented |
+| Follow-up Steps Admin CRUD | `POST/PATCH/DELETE /v2/admin/followups/:itemType/:itemId/steps*` | `followup_steps` | Implemented |
+| Item Chat (optional) | `POST /v2/followups/:itemType/:itemId/chat/conversations`, `GET/POST /v2/followups/:itemType/:itemId/chat/conversations/:id/messages` | `followup_conversations`, `followup_messages` | Implemented |
 | Gallery List | `GET /v2/gallery` | `gallery_items`, `gallery_assets` | Implemented |
 | Gallery Admin CRUD | `POST/PATCH/DELETE /v2/admin/gallery*` | `gallery_items`, `gallery_assets` | Implemented |
 | Rating after completion | `POST /v2/ratings` | `item_ratings`, `product_ratings` | Implemented |
 
 ## Notes
+- Source of truth for module completion status is `docs/kayan-srs.md` (status column). This matrix maps endpoints/tables and should stay implementation-oriented.
+- Legacy follow-up aliases under `/v2/followup/*` and `/v2/admin/followup-steps*` are deprecated and scheduled for cleanup after transition.
 - Auth/Profile remains under existing modules and was not broken by this migration.
 - `users.email` was introduced for v2 identity alignment.
 - `/v1` endpoints are still available and should be treated as deprecated during migration.

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Param, ParseEnumPipe, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AdminGuard } from '../common/guards/admin.guard';
@@ -15,7 +15,9 @@ import {
   CreateCartItemDto,
   CreateFaultDto,
   CreateFollowupConversationDto,
+  CreateFollowupConversationBodyDto,
   CreateFollowupStepDto,
+  CreateFollowupStepBodyDto,
   CreateGalleryItemDto,
   CreateItemRatingDto,
   CreateOrderDto,
@@ -194,12 +196,26 @@ export class KayanController {
     return this.kayanService.cancelService(user, serviceId);
   }
 
-  @Get('followup/steps')
+  @Get('followups/:itemType/:itemId/steps')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   listFollowupSteps(
     @CurrentUser() user: AuthUser,
-    @Query('itemType') itemType: ItemType,
+    @Param('itemType', new ParseEnumPipe(ItemType)) itemType: ItemType,
+    @Param('itemId', ParseIntPipe) itemId: number,
+  ): Promise<Record<string, unknown>> {
+    return this.kayanService.listFollowupSteps(user, itemType, itemId);
+  }
+
+  @Get('followup/steps')
+  @Header('Deprecation', 'true')
+  @Header('Sunset', 'Wed, 31 Dec 2026 23:59:59 GMT')
+  @Header('X-Deprecated-Route', 'Use /v2/followups/:itemType/:itemId/steps')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  listFollowupStepsDeprecated(
+    @CurrentUser() user: AuthUser,
+    @Query('itemType', new ParseEnumPipe(ItemType)) itemType: ItemType,
     @Query('itemId', ParseIntPipe) itemId: number,
   ): Promise<Record<string, unknown>> {
     return this.kayanService.listFollowupSteps(user, itemType, itemId);
@@ -218,24 +234,70 @@ export class KayanController {
     return this.kayanService.createItemRating(user, dto);
   }
 
-  @Post('followup/chat/conversations')
+  @Post('followups/:itemType/:itemId/chat/conversations')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  createConversation(@CurrentUser() user: AuthUser, @Body() dto: CreateFollowupConversationDto): Promise<Record<string, unknown>> {
+  createConversation(
+    @CurrentUser() user: AuthUser,
+    @Param('itemType', new ParseEnumPipe(ItemType)) itemType: ItemType,
+    @Param('itemId', ParseIntPipe) itemId: number,
+    @Body() dto: CreateFollowupConversationBodyDto,
+  ): Promise<Record<string, unknown>> {
+    return this.kayanService.createFollowupConversation(user, { ...dto, itemType, itemId });
+  }
+
+  @Post('followup/chat/conversations')
+  @Header('Deprecation', 'true')
+  @Header('Sunset', 'Wed, 31 Dec 2026 23:59:59 GMT')
+  @Header('X-Deprecated-Route', 'Use /v2/followups/:itemType/:itemId/chat/conversations')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  createConversationDeprecated(@CurrentUser() user: AuthUser, @Body() dto: CreateFollowupConversationDto): Promise<Record<string, unknown>> {
     return this.kayanService.createFollowupConversation(user, dto);
   }
 
-  @Get('followup/chat/conversations/:id/messages')
+  @Get('followups/:itemType/:itemId/chat/conversations/:id/messages')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  listMessages(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) conversationId: number): Promise<Record<string, unknown>> {
+  listMessages(
+    @CurrentUser() user: AuthUser,
+    @Param('itemType', new ParseEnumPipe(ItemType)) itemType: ItemType,
+    @Param('itemId', ParseIntPipe) itemId: number,
+    @Param('id', ParseIntPipe) conversationId: number,
+  ): Promise<Record<string, unknown>> {
+    return this.kayanService.listFollowupMessages(user, conversationId, itemType, itemId);
+  }
+
+  @Get('followup/chat/conversations/:id/messages')
+  @Header('Deprecation', 'true')
+  @Header('Sunset', 'Wed, 31 Dec 2026 23:59:59 GMT')
+  @Header('X-Deprecated-Route', 'Use /v2/followups/:itemType/:itemId/chat/conversations/:id/messages')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  listMessagesDeprecated(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) conversationId: number): Promise<Record<string, unknown>> {
     return this.kayanService.listFollowupMessages(user, conversationId);
   }
 
-  @Post('followup/chat/conversations/:id/messages')
+  @Post('followups/:itemType/:itemId/chat/conversations/:id/messages')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   sendMessage(
+    @CurrentUser() user: AuthUser,
+    @Param('itemType', new ParseEnumPipe(ItemType)) itemType: ItemType,
+    @Param('itemId', ParseIntPipe) itemId: number,
+    @Param('id', ParseIntPipe) conversationId: number,
+    @Body() dto: SendFollowupMessageDto,
+  ): Promise<Record<string, unknown>> {
+    return this.kayanService.sendFollowupMessage(user, conversationId, dto, itemType, itemId);
+  }
+
+  @Post('followup/chat/conversations/:id/messages')
+  @Header('Deprecation', 'true')
+  @Header('Sunset', 'Wed, 31 Dec 2026 23:59:59 GMT')
+  @Header('X-Deprecated-Route', 'Use /v2/followups/:itemType/:itemId/chat/conversations/:id/messages')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  sendMessageDeprecated(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseIntPipe) conversationId: number,
     @Body() dto: SendFollowupMessageDto,
@@ -312,18 +374,56 @@ export class KayanAdminController {
     return this.kayanService.adminUpdateServiceStatus(admin, serviceId, dto);
   }
 
+  @Post('followups/:itemType/:itemId/steps')
+  createStep(
+    @CurrentUser() admin: AuthUser,
+    @Param('itemType', new ParseEnumPipe(ItemType)) itemType: ItemType,
+    @Param('itemId', ParseIntPipe) itemId: number,
+    @Body() dto: CreateFollowupStepBodyDto,
+  ): Promise<Record<string, unknown>> {
+    return this.kayanService.adminCreateFollowupStep(admin, { ...dto, itemType, itemId });
+  }
+
   @Post('followup-steps')
-  createStep(@CurrentUser() admin: AuthUser, @Body() dto: CreateFollowupStepDto): Promise<Record<string, unknown>> {
+  @Header('Deprecation', 'true')
+  @Header('Sunset', 'Wed, 31 Dec 2026 23:59:59 GMT')
+  @Header('X-Deprecated-Route', 'Use /v2/admin/followups/:itemType/:itemId/steps')
+  createStepDeprecated(@CurrentUser() admin: AuthUser, @Body() dto: CreateFollowupStepDto): Promise<Record<string, unknown>> {
     return this.kayanService.adminCreateFollowupStep(admin, dto);
   }
 
-  @Patch('followup-steps/:id')
-  updateStep(@Param('id', ParseIntPipe) stepId: number, @Body() dto: UpdateFollowupStepDto): Promise<Record<string, unknown>> {
+  @Patch('followups/:itemType/:itemId/steps/:id')
+  updateStep(
+    @Param('itemType', new ParseEnumPipe(ItemType)) _itemType: ItemType,
+    @Param('itemId', ParseIntPipe) _itemId: number,
+    @Param('id', ParseIntPipe) stepId: number,
+    @Body() dto: UpdateFollowupStepDto,
+  ): Promise<Record<string, unknown>> {
     return this.kayanService.adminUpdateFollowupStep(stepId, dto);
   }
 
+  @Patch('followup-steps/:id')
+  @Header('Deprecation', 'true')
+  @Header('Sunset', 'Wed, 31 Dec 2026 23:59:59 GMT')
+  @Header('X-Deprecated-Route', 'Use /v2/admin/followups/:itemType/:itemId/steps/:id')
+  updateStepDeprecated(@Param('id', ParseIntPipe) stepId: number, @Body() dto: UpdateFollowupStepDto): Promise<Record<string, unknown>> {
+    return this.kayanService.adminUpdateFollowupStep(stepId, dto);
+  }
+
+  @Delete('followups/:itemType/:itemId/steps/:id')
+  deleteStep(
+    @Param('itemType', new ParseEnumPipe(ItemType)) _itemType: ItemType,
+    @Param('itemId', ParseIntPipe) _itemId: number,
+    @Param('id', ParseIntPipe) stepId: number,
+  ): Promise<Record<string, unknown>> {
+    return this.kayanService.adminDeleteFollowupStep(stepId);
+  }
+
   @Delete('followup-steps/:id')
-  deleteStep(@Param('id', ParseIntPipe) stepId: number): Promise<Record<string, unknown>> {
+  @Header('Deprecation', 'true')
+  @Header('Sunset', 'Wed, 31 Dec 2026 23:59:59 GMT')
+  @Header('X-Deprecated-Route', 'Use /v2/admin/followups/:itemType/:itemId/steps/:id')
+  deleteStepDeprecated(@Param('id', ParseIntPipe) stepId: number): Promise<Record<string, unknown>> {
     return this.kayanService.adminDeleteFollowupStep(stepId);
   }
 

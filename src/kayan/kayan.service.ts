@@ -481,7 +481,7 @@ export class KayanService {
     const current = await this.db.query<{ status: FaultStatus }>(`SELECT status FROM fault_reports WHERE id = $1 LIMIT 1`, [faultId]);
     if (!current.rowCount) throw new NotFoundException('Fault not found');
     this.assertValidFaultTransition(current.rows[0].status, dto.status);
-    const q = await this.db.query(`UPDATE fault_reports SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id`, [dto.status, faultId]);
+    await this.db.query(`UPDATE fault_reports SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id`, [dto.status, faultId]);
     await this.db.query(`INSERT INTO fault_status_history(fault_id, status, changed_by) VALUES($1,$2,$3)`, [faultId, dto.status, admin.sub]);
     return this.getFaultForUser(0, faultId, true);
   }
@@ -617,6 +617,7 @@ export class KayanService {
   }
 
   async adminCreateFollowupStep(admin: AuthUser, dto: CreateFollowupStepDto): Promise<Record<string, unknown>> {
+    await this.assertItemExists(dto.itemType, dto.itemId);
     const q = await this.db.query(
       `INSERT INTO followup_steps(item_type, item_id, title, step_image_file_id, sort_order, created_by)
        VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -734,6 +735,7 @@ export class KayanService {
     await this.assertUserOwnsItem(user, dto.itemType, dto.itemId);
     const adminId = dto.adminId ?? await this.findAnyAdminId();
     if (!adminId) throw new BadRequestException('No admin account available');
+    if (!await this.isActiveAdmin(adminId)) throw new BadRequestException('Admin not found');
     const q = await this.db.query(
       `INSERT INTO followup_conversations(item_type, item_id, user_id, admin_id)
        VALUES($1,$2,$3,$4)
@@ -745,8 +747,16 @@ export class KayanService {
     return { conversation: q.rows[0] };
   }
 
-  async listFollowupMessages(user: AuthUser, conversationId: number): Promise<Record<string, unknown>> {
+  async listFollowupMessages(
+    user: AuthUser,
+    conversationId: number,
+    itemType?: ItemType,
+    itemId?: number,
+  ): Promise<Record<string, unknown>> {
     await this.assertFollowupConversationAccess(user, conversationId);
+    if (itemType !== undefined && itemId !== undefined) {
+      await this.assertFollowupConversationItemScope(conversationId, itemType, itemId);
+    }
     const q = await this.db.query(
       `SELECT id, conversation_id, sender_id, message_text, sent_at::text AS sent_at
        FROM followup_messages WHERE conversation_id = $1 ORDER BY sent_at ASC`,
@@ -755,8 +765,17 @@ export class KayanService {
     return { items: q.rows };
   }
 
-  async sendFollowupMessage(user: AuthUser, conversationId: number, dto: SendFollowupMessageDto): Promise<Record<string, unknown>> {
+  async sendFollowupMessage(
+    user: AuthUser,
+    conversationId: number,
+    dto: SendFollowupMessageDto,
+    itemType?: ItemType,
+    itemId?: number,
+  ): Promise<Record<string, unknown>> {
     await this.assertFollowupConversationAccess(user, conversationId);
+    if (itemType !== undefined && itemId !== undefined) {
+      await this.assertFollowupConversationItemScope(conversationId, itemType, itemId);
+    }
     const q = await this.db.query(
       `INSERT INTO followup_messages(conversation_id, sender_id, message_text)
        VALUES($1,$2,$3) RETURNING id, conversation_id, sender_id, message_text, sent_at::text AS sent_at`,
@@ -771,10 +790,23 @@ export class KayanService {
   }
 
   private async assertUserOwnsItem(user: AuthUser, itemType: ItemType, itemId: number): Promise<void> {
-    if (user.isAdmin) return;
     const ownership = await this.resolveOwnership(itemType, itemId);
     if (ownership === null) throw new NotFoundException('Item not found');
+    if (user.isAdmin) return;
     if (ownership !== user.sub) throw new ForbiddenException('Not allowed');
+  }
+
+  private async assertItemExists(itemType: ItemType, itemId: number): Promise<void> {
+    const ownership = await this.resolveOwnership(itemType, itemId);
+    if (ownership === null) throw new NotFoundException('Item not found');
+  }
+
+  private async isActiveAdmin(userId: number): Promise<boolean> {
+    const q = await this.db.query<{ id: number }>(
+      `SELECT id FROM users WHERE id = $1 AND is_admin = true AND deleted_at IS NULL LIMIT 1`,
+      [userId],
+    );
+    return Number(q.rowCount ?? 0) > 0;
   }
 
   private async resolveOwnership(itemType: ItemType, itemId: number): Promise<number | null> {
@@ -833,6 +865,14 @@ export class KayanService {
     if (!q.rowCount) throw new NotFoundException('Conversation not found');
     const row = q.rows[0];
     if (Number(row.user_id) !== user.sub && Number(row.admin_id) !== user.sub) throw new ForbiddenException('Not allowed');
+  }
+
+  private async assertFollowupConversationItemScope(conversationId: number, itemType: ItemType, itemId: number): Promise<void> {
+    const q = await this.db.query<{ id: number }>(
+      `SELECT id FROM followup_conversations WHERE id = $1 AND item_type = $2 AND item_id = $3 LIMIT 1`,
+      [conversationId, itemType, itemId],
+    );
+    if (!q.rowCount) throw new NotFoundException('Conversation not found');
   }
 
   private async getProductWithAssets(executor: SqlExecutor, productId: number): Promise<Record<string, unknown>> {

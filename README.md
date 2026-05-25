@@ -152,6 +152,25 @@ Then run:
 NODE_ENV=development OTP_DEV_MODE=true npm run simulate
 ```
 
+Module 6 (Follow-Up + Item Chat) client-flow simulation:
+
+```bash
+# stack already running (docker compose up -d)
+BASE_URL=http://localhost \
+ADMIN_EMAIL=admin@example.com \
+ADMIN_PASSWORD=ChangeMe123 \
+OTP_DEV_MODE=true \
+npm run simulate:kayan:followup
+```
+
+Optional controls:
+- `KAYAN_FOLLOWUP_TEST_TIMEOUT_MS` (default `20000`)
+- `KAYAN_FOLLOWUP_TEST_VERBOSE` (`true`/`false`, default `true`)
+- `KAYAN_FOLLOWUP_TEST_NEGATIVE` (`true`/`false`, default `true`)
+- `KAYAN_FOLLOWUP_TEST_CONTINUE_ON_FAIL` (`true`/`false`, default `false`)
+
+The simulation covers canonical Module 6 REST routes and Socket.io `/chat` events for `order`, `fault`, and `service`, then writes a JSON report under `logs/kayan-followup-test/`.
+
 `THROTTLE_DEV_BYPASS` is only honored when `NODE_ENV=development`.
 
 If simulation fails at `POST /auth/login (admin)` with `401 Invalid credentials`, seed admin in the same active DB environment, then rerun:
