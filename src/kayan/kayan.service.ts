@@ -22,11 +22,13 @@ import {
   ListMyFaultsQueryDto,
   ListOrdersQueryDto,
   ListProductsQueryDto,
+  ListServicesQueryDto,
   OrderSortBy,
   OrderStatus,
   ProductAvailabilityFilter,
   ProductSortBy,
   SendFollowupMessageDto,
+  ServiceSortBy,
   ServiceStatus,
   SortDirection,
   UpdateFaultDto,
@@ -506,8 +508,34 @@ export class KayanService {
     return this.getServiceForUser(user.sub, serviceId, true);
   }
 
-  async listMyServices(user: AuthUser): Promise<Record<string, unknown>> {
-    const q = await this.db.query(`SELECT * FROM service_orders WHERE user_id = $1 ORDER BY created_at DESC`, [user.sub]);
+  async listMyServices(user: AuthUser, query: ListServicesQueryDto = {}): Promise<Record<string, unknown>> {
+    const conditions = ['so.user_id = $1'];
+    const params: unknown[] = [user.sub];
+
+    if (query.serviceType) {
+      params.push(query.serviceType);
+      conditions.push(`so.service_type = $${params.length}`);
+    }
+    if (query.fromDate) {
+      params.push(query.fromDate);
+      conditions.push(`so.created_at >= $${params.length}`);
+    }
+    if (query.toDate) {
+      params.push(query.toDate);
+      conditions.push(`so.created_at <= $${params.length}`);
+    }
+
+    const sortBy = query.sortBy ?? ServiceSortBy.CREATED_AT;
+    const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
+    const orderColumn = sortBy === ServiceSortBy.CREATED_AT ? 'so.created_at' : 'so.created_at';
+
+    const q = await this.db.query(
+      `SELECT so.*
+       FROM service_orders so
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY ${orderColumn} ${sortDirection}, so.id DESC`,
+      params,
+    );
     return { items: q.rows };
   }
 
@@ -528,9 +556,47 @@ export class KayanService {
     return { service };
   }
 
-  async adminListServices(): Promise<Record<string, unknown>> {
-    const q = await this.db.query(`SELECT * FROM service_orders ORDER BY created_at DESC`);
-    return { items: q.rows };
+  async adminListServices(query: ListServicesQueryDto = {}): Promise<Record<string, unknown>> {
+    const conditions = ['1=1'];
+    const params: unknown[] = [];
+
+    if (query.serviceType) {
+      params.push(query.serviceType);
+      conditions.push(`so.service_type = $${params.length}`);
+    }
+    if (query.fromDate) {
+      params.push(query.fromDate);
+      conditions.push(`so.created_at >= $${params.length}`);
+    }
+    if (query.toDate) {
+      params.push(query.toDate);
+      conditions.push(`so.created_at <= $${params.length}`);
+    }
+
+    const sortBy = query.sortBy ?? ServiceSortBy.CREATED_AT;
+    const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
+    const orderColumn = sortBy === ServiceSortBy.CREATED_AT ? 'so.created_at' : 'so.created_at';
+
+    const q = await this.db.query(
+      `SELECT so.*,
+              u.name AS user_name, u.email AS user_email, u.phone AS user_phone
+       FROM service_orders so
+       LEFT JOIN users u ON u.id = so.user_id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY ${orderColumn} ${sortDirection}, so.id DESC`,
+      params,
+    );
+    return {
+      items: q.rows.map((item) => ({
+        ...item,
+        user: {
+          id: Number(item.user_id),
+          name: item.user_name ?? null,
+          email: item.user_email ?? null,
+          phone: item.user_phone ?? null,
+        },
+      })),
+    };
   }
 
   async adminUpdateServiceStatus(admin: AuthUser, serviceId: number, dto: AdminUpdateServiceStatusDto): Promise<Record<string, unknown>> {

@@ -209,12 +209,40 @@ For frontend and mobile implementation guidance, see [Module 4 Faults Integratio
 | Use Case                    | Main Actor | Description                                                  | Priority  | Status |
 | --------------------------- | ---------- | ------------------------------------------------------------ | --------- | ------ |
 | Order a Service             | User       | Users can order a service. A service includes type, description, and address. Service types include: designing, maintenance, and renewal. | Mandatory | Completed |
-| List All Service Orders     | Admin      | Admins can see all service orders and the users who ordered them. Service orders can be filtered by type and creation date range. Service orders can be sorted by date in ascending or descending order. | Mandatory | Partial |
-| My Service Orders           | User       | Users can list their ordered services. Service orders can be filtered by type and creation date range. Service orders can be sorted by date in ascending or descending order. | Mandatory | Partial |
+| List All Service Orders     | Admin      | Admins can see all service orders and the users who ordered them. Service orders can be filtered by type and creation date range. Service orders can be sorted by date in ascending or descending order. | Mandatory | Completed |
+| My Service Orders           | User       | Users can list their ordered services. Service orders can be filtered by type and creation date range. Service orders can be sorted by date in ascending or descending order. | Mandatory | Completed |
 | Cancel Service              | All        | Users can cancel a service order.                            | Mandatory | Completed |
 | Update Service Order        | User       | Users can update the service order description.              | Mandatory | Completed |
 | Update Service Order Status | Admin      | Admins can cancel a service order or mark it as complete/incomplete. Service statuses include: not started, in progress, cancelled, and finished. | Mandatory | Completed |
 | Rate Service                | User       | Users can rate a service one time only after it is marked as finished. | Mandatory | Completed |
+
+Implementation notes:
+- Service endpoints:
+  - `POST /v2/services`
+  - `PATCH /v2/services/:id`
+  - `POST /v2/services/:id/cancel`
+  - `GET /v2/services/me`
+  - `GET /v2/admin/services`
+  - `PATCH /v2/admin/services/:id/status`
+- Supported service types:
+  - `designing`, `maintenance`, `renewal`
+- Supported service statuses:
+  - `not_started`, `in_progress`, `cancelled`, `finished`
+- Service list query shape (`GET /v2/services/me`, `GET /v2/admin/services`):
+  - `serviceType`
+  - `fromDate`, `toDate`
+  - `sortBy` (`createdAt`)
+  - `sortDirection` (`asc`, `desc`)
+- Business rules:
+  - Users can update/cancel only before processing starts (`not_started`).
+  - Service rating is allowed only after `finished` and only once per user per service.
+- Key expected errors in module flows:
+  - `400` invalid payload, invalid status enum, update/cancel not allowed for current status, rating before completion, or duplicate rating
+  - `401` invalid/missing bearer token
+  - `403` trying to access/update/cancel/rate another user service (or policy/permission rejection)
+  - `404` service order not found
+
+For frontend and mobile implementation guidance, see [Module 5 Services Integration Guide](./module-5-services-integration.md).
 
 ---
 

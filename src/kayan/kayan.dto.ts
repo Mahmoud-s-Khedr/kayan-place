@@ -69,6 +69,10 @@ export enum FaultSortBy {
   SEVERITY = 'severity',
 }
 
+export enum ServiceSortBy {
+  CREATED_AT = 'createdAt',
+}
+
 export class ProductItemDto {
   @IsInt() @Min(1) productId!: number;
   @IsInt() @Min(1) quantity!: number;
@@ -181,6 +185,14 @@ export class UpdateServiceOrderDto {
 
 export class AdminUpdateServiceStatusDto {
   @IsEnum(ServiceStatus) status!: ServiceStatus;
+}
+
+export class ListServicesQueryDto {
+  @IsOptional() @IsEnum(ServiceType) serviceType?: ServiceType;
+  @IsOptional() @IsDateString() fromDate?: string;
+  @IsOptional() @IsDateString() toDate?: string;
+  @IsOptional() @IsEnum(ServiceSortBy) sortBy?: ServiceSortBy;
+  @IsOptional() @IsEnum(SortDirection) sortDirection?: SortDirection;
 }
 
 export class CreateFollowupStepDto {

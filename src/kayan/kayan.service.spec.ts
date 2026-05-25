@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { KayanService } from './kayan.service';
-import { FaultStatus, ItemType, OrderStatus } from './kayan.dto';
+import { FaultStatus, ItemType, OrderStatus, ServiceStatus, ServiceType } from './kayan.dto';
 
 describe('KayanService', () => {
   const databaseService = {
@@ -279,6 +279,101 @@ describe('KayanService', () => {
     });
   });
 
+  it('lists my services with filters and sorting', async () => {
+    databaseService.query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 51,
+          user_id: 6,
+          service_type: ServiceType.MAINTENANCE,
+          description: 'Fix AC',
+          address: 'Cairo',
+          status: ServiceStatus.NOT_STARTED,
+          created_at: '2026-03-01T00:00:00.000Z',
+          updated_at: '2026-03-01T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const result = await service.listMyServices(
+      { sub: 6, phone: '+201000000006', isAdmin: false },
+      {
+        serviceType: ServiceType.MAINTENANCE,
+        fromDate: '2026-03-01',
+        toDate: '2026-03-31',
+        sortDirection: 'asc' as any,
+        sortBy: 'createdAt' as any,
+      },
+    );
+
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          id: 51,
+          service_type: ServiceType.MAINTENANCE,
+        }),
+      ],
+    });
+
+    const [queryText, params] = databaseService.query.mock.calls[0];
+    expect(queryText).toContain('so.user_id = $1');
+    expect(queryText).toContain('so.service_type = $2');
+    expect(queryText).toContain('so.created_at >= $3');
+    expect(queryText).toContain('so.created_at <= $4');
+    expect(queryText).toContain('ORDER BY so.created_at ASC, so.id DESC');
+    expect(params).toEqual([6, ServiceType.MAINTENANCE, '2026-03-01', '2026-03-31']);
+  });
+
+  it('lists admin services with filters and user information', async () => {
+    databaseService.query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 61,
+          user_id: 12,
+          service_type: ServiceType.DESIGNING,
+          description: 'Design living room',
+          address: 'Giza',
+          status: ServiceStatus.IN_PROGRESS,
+          created_at: '2026-04-01T00:00:00.000Z',
+          updated_at: '2026-04-01T00:00:00.000Z',
+          user_name: 'Laila',
+          user_email: 'laila@example.com',
+          user_phone: '+201000000012',
+        },
+      ],
+    });
+
+    const result = await service.adminListServices({
+      serviceType: ServiceType.DESIGNING,
+      fromDate: '2026-04-01',
+      toDate: '2026-04-30',
+      sortDirection: 'desc' as any,
+      sortBy: 'createdAt' as any,
+    });
+
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          id: 61,
+          user: expect.objectContaining({
+            id: 12,
+            name: 'Laila',
+            email: 'laila@example.com',
+            phone: '+201000000012',
+          }),
+        }),
+      ],
+    });
+
+    const [queryText, params] = databaseService.query.mock.calls[0];
+    expect(queryText).toContain('LEFT JOIN users u ON u.id = so.user_id');
+    expect(queryText).toContain('so.service_type = $1');
+    expect(queryText).toContain('so.created_at >= $2');
+    expect(queryText).toContain('so.created_at <= $3');
+    expect(queryText).toContain('ORDER BY so.created_at DESC, so.id DESC');
+    expect(params).toEqual([ServiceType.DESIGNING, '2026-04-01', '2026-04-30']);
+  });
+
   it('creates a product rating only for delivered ordered products', async () => {
     databaseService.query
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 4, status: OrderStatus.DELIVERED }] })
@@ -312,6 +407,62 @@ describe('KayanService', () => {
       service.createItemRating(
         { sub: 4, phone: '+201000000004', isAdmin: false },
         { itemType: ItemType.ORDER, orderId: 6, productId: 2, ratingValue: 5 },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects service rating before service is finished', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ status: ServiceStatus.IN_PROGRESS }] });
+
+    await expect(
+      service.createItemRating(
+        { sub: 7, phone: '+201000000007', isAdmin: false },
+        { itemType: ItemType.SERVICE, itemId: 77, ratingValue: 5 },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects duplicate service ratings', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ status: ServiceStatus.FINISHED }] })
+      .mockRejectedValueOnce({ code: '23505' });
+
+    await expect(
+      service.createItemRating(
+        { sub: 7, phone: '+201000000007', isAdmin: false },
+        { itemType: ItemType.SERVICE, itemId: 77, ratingValue: 5 },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('blocks service update after processing starts', async () => {
+    databaseService.query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ status: ServiceStatus.IN_PROGRESS }],
+    });
+
+    await expect(
+      service.updateService(
+        { sub: 9, phone: '+201000000009', isAdmin: false },
+        88,
+        { description: 'Updated description' },
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('blocks service cancel after processing starts', async () => {
+    databaseService.query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ status: ServiceStatus.IN_PROGRESS }],
+    });
+
+    await expect(
+      service.cancelService(
+        { sub: 9, phone: '+201000000009', isAdmin: false },
+        89,
       ),
     ).rejects.toThrow(BadRequestException);
   });
