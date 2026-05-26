@@ -1,92 +1,90 @@
 # API List
 
-Generated from `openapi.json` (REST) and `src/**/*.gateway.ts` (WebSocket).
-
 ## REST APIs
 
 ### Admin
 
 | Method | Path | Auth | Name | Summary | Request | Response | Notes |
 |---|---|---|---|---|---|---|---|
-| GET | /admin/admins | bearer | AdminController_listAdmins | List all admins (admin only) | - | 200:AdminAdminsListResponseDto |  |
-| DELETE | /admin/admins/{id} | bearer | AdminController_demoteAdmin | Demote an admin to regular user (admin only) | - | 200:AdminUserResponseDto |  |
-| POST | /admin/admins/{id} | bearer | AdminController_promoteAdmin | Promote a user to admin (admin only) | - | 200:AdminUserResponseDto |  |
-| GET | /admin/users | bearer | AdminController_listUsers | List all users with optional filters (admin only) | - | 200:AdminUsersListResponseDto |  |
-| DELETE | /admin/users/{id} | bearer | AdminController_deleteUser | Delete a user (soft-delete, admin only) | - | 200:SuccessResponseDto |  |
-| GET | /admin/users/{id} | bearer | AdminController_getUserDetails | Get user details for moderation page (admin only) | - | 200:AdminUserDetailsResponseDto |  |
-| GET | /admin/users/{id}/listings | bearer | AdminController_listUserListings | List user listings for admin view (read-only) | - | 200:AdminUserListingsResponseDto |  |
-| PATCH | /admin/users/{id}/status | bearer | AdminController_updateUserStatus | Update a user's status (admin only) | UpdateUserStatusDto | 200:AdminUserResponseDto |  |
-| POST | /admin/warnings | bearer | AdminController_createWarning | Issue a warning to a user (admin only) | CreateWarningDto | 201:WarningResponseDto |  |
+| GET | /admin/admins | bearer | AdminController_listAdmins | List all admins (admin only) | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => AdminAdminsListDataDto }) data!: AdminAdminsListDataDto} |  |
+| DELETE | /admin/admins/{id} | bearer | AdminController_demoteAdmin | Demote an admin to regular user (admin only) | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => AdminUserDataDto }) data!: AdminUserDataDto} |  |
+| POST | /admin/admins/{id} | bearer | AdminController_promoteAdmin | Promote a user to admin (admin only) | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => AdminUserDataDto }) data!: AdminUserDataDto} |  |
+| GET | /admin/users | bearer | AdminController_listUsers | List all users with optional filters (admin only) | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => AdminUsersListDataDto }) data!: AdminUsersListDataDto} |  |
+| DELETE | /admin/users/{id} | bearer | AdminController_deleteUser | Delete a user (soft-delete, admin only) | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => SuccessDataDto }) data!: SuccessDataDto} |  |
+| GET | /admin/users/{id} | bearer | AdminController_getUserDetails | Get user details for moderation page (admin only) | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => AdminUserDetailsDataDto }) data!: AdminUserDetailsDataDto} |  |
+| GET | /admin/users/{id}/listings | bearer | AdminController_listUserListings | List user listings for admin view (read-only) | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => AdminUserListingsDataDto }) data!: AdminUserListingsDataDto} |  |
+| PATCH | /admin/users/{id}/status | bearer | AdminController_updateUserStatus | Update a user's status (admin only) | {enum:['active', 'paused', 'banned'], description: 'New account status for the user', example: 'banned' }) @IsEnum(['active', 'paused', 'banned']) status!: 'active' | 'paused' | 'banned'} | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => AdminUserDataDto }) data!: AdminUserDataDto} |  |
+| POST | /admin/warnings | bearer | AdminController_createWarning | Issue a warning to a user (admin only) | {description:'ID of the user to warn', example: 42, minimum: 1 }) @IsInt() @Min(1) targetUserId!: number,description:'Warning message (2–2000 chars)', example: 'Your listing violated our terms of service.', minLength: 2, maxLength: 2000 }) @IsString() @Length(2, 2000) message!: string} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => WarningDataDto }) data!: WarningDataDto} |  |
 
 ### Auth
 
 | Method | Path | Auth | Name | Summary | Request | Response | Notes |
 |---|---|---|---|---|---|---|---|
-| POST | /auth/login | public | AuthController_login | Login with email and password | LoginDto | 201:TokenResponseDto |  |
-| POST | /auth/logout | bearer | AuthController_logout | Revoke refresh token and logout | LogoutDto | 201:LogoutResponseDto |  |
-| POST | /auth/password/request-otp | public | AuthController_requestPasswordResetOtp | Request a password-reset OTP via email | RequestPasswordResetOtpDto | 201:OtpSentResponseDto |  |
-| POST | /auth/password/reset | public | AuthController_resetPassword | Reset password using OTP | ResetPasswordDto | 201:TokenResponseDto |  |
-| POST | /auth/refresh | bearer | AuthController_refresh | Refresh access token using a refresh token | RefreshTokenDto | 201:TokenResponseDto |  |
-| POST | /auth/register | public | AuthController_requestRegistrationOtp | Register with name/email/phone/password and request a verification OTP via email | RequestRegistrationOtpDto | 201:OtpSentResponseDto |  |
-| POST | /auth/register/resend-otp | public | AuthController_resendRegistrationOtp | Resend registration OTP to an existing pending registration | ResendRegistrationOtpDto | 201:OtpSentResponseDto |  |
-| POST | /auth/register/verify | public | AuthController_verifyRegistrationOtp | Verify OTP and complete registration | VerifyRegistrationOtpDto | 201:TokenResponseDto |  |
+| POST | /auth/login | public | AuthController_login | Login with email and password | {description:'User email address', example: 'user@example.com' }) @IsEmail() email!: string,description:'User password (8–64 chars)', example: 'Secret123', minLength: 8, maxLength: 64 }) @IsString() @Length(8, 64) password!: string} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => TokenDataDto }) data!: TokenDataDto} |  |
+| POST | /auth/logout | bearer | AuthController_logout | Revoke refresh token and logout | {description:'The refresh token to revoke', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' }) @IsString() @IsNotEmpty() refreshToken!: string} | 201:LogoutResponseDto |  |
+| POST | /auth/password/request-otp | public | AuthController_requestPasswordResetOtp | Request a password-reset OTP via email | {description:'Registered email to receive the reset OTP', example: 'user@example.com' }) @IsEmail() email!: string} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => OtpSentDataDto }) data!: OtpSentDataDto} |  |
+| POST | /auth/password/reset | public | AuthController_resetPassword | Reset password using OTP | {description:'Email associated with the account', example: 'user@example.com' }) @IsEmail() email!: string,description:'One-time password received via email (4–8 digits)', example: '000000', minLength: 4, maxLength: 8 }) @IsString() @Length(4, 8) otp!: string,description:'New password — must contain letters and numbers (8–64 chars)', example: 'NewSecret123', minLength: 8, maxLength: 64 }) @IsString() @Length(8, 64) @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, { message: 'Password must contain letters and numbers', }) newPassword!: string,description:'Must match newPassword', example: 'NewSecret123', minLength: 8, maxLength: 64 }) @IsString() @Length(8, 64) confirmPassword!: string} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => TokenDataDto }) data!: TokenDataDto} |  |
+| POST | /auth/refresh | bearer | AuthController_refresh | Refresh access token using a refresh token | {description:'JWT refresh token', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' }) @IsString() refreshToken!: string} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => TokenDataDto }) data!: TokenDataDto} |  |
+| POST | /auth/register | public | AuthController_requestRegistrationOtp | Register with name/email/phone/password and request a verification OTP via email | {description:'Full name (2–150 chars)', example: 'Ahmed Ali', minLength: 2, maxLength: 150 }) @IsString() @IsNotEmpty() @Length(2, 150) name!: string,description:'National ID / SSN (8–32 chars)', example: '12345678', minLength: 8, maxLength: 32 }) @IsString() @IsNotEmpty() @Length(8, 32) ssn!: string,description:'Email address', example: 'user@example.com' }) @IsEmail() email!: string,description:'Phone number (7–32 chars)', example: '+201001234567', minLength: 7, maxLength: 32 }) @IsString() @IsNotEmpty() @Length(7, 32) phone!: string,description:'Password — must contain letters and numbers (8–64 chars)', example: 'Secret123', minLength: 8, maxLength: 64 }) @IsString() @Length(8, 64) @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, { message: 'Password must contain letters and numbers', }) password!: string} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => OtpSentDataDto }) data!: OtpSentDataDto} |  |
+| POST | /auth/register/resend-otp | public | AuthController_resendRegistrationOtp | Resend registration OTP to an existing pending registration | {description:'Email address', example: 'user@example.com' }) @IsEmail() email!: string} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => OtpSentDataDto }) data!: OtpSentDataDto} |  |
+| POST | /auth/register/verify | public | AuthController_verifyRegistrationOtp | Verify OTP and complete registration | {description:'Email address', example: 'user@example.com' }) @IsEmail() email!: string,description:'One-time password sent via email (4–8 digits)', example: '000000', minLength: 4, maxLength: 8 }) @IsString() @Length(4, 8) otp!: string} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => TokenDataDto }) data!: TokenDataDto} |  |
 
 ### Chat
 
 | Method | Path | Auth | Name | Summary | Request | Response | Notes |
 |---|---|---|---|---|---|---|---|
-| GET | /chat/conversations | bearer | ChatController_listConversations | List conversations for the current user | - | 200:ConversationsListResponseDto |  |
-| POST | /chat/conversations | bearer | ChatController_createConversation | Get or create a conversation with another user | CreateConversationDto | 201:ConversationResponseDto |  |
-| GET | /chat/conversations/{id} | bearer | ChatController_getConversation | Get a single conversation with metadata for the current user | - | 200:ConversationResponseDto |  |
-| GET | /chat/conversations/{id}/messages | bearer | ChatController_listMessages | List messages in a conversation (cursor-paginated) | - | 200:MessagesListResponseDto |  |
+| GET | /chat/conversations | bearer | ChatController_listConversations | List conversations for the current user | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => ConversationsListDataDto }) data!: ConversationsListDataDto} |  |
+| POST | /chat/conversations | bearer | ChatController_createConversation | Get or create a conversation with another user | {description:'User ID of the other conversation participant', example: 12, minimum: 1 }) @IsNumber() @Min(1) participantId!: number,description:'Optional product ID to attach as context for the conversation', example: 45, required: false, }) @IsOptional() @IsNumber() @Min(1) productId?: number} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => ConversationDataDto }) data!: ConversationDataDto} |  |
+| GET | /chat/conversations/{id} | bearer | ChatController_getConversation | Get a single conversation with metadata for the current user | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => ConversationDataDto }) data!: ConversationDataDto} |  |
+| GET | /chat/conversations/{id}/messages | bearer | ChatController_listMessages | List messages in a conversation (cursor-paginated) | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => MessagesListDataDto }) data!: MessagesListDataDto} |  |
 
 ### Files
 
 | Method | Path | Auth | Name | Summary | Request | Response | Notes |
 |---|---|---|---|---|---|---|---|
-| GET | /files/{id} | bearer | FilesController_getFile | Get file metadata and signed download URL | - | 200:FileResponseDto |  |
-| PATCH | /files/{id}/mark-uploaded | bearer | FilesController_markUploaded | Confirm a file has been uploaded to storage | MarkUploadedDto | 200:FileMarkUploadedResponseDto |  |
-| POST | /files/upload-intent | bearer | FilesController_createUploadIntent | Create a signed upload URL for a file | CreateUploadIntentDto | 201:UploadIntentResponseDto |  |
+| GET | /files/{id} | bearer | FilesController_getFile | Get file metadata and signed download URL | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => FileDataDto }) data!: FileDataDto} |  |
+| PATCH | /files/{id}/mark-uploaded | bearer | FilesController_markUploaded | Confirm a file has been uploaded to storage | {description:'SHA-256 checksum of the uploaded file (hex, 64 chars) for integrity verification', example: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', minLength: 64, maxLength: 64 }) @IsOptional() @IsString() @Length(64, 64) checksumSha256?: string} | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => FileMarkUploadedDataDto }) data!: FileMarkUploadedDataDto} |  |
+| POST | /files/upload-intent | bearer | FilesController_createUploadIntent | Create a signed upload URL for a file | {enum:['user', 'product', 'message'], description: 'Entity type that owns this file', example: 'product' }) @IsEnum(['user', 'product', 'message']) ownerType!: 'user' | 'product' | 'message',description:'ID of the owning entity (omit for new entities)', example: 5, minimum: 1 }) @IsOptional() @IsNumber() @Min(1) ownerId?: number,enum:['avatar', 'product_image', 'chat_attachment', 'document'], description: 'Intended use of the file', example: 'product_image' }) @IsEnum(['avatar', 'product_image', 'chat_attachment', 'document']) purpose!: 'avatar' | 'product_image' | 'chat_attachment' | 'document',description:'Original filename including extension', example: 'photo.jpg', minLength: 1, maxLength: 255 }) @IsString() @Length(1, 255) filename!: string,enum:[ 'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip', ], description: 'MIME type of the file', example: 'image/jpeg', }) @IsIn([ 'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip', ]) mimeType!: string,description:'File size in bytes (max 50 MB)', example: 204800, minimum: 0, maximum: 52428800 }) @IsOptional() @IsNumber() @Min(0) @Max(50 * 1024 * 1024) fileSizeBytes?: number} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => UploadIntentDataDto }) data!: UploadIntentDataDto} |  |
 
 ### Health
 
 | Method | Path | Auth | Name | Summary | Request | Response | Notes |
 |---|---|---|---|---|---|---|---|
-| GET | /health/live | public | HealthController_live | Liveness probe — always returns 200 | - | 200:HealthResponseDto |  |
-| GET | /health/ready | public | HealthController_ready | Readiness probe — checks DB connectivity | - | 200:HealthResponseDto |  |
+| GET | /health/live | public | HealthController_live | Liveness probe — always returns 200 | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => HealthDataDto }) data!: HealthDataDto} |  |
+| GET | /health/ready | public | HealthController_ready | Readiness probe — checks DB connectivity | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => HealthDataDto }) data!: HealthDataDto} |  |
 
 ### Kayan V2
 
 | Method | Path | Auth | Name | Summary | Request | Response | Notes |
 |---|---|---|---|---|---|---|---|
 | GET | /v2/cart | bearer | KayanController_listCart | KayanController_listCart | - | - |  |
-| POST | /v2/cart/checkout | bearer | KayanController_checkoutCart | KayanController_checkoutCart | CheckoutCartDto | - |  |
-| POST | /v2/cart/items | bearer | KayanController_addCartItem | KayanController_addCartItem | CreateCartItemDto | - |  |
+| POST | /v2/cart/checkout | bearer | KayanController_checkoutCart | KayanController_checkoutCart | {deliveryAddress:string} | - |  |
+| POST | /v2/cart/items | bearer | KayanController_addCartItem | KayanController_addCartItem | {productId:number,quantity:number} | - |  |
 | DELETE | /v2/cart/items/{id} | bearer | KayanController_deleteCartItem | KayanController_deleteCartItem | - | - |  |
-| PATCH | /v2/cart/items/{id} | bearer | KayanController_updateCartItem | KayanController_updateCartItem | UpdateCartItemDto | - |  |
-| POST | /v2/faults | bearer | KayanController_createFault | KayanController_createFault | CreateFaultDto | - |  |
-| PATCH | /v2/faults/{id} | bearer | KayanController_updateFault | KayanController_updateFault | UpdateFaultDto | - |  |
+| PATCH | /v2/cart/items/{id} | bearer | KayanController_updateCartItem | KayanController_updateCartItem | {quantity:number} | - |  |
+| POST | /v2/faults | bearer | KayanController_createFault | KayanController_createFault | {title:string,description:string,severity:'normal'|'high'|'urgent'|'emergent',address:string,each:true }) imageFileIds?: number[]} | - |  |
+| PATCH | /v2/faults/{id} | bearer | KayanController_updateFault | KayanController_updateFault | {title?:string,description?:string,severity?:'normal'|'high'|'urgent'|'emergent',address?:string,each:true }) imageFileIds?: number[]} | - |  |
 | POST | /v2/faults/{id}/cancel | bearer | KayanController_cancelFault | KayanController_cancelFault | - | - |  |
 | GET | /v2/faults/me | bearer | KayanController_listMyFaults | KayanController_listMyFaults | - | - |  |
-| POST | /v2/followup/chat/conversations | bearer | KayanController_createConversationDeprecated | KayanController_createConversationDeprecated | CreateFollowupConversationDto | - |  |
+| POST | /v2/followup/chat/conversations | bearer | KayanController_createConversationDeprecated | KayanController_createConversationDeprecated | {itemType:'order'|'fault'|'service',itemId:number,adminId?:number} | - |  |
 | GET | /v2/followup/chat/conversations/{id}/messages | bearer | KayanController_listMessagesDeprecated | KayanController_listMessagesDeprecated | - | - |  |
-| POST | /v2/followup/chat/conversations/{id}/messages | bearer | KayanController_sendMessageDeprecated | KayanController_sendMessageDeprecated | SendFollowupMessageDto | - |  |
+| POST | /v2/followup/chat/conversations/{id}/messages | bearer | KayanController_sendMessageDeprecated | KayanController_sendMessageDeprecated | {messageText:string} | - |  |
 | GET | /v2/followup/steps | bearer | KayanController_listFollowupStepsDeprecated | KayanController_listFollowupStepsDeprecated | - | - |  |
-| POST | /v2/followups/{itemType}/{itemId}/chat/conversations | bearer | KayanController_createConversation | KayanController_createConversation | CreateFollowupConversationBodyDto | - |  |
+| POST | /v2/followups/{itemType}/{itemId}/chat/conversations | bearer | KayanController_createConversation | KayanController_createConversation | {adminId?:number} | - |  |
 | GET | /v2/followups/{itemType}/{itemId}/chat/conversations/{id}/messages | bearer | KayanController_listMessages | KayanController_listMessages | - | - |  |
-| POST | /v2/followups/{itemType}/{itemId}/chat/conversations/{id}/messages | bearer | KayanController_sendMessage | KayanController_sendMessage | SendFollowupMessageDto | - |  |
+| POST | /v2/followups/{itemType}/{itemId}/chat/conversations/{id}/messages | bearer | KayanController_sendMessage | KayanController_sendMessage | {messageText:string} | - |  |
 | GET | /v2/followups/{itemType}/{itemId}/steps | bearer | KayanController_listFollowupSteps | KayanController_listFollowupSteps | - | - |  |
 | GET | /v2/gallery | public | KayanController_listGallery | KayanController_listGallery | - | - |  |
-| POST | /v2/orders | bearer | KayanController_createOrder | KayanController_createOrder | CreateOrderDto | - |  |
+| POST | /v2/orders | bearer | KayanController_createOrder | KayanController_createOrder | {deliveryAddress:string,each:true }) @Type(() => ProductItemDto) items!: ProductItemDto[]} | - |  |
 | GET | /v2/orders/{id} | bearer | KayanController_getOrder | KayanController_getOrder | - | - |  |
-| PATCH | /v2/orders/{id}/address | bearer | KayanController_updateOrderAddress | KayanController_updateOrderAddress | UpdateOrderAddressDto | - |  |
+| PATCH | /v2/orders/{id}/address | bearer | KayanController_updateOrderAddress | KayanController_updateOrderAddress | {deliveryAddress:string} | - |  |
 | POST | /v2/orders/{id}/cancel | bearer | KayanController_cancelOrder | KayanController_cancelOrder | - | - |  |
 | GET | /v2/orders/me | bearer | KayanController_listMyOrders | KayanController_listMyOrders | - | - |  |
 | GET | /v2/products | public | KayanController_listProducts | KayanController_listProducts | - | - |  |
 | GET | /v2/products/{id} | public | KayanController_getProduct | KayanController_getProduct | - | - |  |
-| POST | /v2/ratings | bearer | KayanController_createItemRating | KayanController_createItemRating | CreateItemRatingDto | - |  |
-| POST | /v2/services | bearer | KayanController_createService | KayanController_createService | CreateServiceOrderDto | - |  |
-| PATCH | /v2/services/{id} | bearer | KayanController_updateService | KayanController_updateService | UpdateServiceOrderDto | - |  |
+| POST | /v2/ratings | bearer | KayanController_createItemRating | KayanController_createItemRating | {itemType:'order'|'fault'|'service',dto:CreateItemRatingDto) => dto.itemType !== ItemType.ORDER) @IsInt() @Min(1) itemId?: number,dto:CreateItemRatingDto) => dto.itemType === ItemType.ORDER) @IsInt() @Min(1) orderId?: number,dto:CreateItemRatingDto) => dto.itemType === ItemType.ORDER) @IsInt() @Min(1) productId?: number,ratingValue:number} | - |  |
+| POST | /v2/services | bearer | KayanController_createService | KayanController_createService | {serviceType:'designing'|'maintenance'|'renewal',description:string,address:string} | - |  |
+| PATCH | /v2/services/{id} | bearer | KayanController_updateService | KayanController_updateService | {description?:string} | - |  |
 | POST | /v2/services/{id}/cancel | bearer | KayanController_cancelService | KayanController_cancelService | - | - |  |
 | GET | /v2/services/me | bearer | KayanController_listMyServices | KayanController_listMyServices | - | - |  |
 
@@ -95,53 +93,53 @@ Generated from `openapi.json` (REST) and `src/**/*.gateway.ts` (WebSocket).
 | Method | Path | Auth | Name | Summary | Request | Response | Notes |
 |---|---|---|---|---|---|---|---|
 | GET | /v2/admin/faults | bearer | KayanAdminController_listFaults | KayanAdminController_listFaults | - | - |  |
-| PATCH | /v2/admin/faults/{id}/status | bearer | KayanAdminController_updateFaultStatus | KayanAdminController_updateFaultStatus | AdminUpdateFaultStatusDto | - |  |
-| POST | /v2/admin/followup-steps | bearer | KayanAdminController_createStepDeprecated | KayanAdminController_createStepDeprecated | CreateFollowupStepDto | - |  |
+| PATCH | /v2/admin/faults/{id}/status | bearer | KayanAdminController_updateFaultStatus | KayanAdminController_updateFaultStatus | {status:'received'|'assigned'|'on_the_way'|'in_progress'|'finished'|'cancelled'} | - |  |
+| POST | /v2/admin/followup-steps | bearer | KayanAdminController_createStepDeprecated | KayanAdminController_createStepDeprecated | {itemType:'order'|'fault'|'service',itemId:number,title:string,stepImageFileId?:number,sortOrder?:number} | - |  |
 | DELETE | /v2/admin/followup-steps/{id} | bearer | KayanAdminController_deleteStepDeprecated | KayanAdminController_deleteStepDeprecated | - | - |  |
-| PATCH | /v2/admin/followup-steps/{id} | bearer | KayanAdminController_updateStepDeprecated | KayanAdminController_updateStepDeprecated | UpdateFollowupStepDto | - |  |
-| POST | /v2/admin/followups/{itemType}/{itemId}/steps | bearer | KayanAdminController_createStep | KayanAdminController_createStep | CreateFollowupStepBodyDto | - |  |
+| PATCH | /v2/admin/followup-steps/{id} | bearer | KayanAdminController_updateStepDeprecated | KayanAdminController_updateStepDeprecated | {title?:string,stepImageFileId?:number,sortOrder?:number} | - |  |
+| POST | /v2/admin/followups/{itemType}/{itemId}/steps | bearer | KayanAdminController_createStep | KayanAdminController_createStep | {title:string,stepImageFileId?:number,sortOrder?:number} | - |  |
 | DELETE | /v2/admin/followups/{itemType}/{itemId}/steps/{id} | bearer | KayanAdminController_deleteStep | KayanAdminController_deleteStep | - | - |  |
-| PATCH | /v2/admin/followups/{itemType}/{itemId}/steps/{id} | bearer | KayanAdminController_updateStep | KayanAdminController_updateStep | UpdateFollowupStepDto | - |  |
+| PATCH | /v2/admin/followups/{itemType}/{itemId}/steps/{id} | bearer | KayanAdminController_updateStep | KayanAdminController_updateStep | {title?:string,stepImageFileId?:number,sortOrder?:number} | - |  |
 | GET | /v2/admin/gallery | bearer | KayanAdminController_listGallery | KayanAdminController_listGallery | - | - |  |
-| POST | /v2/admin/gallery | bearer | KayanAdminController_createGalleryItem | KayanAdminController_createGalleryItem | CreateGalleryItemDto | - |  |
+| POST | /v2/admin/gallery | bearer | KayanAdminController_createGalleryItem | KayanAdminController_createGalleryItem | {title:string,description:string,each:true }) imageFileIds?: number[]} | - |  |
 | DELETE | /v2/admin/gallery/{id} | bearer | KayanAdminController_deleteGalleryItem | KayanAdminController_deleteGalleryItem | - | - |  |
-| PATCH | /v2/admin/gallery/{id} | bearer | KayanAdminController_updateGalleryItem | KayanAdminController_updateGalleryItem | UpdateGalleryItemDto | - |  |
+| PATCH | /v2/admin/gallery/{id} | bearer | KayanAdminController_updateGalleryItem | KayanAdminController_updateGalleryItem | {title?:string,description?:string,isActive?:boolean,each:true }) imageFileIds?: number[]} | - |  |
 | GET | /v2/admin/orders | bearer | KayanAdminController_listOrders | KayanAdminController_listOrders | - | - |  |
-| PATCH | /v2/admin/orders/{id}/status | bearer | KayanAdminController_updateOrderStatus | KayanAdminController_updateOrderStatus | AdminUpdateOrderStatusDto | - |  |
-| POST | /v2/admin/products | bearer | KayanAdminController_createProduct | KayanAdminController_createProduct | AdminCreateProductDto | - |  |
+| PATCH | /v2/admin/orders/{id}/status | bearer | KayanAdminController_updateOrderStatus | KayanAdminController_updateOrderStatus | {status:'received'|'ready_to_ship'|'on_the_way'|'cancelled'|'delivered'} | - |  |
+| POST | /v2/admin/products | bearer | KayanAdminController_createProduct | KayanAdminController_createProduct | {title:string,description:string,amount:number,price:number,details?:{[key:string]:unknown},each:true }) imageFileIds?: number[],each:true }) fileIds?: number[]} | - |  |
 | DELETE | /v2/admin/products/{id} | bearer | KayanAdminController_deleteProduct | KayanAdminController_deleteProduct | - | - |  |
-| PATCH | /v2/admin/products/{id} | bearer | KayanAdminController_updateProduct | KayanAdminController_updateProduct | AdminUpdateProductDto | - |  |
+| PATCH | /v2/admin/products/{id} | bearer | KayanAdminController_updateProduct | KayanAdminController_updateProduct | {title?:string,description?:string,amount?:number,price?:number,details?:{[key:string]:unknown},each:true }) imageFileIds?: number[],each:true }) fileIds?: number[],isActive?:boolean} | - |  |
 | GET | /v2/admin/services | bearer | KayanAdminController_listServices | KayanAdminController_listServices | - | - |  |
-| PATCH | /v2/admin/services/{id}/status | bearer | KayanAdminController_updateServiceStatus | KayanAdminController_updateServiceStatus | AdminUpdateServiceStatusDto | - |  |
+| PATCH | /v2/admin/services/{id}/status | bearer | KayanAdminController_updateServiceStatus | KayanAdminController_updateServiceStatus | {status:'not_started'|'in_progress'|'cancelled'|'finished'} | - |  |
 
 ### Products
 
 | Method | Path | Auth | Name | Summary | Request | Response | Notes |
 |---|---|---|---|---|---|---|---|
-| GET | /my/products | bearer | ProductsController_listMyProducts | List the current user's products | - | 200:ProductListResponseDto |  |
-| POST | /products | bearer | ProductsController_createProduct | Create a new product listing | CreateProductDto | 201:ProductResponseDto |  |
-| DELETE | /products/{id} | bearer | ProductsController_deleteProduct | Soft-delete a product listing | - | 200:ProductDeleteResponseDto |  |
-| GET | /products/{id} | public | ProductsController_getProduct | Get a product by ID | - | 200:ProductResponseDto |  |
-| PATCH | /products/{id} | bearer | ProductsController_updateProduct | Update a product listing | UpdateProductDto | 200:ProductResponseDto |  |
-| PATCH | /products/{id}/status | bearer | ProductsController_updateProductStatus | Update product status (available/sold/archived) | UpdateProductStatusDto | 200:ProductStatusResponseDto |  |
-| GET | /search/products | public | ProductsController_searchProducts | Search / filter public product listings | - | 200:ProductListResponseDto |  |
+| GET | /my/products | bearer | ProductsController_listMyProducts | List the current user's products | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => ProductListDataDto }) data!: ProductListDataDto} |  |
+| POST | /products | bearer | ProductsController_createProduct | Create a new product listing | {description:'Product category enum key', enum: PRODUCT_CATEGORIES, example: 'electronics' }) @IsString() @IsValidProductCategory({ message: 'category must be a valid ProductCategory key' }) category!: string,description:'Product subcategory enum key', enum: PRODUCT_SUBCATEGORIES, example: 'smartphones' }) @IsOptional() @ValidateIf((_, value) => value !== null) @IsString() @IsValidSubcategoryForCategory('category', { allowAll: false }, { message: 'subcategory must belong to the selected category and cannot be all' }) subcategory?: string | null,description:'Product title (1–255 chars)', example: 'iPhone 14 Pro Max', minLength: 1, maxLength: 255 }) @IsString() @Length(1, 255) name!: string,description:'Product description (1–5000 chars)', example: 'Excellent condition, barely used.', minLength: 1, maxLength: 5000 }) @IsString() @Length(1, 5000) description!: string,description:'Price in the local currency', example: 1500.00, minimum: 0, maximum: 9999999999.99 }) @IsNumber() @Min(0) @Max(9999999999.99) price!: number,description:'City where the product is located', example: 'Cairo', minLength: 1, maxLength: 255 }) @IsString() @Length(1, 255) city!: string,description:'Street / area address text (1–1000 chars)', example: '15 Tahrir Square, Downtown', minLength: 1, maxLength: 1000 }) @IsString() @Length(1, 1000) addressText!: string,description:'Additional product details as a JSON object', example: { condition: 'used', color: 'black', storage: '256GB' }, }) @IsOptional() @IsObject() details?: Record<string, unknown>,type:[Number], description: 'Up to 10 pre-uploaded file IDs for product images', example: [1, 2, 3] }) @IsOptional() @IsArray() @ArrayMaxSize(10) @IsNumber({}, { each: true }) imageFileIds?: number[],description:'Whether price is negotiable', example: true }) @IsOptional() @IsBoolean() isNegotiable?: boolean,description:'Preferred contact method', enum: ['phone', 'chat', 'both'], example: 'both', }) @IsOptional() @IsEnum(['phone', 'chat', 'both']) preferredContactMethod?: 'phone' | 'chat' | 'both'} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => ProductDataDto }) data!: ProductDataDto} |  |
+| DELETE | /products/{id} | bearer | ProductsController_deleteProduct | Soft-delete a product listing | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => ProductDeleteDataDto }) data!: ProductDeleteDataDto} |  |
+| GET | /products/{id} | public | ProductsController_getProduct | Get a product by ID | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => ProductDataDto }) data!: ProductDataDto} |  |
+| PATCH | /products/{id} | bearer | ProductsController_updateProduct | Update a product listing | {description:'Product category enum key', enum: PRODUCT_CATEGORIES, example: 'electronics' }) @IsOptional() @IsString() @IsValidProductCategory({ message: 'category must be a valid ProductCategory key' }) category?: string,description:'Product subcategory enum key', enum: PRODUCT_SUBCATEGORIES, example: 'smartphones', nullable: true }) @IsOptional() @ValidateIf((_, value) => value !== null) @IsString() @IsValidSubcategoryForCategory('category', { allowAll: false }, { message: 'subcategory must belong to the selected category and cannot be all' }) subcategory?: string | null,description:'Product title (1–255 chars)', example: 'iPhone 14 Pro Max', minLength: 1, maxLength: 255 }) @IsOptional() @IsString() @Length(1, 255) name?: string,description:'Product description (1–5000 chars)', example: 'Excellent condition.', minLength: 1, maxLength: 5000 }) @IsOptional() @IsString() @Length(1, 5000) description?: string,description:'Price in local currency', example: 1500.00, minimum: 0, maximum: 9999999999.99 }) @IsOptional() @IsNumber() @Min(0) @Max(9999999999.99) price?: number,description:'City where the product is located', example: 'Cairo', minLength: 1, maxLength: 255 }) @IsOptional() @IsString() @Length(1, 255) city?: string,description:'Street / area address text (1–1000 chars)', example: '15 Tahrir Square, Downtown', minLength: 1, maxLength: 1000 }) @IsOptional() @IsString() @Length(1, 1000) addressText?: string,description:'Additional product details as a JSON object', example: { condition: 'like_new', warrantyMonths: 3 }, }) @IsOptional() @IsObject() details?: Record<string, unknown>,type:[Number], description: 'Replaces the full image set with up to 10 file IDs', example: [1, 2] }) @IsOptional() @IsArray() @ArrayMaxSize(10) @IsNumber({}, { each: true }) imageFileIds?: number[],description:'Whether price is negotiable', example: true }) @IsOptional() @IsBoolean() isNegotiable?: boolean,description:'Preferred contact method', enum: ['phone', 'chat', 'both'], example: 'both', }) @IsOptional() @IsEnum(['phone', 'chat', 'both']) preferredContactMethod?: 'phone' | 'chat' | 'both'} | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => ProductDataDto }) data!: ProductDataDto} |  |
+| PATCH | /products/{id}/status | bearer | ProductsController_updateProductStatus | Update product status (available/sold/archived) | {enum:['available', 'sold', 'archived'], description: 'New product status', example: 'sold' }) @IsEnum(['available', 'sold', 'archived']) status!: 'available' | 'sold' | 'archived'} | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => ProductStatusDataDto }) data!: ProductStatusDataDto} |  |
+| GET | /search/products | public | ProductsController_searchProducts | Search / filter public product listings | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => ProductListDataDto }) data!: ProductListDataDto} |  |
 
 ### Ratings
 
 | Method | Path | Auth | Name | Summary | Request | Response | Notes |
 |---|---|---|---|---|---|---|---|
-| POST | /ratings | bearer | RatingsController_rateUser | Rate a user (1–5 stars) | CreateRatingDto | 201:RatingResponseDto |  |
-| GET | /ratings/{userId} | public | RatingsController_getUserRatingSummary | Get rating summary for a user | - | 200:RatingSummaryResponseDto |  |
+| POST | /ratings | bearer | RatingsController_rateUser | Rate a user (1–5 stars) | {description:'ID of the user being rated', example: 15, minimum: 1 }) @IsInt() @Min(1) ratedUserId!: number,description:'Star rating (1–5)', example: 4, minimum: 1, maximum: 5 }) @IsInt() @Min(1) @Max(5) ratingValue!: number,description:'Optional review comment (1–2000 chars)', example: 'Great seller, fast shipping!', minLength: 1, maxLength: 2000 }) @IsOptional() @IsString() @Length(1, 2000) comment?: string} | 201:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => RatingDataDto }) data!: RatingDataDto} |  |
+| GET | /ratings/{userId} | public | RatingsController_getUserRatingSummary | Get rating summary for a user | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => RatingSummaryDataDto }) data!: RatingSummaryDataDto} |  |
 
 ### Users
 
 | Method | Path | Auth | Name | Summary | Request | Response | Notes |
 |---|---|---|---|---|---|---|---|
-| DELETE | /me | bearer | UsersController_deleteMe | Delete current user account (soft-delete) | - | 200:SuccessResponseDto |  |
-| GET | /me | bearer | UsersController_getMe | Get current user profile | - | 200:UserProfileResponseDto |  |
-| PATCH | /me | bearer | UsersController_updateMe | Update current user profile | UpdateProfileDto | 200:UserProfileResponseDto |  |
-| PATCH | /me/password | bearer | UsersController_changePassword | Change current user password | ChangePasswordDto | 200:SuccessResponseDto |  |
-| GET | /users/{id} | public | PublicUsersController_getPublicProfile | Get public profile and active listings for a user | - | 200:PublicUserProfileResponseDto |  |
+| DELETE | /me | bearer | UsersController_deleteMe | Delete current user account (soft-delete) | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => SuccessDataDto }) data!: SuccessDataDto} |  |
+| GET | /me | bearer | UsersController_getMe | Get current user profile | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => UserProfileDataDto }) data!: UserProfileDataDto} |  |
+| PATCH | /me | bearer | UsersController_updateMe | Update current user profile | {description:'Display name (2–150 chars)', example: 'Ahmed Ali', minLength: 2, maxLength: 150 }) @IsOptional() @IsString() @Length(2, 150) name?: string,description:'File ID of the uploaded avatar image, or null to remove avatar', example: 7, nullable: true }) @IsOptional() @IsNumber() avatarFileId?: number | null,description:'Public contact information string (or null to clear)', example: '+201012345678', nullable: true, minLength: 1, maxLength: 255 }) @IsOptional() @IsString() @Length(1, 255) contactInfo?: string | null,description:'Phone number (7–32 chars)', example: '+201001234567', minLength: 7, maxLength: 32 }) @IsOptional() @IsString() @Length(7, 32) phone?: string} | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => UserProfileDataDto }) data!: UserProfileDataDto} |  |
+| PATCH | /me/password | bearer | UsersController_changePassword | Change current user password | {description:'Current password', example: 'OldSecret123', minLength: 8, maxLength: 64 }) @IsString() @Length(8, 64) oldPassword!: string,description:'New password — must contain letters and numbers (8–64 chars)', example: 'NewSecret456', minLength: 8, maxLength: 64 }) @IsString() @Length(8, 64) @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, { message: 'Password must contain letters and numbers', }) newPassword!: string} | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => SuccessDataDto }) data!: SuccessDataDto} |  |
+| GET | /users/{id} | public | PublicUsersController_getPublicProfile | Get public profile and active listings for a user | - | 200:{example:true }) success!: boolean,example:200 }) statusCode!: number,type:() => PublicUserProfileDataDto }) data!: PublicUserProfileDataDto} |  |
 
 ## WebSocket APIs
 
@@ -149,7 +147,7 @@ Generated from `openapi.json` (REST) and `src/**/*.gateway.ts` (WebSocket).
 
 | Event | Channel | Auth | Handler | Summary | Request | Response | Notes |
 |---|---|---|---|---|---|---|---|
-| conversation.join | /chat | bearer | joinConversation | Handle conversation.join | JoinConversationDto | conversation.joined | JWT required in Socket auth/header during connection. |
-| message.read | /chat | bearer | markRead | Handle message.read | MarkMessageReadDto | message.read | JWT required in Socket auth/header during connection. |
-| message.send | /chat | bearer | sendMessage | Handle message.send | SendMessageDto | message.received | JWT required in Socket auth/header during connection. |
+| conversation.join | /chat | bearer | joinConversation | Handle conversation.join | {conversationId:number} | {event:'conversation.joined',payload:{success:boolean,statusCode:number,data:unknown}} | JWT required in Socket auth/header during connection. |
+| message.read | /chat | bearer | markRead | Handle message.read | {messageId:number} | {event:'message.read',payload:{[key:string]:unknown}} | JWT required in Socket auth/header during connection. |
+| message.send | /chat | bearer | sendMessage | Handle message.send | {conversationId:number,text:string} | {event:'message.received',payload:{[key:string]:unknown}} | JWT required in Socket auth/header during connection. |
 

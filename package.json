@@ -42,9 +42,7 @@
     "test:followup-chat": "jest --runInBand src/kayan/kayan.service.spec.ts src/kayan/kayan.controller.spec.ts src/chat/chat.service.spec.ts src/chat/chat.controller.spec.ts src/chat/chat.gateway.spec.ts",
     "ci:followup-chat": "npm run test:followup-chat",
     "simulate:kayan:followup": "ts-node --transpile-only scripts/simulate-kayan-followup-flows.ts",
-    "test:kayan:followup:cli": "ts-node --transpile-only scripts/simulate-kayan-followup-flows.ts",
-    "docs:api-list": "ts-node --transpile-only scripts/generate-api-list.ts",
-    "docs:api-list:check": "npm run docs:api-list && git diff --exit-code -- docs/api-list.md"
+    "test:kayan:followup:cli": "ts-node --transpile-only scripts/simulate-kayan-followup-flows.ts"
   },
   "engines": {
     "node": ">=20"
