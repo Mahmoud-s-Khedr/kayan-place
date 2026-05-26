@@ -493,11 +493,11 @@ export async function runGalleryHappyPath(
   const userToken = state.userTokens.accessToken;
 
   await runAndRecord(config, steps, 'public list gallery baseline', 200, () =>
-    requestJson(config, 'GET', '/v2/gallery'),
+    requestJson(config, 'GET', '/api/gallery'),
   );
 
   await runAndRecord(config, steps, 'admin list gallery baseline', 200, () =>
-    requestJson(config, 'GET', '/v2/admin/gallery', undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'GET', '/api/admin/gallery', undefined, { Authorization: `Bearer ${adminToken}` }),
   );
 
   const fileName = `gallery-sim-${Date.now()}.png`;
@@ -557,7 +557,7 @@ export async function runGalleryHappyPath(
     requestJson(
       config,
       'POST',
-      '/v2/admin/gallery',
+      '/api/admin/gallery',
       {
         title: `Gallery Sim Item ${Date.now()}`,
         description: 'Gallery simulation item created via CLI client flow.',
@@ -569,7 +569,7 @@ export async function runGalleryHappyPath(
   state.galleryItemId = pickNestedId(create.body, 'item');
 
   const pubAfterCreate = await runAndRecord(config, steps, 'public list gallery after create', 200, () =>
-    requestJson(config, 'GET', '/v2/gallery'),
+    requestJson(config, 'GET', '/api/gallery'),
   );
   const createdInPublic = findGalleryItem(extractItems(pubAfterCreate.body), state.galleryItemId);
   pushAssertion(
@@ -590,7 +590,7 @@ export async function runGalleryHappyPath(
     requestJson(
       config,
       'PATCH',
-      `/v2/admin/gallery/${state.galleryItemId}`,
+      `/api/admin/gallery/${state.galleryItemId}`,
       {
         title: `Gallery Sim Item Updated ${Date.now()}`,
         description: 'Updated and made inactive by simulation.',
@@ -602,7 +602,7 @@ export async function runGalleryHappyPath(
   );
 
   const pubAfterInactive = await runAndRecord(config, steps, 'public list gallery after inactive', 200, () =>
-    requestJson(config, 'GET', '/v2/gallery'),
+    requestJson(config, 'GET', '/api/gallery'),
   );
   const inactiveInPublic = findGalleryItem(extractItems(pubAfterInactive.body), state.galleryItemId);
   pushAssertion(
@@ -615,7 +615,7 @@ export async function runGalleryHappyPath(
   );
 
   const adminAfterInactive = await runAndRecord(config, steps, 'admin list gallery after inactive', 200, () =>
-    requestJson(config, 'GET', '/v2/admin/gallery', undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'GET', '/api/admin/gallery', undefined, { Authorization: `Bearer ${adminToken}` }),
   );
   const inactiveInAdmin = findGalleryItem(extractItems(adminAfterInactive.body), state.galleryItemId);
   pushAssertion(
@@ -636,14 +636,14 @@ export async function runGalleryHappyPath(
     requestJson(
       config,
       'PATCH',
-      `/v2/admin/gallery/${state.galleryItemId}`,
+      `/api/admin/gallery/${state.galleryItemId}`,
       { isActive: true, imageFileIds: [fileId] },
       { Authorization: `Bearer ${adminToken}` },
     ),
   );
 
   const pubAfterReactivate = await runAndRecord(config, steps, 'public list gallery after reactivate', 200, () =>
-    requestJson(config, 'GET', '/v2/gallery'),
+    requestJson(config, 'GET', '/api/gallery'),
   );
   const reactivatedInPublic = findGalleryItem(extractItems(pubAfterReactivate.body), state.galleryItemId);
   pushAssertion(
@@ -661,11 +661,11 @@ export async function runGalleryHappyPath(
   );
 
   await runAndRecord(config, steps, 'admin soft delete gallery item', [200, 201], () =>
-    requestJson(config, 'DELETE', `/v2/admin/gallery/${state.galleryItemId}`, undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'DELETE', `/api/admin/gallery/${state.galleryItemId}`, undefined, { Authorization: `Bearer ${adminToken}` }),
   );
 
   const pubAfterDelete = await runAndRecord(config, steps, 'public list gallery after delete', 200, () =>
-    requestJson(config, 'GET', '/v2/gallery'),
+    requestJson(config, 'GET', '/api/gallery'),
   );
   const deletedInPublic = findGalleryItem(extractItems(pubAfterDelete.body), state.galleryItemId);
   pushAssertion(
@@ -678,7 +678,7 @@ export async function runGalleryHappyPath(
   );
 
   const adminAfterDelete = await runAndRecord(config, steps, 'admin list gallery after delete', 200, () =>
-    requestJson(config, 'GET', '/v2/admin/gallery', undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'GET', '/api/admin/gallery', undefined, { Authorization: `Bearer ${adminToken}` }),
   );
   const deletedInAdmin = findGalleryItem(extractItems(adminAfterDelete.body), state.galleryItemId);
   pushAssertion(
@@ -703,7 +703,7 @@ export async function runGalleryNegativeCases(
   const userToken = state.userTokens.accessToken;
 
   await runAndRecord(config, steps, 'negative unauthorized admin create gallery', 401, () =>
-    requestJson(config, 'POST', '/v2/admin/gallery', {
+    requestJson(config, 'POST', '/api/admin/gallery', {
       title: 'Unauthorized',
       description: 'Should fail',
       imageFileIds: [],
@@ -711,7 +711,7 @@ export async function runGalleryNegativeCases(
   );
 
   await runAndRecord(config, steps, 'negative non-admin create gallery', 403, () =>
-    requestJson(config, 'POST', '/v2/admin/gallery', {
+    requestJson(config, 'POST', '/api/admin/gallery', {
       title: 'Forbidden',
       description: 'Should fail',
       imageFileIds: [],
@@ -719,15 +719,15 @@ export async function runGalleryNegativeCases(
   );
 
   await runAndRecord(config, steps, 'negative admin update invalid gallery id', 404, () =>
-    requestJson(config, 'PATCH', '/v2/admin/gallery/999999999', { title: 'missing' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', '/api/admin/gallery/999999999', { title: 'missing' }, { Authorization: `Bearer ${adminToken}` }),
   );
 
   await runAndRecord(config, steps, 'negative admin delete invalid gallery id', 404, () =>
-    requestJson(config, 'DELETE', '/v2/admin/gallery/999999999', undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'DELETE', '/api/admin/gallery/999999999', undefined, { Authorization: `Bearer ${adminToken}` }),
   );
 
   await runAndRecord(config, steps, 'negative admin create invalid gallery payload', [400, 422], () =>
-    requestJson(config, 'POST', '/v2/admin/gallery', {
+    requestJson(config, 'POST', '/api/admin/gallery', {
       title: '',
       description: 'invalid title',
       imageFileIds: [],

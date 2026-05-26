@@ -22,7 +22,7 @@ function parseArgs(argv: string[]): { outputDir: string; inputs: string[] } {
   }
 
   if (inputs.length === 0) {
-    throw new Error('Usage: npm run fetch:images -- <json-file-or-dir> [more paths] [--out <directory>]');
+    inputs.push(path.join(process.cwd(), 'logs'));
   }
 
   return { outputDir, inputs };
@@ -30,7 +30,12 @@ function parseArgs(argv: string[]): { outputDir: string; inputs: string[] } {
 
 async function listJsonFiles(inputPath: string): Promise<string[]> {
   const abs = path.resolve(inputPath);
-  const stats = await fs.stat(abs);
+  let stats;
+  try {
+    stats = await fs.stat(abs);
+  } catch {
+    return [];
+  }
 
   if (stats.isFile()) {
     return abs.endsWith('.json') ? [abs] : [];
@@ -162,7 +167,7 @@ async function main(): Promise<void> {
   const jsonFiles = [...new Set(jsonFilesNested.flat())].sort();
 
   if (jsonFiles.length === 0) {
-    console.log('No JSON files found from provided input paths.');
+    console.log(`No JSON files found in input paths: ${inputs.join(', ')}`);
     return;
   }
 

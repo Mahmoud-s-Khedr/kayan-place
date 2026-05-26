@@ -21,7 +21,7 @@ It covers:
 
 ### 3.1 Create Service Order (User)
 
-1. User creates service order using `POST /v2/services`.
+1. User creates service order using `POST /api/services`.
 2. Backend creates service with initial status `not_started`.
 
 Typical create payload:
@@ -36,7 +36,7 @@ Typical create payload:
 
 ### 3.2 Update Service Order (User)
 
-1. User updates own service using `PATCH /v2/services/:id`.
+1. User updates own service using `PATCH /api/services/:id`.
 2. Only description is updatable by user.
 3. Update is allowed only while service status is `not_started`.
 
@@ -51,7 +51,7 @@ Typical update payload:
 ### 3.3 My Service Orders (User)
 
 Endpoint:
-- `GET /v2/services/me`
+- `GET /api/services/me`
 
 Query options:
 - `serviceType` (`designing`, `maintenance`, `renewal`)
@@ -60,13 +60,13 @@ Query options:
 - `sortDirection` (`asc`, `desc`)
 
 Examples:
-- `GET /v2/services/me?serviceType=maintenance&sortBy=createdAt&sortDirection=desc`
-- `GET /v2/services/me?fromDate=2026-01-01&toDate=2026-12-31&sortBy=createdAt&sortDirection=asc`
+- `GET /api/services/me?serviceType=maintenance&sortBy=createdAt&sortDirection=desc`
+- `GET /api/services/me?fromDate=2026-01-01&toDate=2026-12-31&sortBy=createdAt&sortDirection=asc`
 
 ### 3.4 List All Service Orders (Admin)
 
 Endpoint:
-- `GET /v2/admin/services`
+- `GET /api/admin/services`
 
 Query options:
 - `serviceType` (`designing`, `maintenance`, `renewal`)
@@ -79,7 +79,7 @@ Admin response list includes related user context per service order.
 ### 3.5 Update Service Order Status (Admin)
 
 Endpoint:
-- `PATCH /v2/admin/services/:id/status`
+- `PATCH /api/admin/services/:id/status`
 
 Supported statuses:
 - `not_started`
@@ -98,20 +98,20 @@ Typical admin status payload:
 ### 3.6 Cancel Service
 
 User endpoint:
-- `POST /v2/services/:id/cancel`
+- `POST /api/services/:id/cancel`
 
 Rule:
 - Cancellation by user is allowed only while status is `not_started`.
 
 Admin cancellation:
-- Admin can set service status to `cancelled` using `PATCH /v2/admin/services/:id/status`.
+- Admin can set service status to `cancelled` using `PATCH /api/admin/services/:id/status`.
 
 ### 3.7 Service Rating
 
 Users can rate a service one time only after status is `finished`.
 
 Endpoint:
-- `POST /v2/ratings`
+- `POST /api/ratings`
 
 Service rating payload:
 
@@ -128,15 +128,15 @@ Duplicate rating on the same service by the same user is rejected.
 ## 4. Endpoint Map (High Level)
 
 User:
-- `POST /v2/services`
-- `PATCH /v2/services/:id`
-- `GET /v2/services/me`
-- `POST /v2/services/:id/cancel`
-- `POST /v2/ratings` (service rating shape)
+- `POST /api/services`
+- `PATCH /api/services/:id`
+- `GET /api/services/me`
+- `POST /api/services/:id/cancel`
+- `POST /api/ratings` (service rating shape)
 
 Admin:
-- `GET /v2/admin/services`
-- `PATCH /v2/admin/services/:id/status`
+- `GET /api/admin/services`
+- `PATCH /api/admin/services/:id/status`
 
 ## 5. Client Validation and Error Handling
 
@@ -174,7 +174,7 @@ Admin:
 - User can create service with valid type/description/address.
 - User can update own service while status is `not_started`.
 - User cannot update/cancel own service after processing starts.
-- `GET /v2/services/me` supports expected filter/sort query combinations.
+- `GET /api/services/me` supports expected filter/sort query combinations.
 - Admin can list services with user context and apply filter/sort query params.
 - Admin can update service statuses using valid enum values.
 - User can rate only after service reaches `finished`.

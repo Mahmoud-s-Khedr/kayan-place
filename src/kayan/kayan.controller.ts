@@ -59,8 +59,8 @@ import {
   KayanServicesResponseDto,
 } from './kayan-response.dto';
 
-@ApiTags('Kayan V2')
-@Controller('v2')
+@ApiTags('Kayan API')
+@Controller('api')
 export class KayanController {
   constructor(private readonly kayanService: KayanService) {}
 
@@ -298,10 +298,10 @@ export class KayanController {
   }
 }
 
-@ApiTags('Kayan V2 Admin')
+@ApiTags('Kayan API Admin')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, AdminGuard)
-@Controller('v2/admin')
+@Controller('api/admin')
 export class KayanAdminController {
   constructor(private readonly kayanService: KayanService) {}
 

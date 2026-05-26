@@ -25,7 +25,7 @@ It covers:
 ### 3.1 Create Fault Report (User)
 
 1. User uploads fault image(s) through files flow (optional).
-2. User creates report with `POST /v2/faults`.
+2. User creates report with `POST /api/faults`.
 3. Backend creates fault with initial status `received`.
 
 Typical create payload:
@@ -61,7 +61,7 @@ Example upload-intent payload:
 
 ### 3.3 Update Fault Report (User)
 
-1. User updates own report with `PATCH /v2/faults/:id`.
+1. User updates own report with `PATCH /api/faults/:id`.
 2. Allowed only while report status is `received`.
 3. User can update title/description/severity/address/images.
 
@@ -79,7 +79,7 @@ Typical update payload:
 ### 3.4 My Reports (User)
 
 Endpoint:
-- `GET /v2/faults/me`
+- `GET /api/faults/me`
 
 Query options:
 - `status`
@@ -89,14 +89,14 @@ Query options:
 - `sortDirection` (`asc`, `desc`)
 
 Examples:
-- `GET /v2/faults/me?status=received&sortBy=createdAt&sortDirection=desc`
-- `GET /v2/faults/me?severity=urgent&sortBy=severity&sortDirection=asc`
+- `GET /api/faults/me?status=received&sortBy=createdAt&sortDirection=desc`
+- `GET /api/faults/me?severity=urgent&sortBy=severity&sortDirection=asc`
 
 ### 3.5 Admin List and Update Fault Status
 
 Admin endpoints:
-- `GET /v2/admin/faults`
-- `PATCH /v2/admin/faults/:id/status`
+- `GET /api/admin/faults`
+- `PATCH /api/admin/faults/:id/status`
 
 Supported statuses:
 - `received`
@@ -121,7 +121,7 @@ Typical admin status payload:
 ### 3.6 Cancel Fault Report
 
 User:
-- `POST /v2/faults/:id/cancel`
+- `POST /api/faults/:id/cancel`
 - Allowed only while status is `received`.
 
 Admin:
@@ -132,7 +132,7 @@ Admin:
 Users can rate a fault one time only after status is `finished`.
 
 Endpoint:
-- `POST /v2/ratings`
+- `POST /api/ratings`
 
 Fault rating payload:
 
@@ -149,15 +149,15 @@ Duplicate rating on the same fault by the same user is rejected.
 ## 4. Endpoint Map (High Level)
 
 User:
-- `POST /v2/faults`
-- `PATCH /v2/faults/:id`
-- `GET /v2/faults/me`
-- `POST /v2/faults/:id/cancel`
-- `POST /v2/ratings` (fault rating shape)
+- `POST /api/faults`
+- `PATCH /api/faults/:id`
+- `GET /api/faults/me`
+- `POST /api/faults/:id/cancel`
+- `POST /api/ratings` (fault rating shape)
 
 Admin:
-- `GET /v2/admin/faults`
-- `PATCH /v2/admin/faults/:id/status`
+- `GET /api/admin/faults`
+- `PATCH /api/admin/faults/:id/status`
 
 File flow dependency:
 - `POST /files/upload-intent`
@@ -198,7 +198,7 @@ File flow dependency:
 - User can create fault with valid payload and optional image IDs.
 - User can update own fault while status is `received`.
 - User cannot update/cancel own fault after processing starts.
-- `GET /v2/faults/me` supports expected filter/sort query combinations.
+- `GET /api/faults/me` supports expected filter/sort query combinations.
 - Admin can list all faults and update status through valid transitions.
 - Invalid admin transitions are rejected.
 - User can cancel while `received` and cancellation is blocked later.

@@ -22,6 +22,7 @@ type ApiResult = {
 
 type UserBootstrap = {
   actor: Extract<Actor, 'buyer' | 'seller'>;
+  email: string;
   phone: string;
   password: string;
   name: string;
@@ -69,6 +70,10 @@ function phoneFromSeed(seed: number, middle: string): string {
 
 function ssnFromSeed(seed: number): string {
   return String((seed % 90_000_000) + 10_000_000);
+}
+
+function emailFromSeed(seed: number, role: 'buyer' | 'seller'): string {
+  return `chat.${role}.${seed}@example.com`;
 }
 
 function numericSeedFromRunId(runId: string): number {
@@ -225,6 +230,7 @@ async function apiCall(opts: ApiOptions): Promise<ApiResult> {
 }
 
 async function registerAndVerifyUser(actor: Extract<Actor, 'buyer' | 'seller'>, profile: {
+  email: string;
   phone: string;
   password: string;
   name: string;
@@ -232,6 +238,7 @@ async function registerAndVerifyUser(actor: Extract<Actor, 'buyer' | 'seller'>, 
 }): Promise<UserBootstrap> {
   logEvent('system', 'info', 'auth.register.request', {
     actor,
+    email: profile.email,
     phone: profile.phone,
     name: profile.name,
     ssn: profile.ssn,
@@ -242,6 +249,7 @@ async function registerAndVerifyUser(actor: Extract<Actor, 'buyer' | 'seller'>, 
     path: '/auth/register',
     body: {
       name: profile.name,
+      email: profile.email,
       ssn: profile.ssn,
       phone: profile.phone,
       password: profile.password,
@@ -262,7 +270,7 @@ async function registerAndVerifyUser(actor: Extract<Actor, 'buyer' | 'seller'>, 
     method: 'POST',
     path: '/auth/register/verify',
     body: {
-      phone: profile.phone,
+      email: profile.email,
       otp,
     },
     expectedStatus: 201,
@@ -280,6 +288,7 @@ async function registerAndVerifyUser(actor: Extract<Actor, 'buyer' | 'seller'>, 
 
   return {
     actor,
+    email: profile.email,
     phone: profile.phone,
     password: profile.password,
     name: profile.name,
@@ -501,12 +510,14 @@ async function main(): Promise<void> {
 
   const seed = numericSeedFromRunId(RUN_ID);
   const buyerProfile = {
+    email: emailFromSeed(seed + 101, 'buyer'),
     phone: phoneFromSeed(seed + 101, '1'),
     password: 'BuyerPass123',
     name: `Chat Buyer ${seed % 1000}`,
     ssn: ssnFromSeed(seed + 11),
   };
   const sellerProfile = {
+    email: emailFromSeed(seed + 202, 'seller'),
     phone: phoneFromSeed(seed + 202, '2'),
     password: 'SellerPass123',
     name: `Chat Seller ${seed % 1000}`,

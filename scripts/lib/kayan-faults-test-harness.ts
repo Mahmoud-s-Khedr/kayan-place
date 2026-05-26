@@ -4,6 +4,12 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
 type HeadersMap = Record<string, string>;
+type UploadIntentPayload = {
+  url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  fields?: Record<string, string>;
+};
 
 type ApiEnvelope<T = any> = {
   success?: boolean;
@@ -32,6 +38,7 @@ export type KayanFaultsTestConfig = {
   adminEmail?: string;
   adminPhone?: string;
   adminPassword?: string;
+  imageSeed?: string;
 };
 
 type AuthIdentity = {
@@ -111,6 +118,29 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? n : fallback;
+}
+
+function hashSeed(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i += 1) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function nextSeeded(seedState: { value: number }): number {
+  seedState.value = (Math.imul(seedState.value, 1664525) + 1013904223) >>> 0;
+  return seedState.value / 0x100000000;
+}
+
+let globalSeedState: { value: number } | null = null;
+
+function mimeTypeFromFileName(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.png') return 'image/png';
+  if (ext === '.jpeg' || ext === '.jpg') return 'image/jpeg';
+  return 'application/octet-stream';
 }
 
 function makeIdentity(label: 'A' | 'B'): AuthIdentity {
@@ -232,6 +262,87 @@ async function runAndRecord<T>(
   return result;
 }
 
+async function listSimImagePaths(): Promise<string[]> {
+  const simDir = path.join(process.cwd(), 'scripts', 'sim-images');
+  const entries = await fs.readdir(simDir, { withFileTypes: true });
+  const files = entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name)
+    .filter((name) => /\.(jpg|jpeg|png)$/i.test(name))
+    .map((name) => path.join(simDir, name))
+    .sort((a, b) => a.localeCompare(b));
+  if (files.length === 0) {
+    throw new Error(`No supported image files found in ${simDir}. Expected .jpg/.jpeg/.png files.`);
+  }
+  return files;
+}
+
+function pickRandomSimImagePath(paths: string[], seedState?: { value: number }): string {
+  if (paths.length === 1) return paths[0];
+  const rnd = seedState ? nextSeeded(seedState) : Math.random();
+  const idx = Math.floor(rnd * paths.length);
+  return paths[idx];
+}
+
+async function uploadWithSignedIntent(
+  config: KayanFaultsTestConfig,
+  intent: UploadIntentPayload,
+  filePath: string,
+): Promise<void> {
+  const method = (intent.method ?? 'PUT').toUpperCase();
+  const url = intent.url;
+  if (!url) throw new Error('Upload intent missing URL');
+
+  const bytes = await fs.readFile(filePath);
+  const mimeType = mimeTypeFromFileName(filePath);
+  const filename = path.basename(filePath);
+
+  if (method === 'POST') {
+    const form = new FormData();
+    if (intent.fields) {
+      for (const [k, v] of Object.entries(intent.fields)) {
+        form.append(k, v);
+      }
+    }
+    form.append('file', new Blob([bytes], { type: mimeType }), filename);
+    const response = await fetch(url, {
+      method: 'POST',
+      body: form,
+      headers: intent.headers,
+      signal: AbortSignal.timeout(config.timeoutMs),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Signed upload failed with ${response.status}: ${text.slice(0, 500)}`);
+    }
+    return;
+  }
+
+  const headers: HeadersMap = { ...(intent.headers ?? {}) };
+  if (!headers['Content-Type'] && !headers['content-type']) {
+    headers['Content-Type'] = mimeType;
+  }
+  const response = await fetch(url, {
+    method,
+    headers,
+    body: bytes,
+    signal: AbortSignal.timeout(config.timeoutMs),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Signed upload failed with ${response.status}: ${text.slice(0, 500)}`);
+  }
+}
+
+function hasRelatedUserPayload(item: Record<string, unknown>): boolean {
+  const user = item.user;
+  if (user && typeof user === 'object') return true;
+  const userId = item.user_id;
+  const hasUserId = typeof userId === 'number' || (typeof userId === 'string' && /^\d+$/.test(userId));
+  const hasUserFields = 'user_name' in item || 'user_email' in item || 'user_phone' in item;
+  return hasUserId && hasUserFields;
+}
+
 async function loginWithAdaptiveIdentifier(
   config: KayanFaultsTestConfig,
   steps: StepResult[],
@@ -294,6 +405,11 @@ async function createUploadedImageFile(
   name: string,
   mimeType = 'image/jpeg',
 ): Promise<number> {
+  const simImagePaths = await listSimImagePaths();
+  if (config.imageSeed && globalSeedState === null) {
+    globalSeedState = { value: hashSeed(config.imageSeed) };
+  }
+  const seeded = config.imageSeed ? globalSeedState ?? undefined : undefined;
   const createIntent = await runAndRecord(config, steps, `${name} create image upload intent`, 201, () =>
     requestJson(config, 'POST', '/files/upload-intent', {
       ownerType: 'product',
@@ -303,6 +419,18 @@ async function createUploadedImageFile(
       fileSizeBytes: 1024,
     }, { Authorization: `Bearer ${userToken}` }),
   );
+  const intentData = createIntent.body?.data as Record<string, unknown> | undefined;
+  const upload = (intentData?.upload as UploadIntentPayload | undefined) ?? undefined;
+  if (!upload?.url) {
+    throw new Error('Upload intent missing upload URL.');
+  }
+
+  const simPath = pickRandomSimImagePath(simImagePaths, seeded);
+  await runAndRecord(config, steps, `${name} upload binary to signed URL`, [200, 201, 204], async () => {
+    await uploadWithSignedIntent(config, upload, simPath);
+    return { status: 200, body: { success: true, data: { uploadedFrom: simPath } } as ApiEnvelope, rawText: '' };
+  });
+
   const fileId = pickEntityId(createIntent.body, 'file');
   await runAndRecord(config, steps, `${name} mark image uploaded`, 200, () =>
     requestJson(config, 'PATCH', `/files/${fileId}/mark-uploaded`, {}, { Authorization: `Bearer ${userToken}` }),
@@ -394,6 +522,7 @@ export function createKayanFaultsTestContext(overrides?: Partial<KayanFaultsTest
     adminEmail: overrides?.adminEmail ?? process.env.ADMIN_EMAIL,
     adminPhone: overrides?.adminPhone ?? process.env.ADMIN_PHONE,
     adminPassword: overrides?.adminPassword ?? process.env.ADMIN_PASSWORD,
+    imageSeed: overrides?.imageSeed ?? process.env.SIM_KAYAN_FAULTS_IMAGE_SEED,
   };
   if (!config.baseUrl) throw new Error('BASE_URL is required.');
   if (!config.adminPassword) throw new Error('ADMIN_PASSWORD is required.');
@@ -422,7 +551,7 @@ export async function runKayanFaultsHappyPath(
   state.invalidDocFileId = await createUploadedDocumentFile(config, steps, userAToken, 'user A uploaded document');
 
   const createFault = await runAndRecord(config, steps, 'user A create fault report', [200, 201, 404], () =>
-    requestJson(config, 'POST', '/v2/faults', {
+    requestJson(config, 'POST', '/api/faults', {
       title: `Fault Report ${Date.now()}`,
       description: 'Water leak from ceiling in living room.',
       severity: 'normal',
@@ -432,7 +561,7 @@ export async function runKayanFaultsHappyPath(
   );
   if (createFault.status === 404) {
     const recoverList = await runAndRecord(config, steps, 'user A recover created fault id from my faults list', 200, () =>
-      requestJson(config, 'GET', '/v2/faults/me?sortBy=createdAt&sortDirection=desc', undefined, { Authorization: `Bearer ${userAToken}` }),
+      requestJson(config, 'GET', '/api/faults/me?sortBy=createdAt&sortDirection=desc', undefined, { Authorization: `Bearer ${userAToken}` }),
     );
     state.faultId = pickLatestFaultIdFromMyList(recoverList.body);
   } else {
@@ -440,7 +569,7 @@ export async function runKayanFaultsHappyPath(
   }
 
   await runAndRecord(config, steps, 'user A update fault while received', 200, () =>
-    requestJson(config, 'PATCH', `/v2/faults/${state.faultId}`, {
+    requestJson(config, 'PATCH', `/api/faults/${state.faultId}`, {
       description: 'Updated: leak is spreading to hallway.',
       severity: 'high',
       address: 'Cairo, New Cairo',
@@ -449,48 +578,63 @@ export async function runKayanFaultsHappyPath(
   );
 
   await runAndRecord(config, steps, 'user A list my faults default', 200, () =>
-    requestJson(config, 'GET', '/v2/faults/me', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/faults/me', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user A list my faults filter by status', 200, () =>
-    requestJson(config, 'GET', '/v2/faults/me?status=received', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/faults/me?status=received', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user A list my faults filter by severity', 200, () =>
-    requestJson(config, 'GET', '/v2/faults/me?severity=high', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/faults/me?severity=high', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user A list my faults date range', 200, () =>
-    requestJson(config, 'GET', '/v2/faults/me?fromDate=2026-01-01&toDate=2026-12-31', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/faults/me?fromDate=2026-01-01&toDate=2026-12-31', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user A list my faults sort by createdAt', 200, () =>
-    requestJson(config, 'GET', '/v2/faults/me?sortBy=createdAt&sortDirection=desc', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/faults/me?sortBy=createdAt&sortDirection=desc', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user A list my faults sort by severity', 200, () =>
-    requestJson(config, 'GET', '/v2/faults/me?sortBy=severity&sortDirection=asc', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/faults/me?sortBy=severity&sortDirection=asc', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
 
-  const adminList = await runAndRecord(config, steps, 'admin list all faults', 200, () =>
-    requestJson(config, 'GET', '/v2/admin/faults', undefined, { Authorization: `Bearer ${adminToken}` }),
-  );
-  const listItems = (((adminList.body?.data as Record<string, unknown> | undefined)?.items ?? []) as Array<Record<string, unknown>>);
-  const listedFault = listItems.find((item) => Number(item.id) === state.faultId);
-  if (!listedFault || !listedFault.user || typeof listedFault.user !== 'object') {
-    throw new Error('Admin faults list did not include related user payload.');
+  const readAdminFaults = async (): Promise<Array<Record<string, unknown>>> => {
+    const adminList = await runAndRecord(config, steps, 'admin list all faults', 200, () =>
+      requestJson(config, 'GET', '/api/admin/faults', undefined, { Authorization: `Bearer ${adminToken}` }),
+    );
+    const data = adminList.body?.data;
+    if (Array.isArray(data)) {
+      return data as Array<Record<string, unknown>>;
+    }
+    return (((data as Record<string, unknown> | undefined)?.items ?? []) as Array<Record<string, unknown>>);
+  };
+  let listItems = await readAdminFaults();
+  let listedFault = listItems.find((item) => Number(item.id) === state.faultId);
+  if (!listedFault) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    listItems = await readAdminFaults();
+    listedFault = listItems.find((item) => Number(item.id) === state.faultId);
+  }
+  if (!listedFault) {
+    throw new Error(`Admin faults list did not include created fault id=${state.faultId}.`);
+  }
+  if (!hasRelatedUserPayload(listedFault)) {
+    throw new Error(`Admin faults list included fault id=${state.faultId} but did not include related user payload.`);
   }
 
   await runAndRecord(config, steps, 'admin update fault status to assigned', 200, () =>
-    requestJson(config, 'PATCH', `/v2/admin/faults/${state.faultId}/status`, { status: 'assigned' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/faults/${state.faultId}/status`, { status: 'assigned' }, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'admin update fault status to on_the_way', 200, () =>
-    requestJson(config, 'PATCH', `/v2/admin/faults/${state.faultId}/status`, { status: 'on_the_way' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/faults/${state.faultId}/status`, { status: 'on_the_way' }, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'admin update fault status to in_progress', 200, () =>
-    requestJson(config, 'PATCH', `/v2/admin/faults/${state.faultId}/status`, { status: 'in_progress' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/faults/${state.faultId}/status`, { status: 'in_progress' }, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'admin update fault status to finished', 200, () =>
-    requestJson(config, 'PATCH', `/v2/admin/faults/${state.faultId}/status`, { status: 'finished' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/faults/${state.faultId}/status`, { status: 'finished' }, { Authorization: `Bearer ${adminToken}` }),
   );
 
   await runAndRecord(config, steps, 'user A rate finished fault', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/ratings', {
+    requestJson(config, 'POST', '/api/ratings', {
       itemType: 'fault',
       itemId: state.faultId,
       ratingValue: 5,
@@ -511,31 +655,31 @@ export async function runKayanFaultsNegativeCases(
   const userBToken = state.userBTokens.accessToken;
 
   await runAndRecord(config, steps, 'negative unauthorized list my faults', 401, () =>
-    requestJson(config, 'GET', '/v2/faults/me'),
+    requestJson(config, 'GET', '/api/faults/me'),
   );
   await runAndRecord(config, steps, 'negative user B update user A fault', [403, 404], () =>
-    requestJson(config, 'PATCH', `/v2/faults/${state.faultId}`, { description: 'Intrusion update' }, { Authorization: `Bearer ${userBToken}` }),
+    requestJson(config, 'PATCH', `/api/faults/${state.faultId}`, { description: 'Intrusion update' }, { Authorization: `Bearer ${userBToken}` }),
   );
   await runAndRecord(config, steps, 'negative user B cancel user A fault', [403, 404], () =>
-    requestJson(config, 'POST', `/v2/faults/${state.faultId}/cancel`, {}, { Authorization: `Bearer ${userBToken}` }),
+    requestJson(config, 'POST', `/api/faults/${state.faultId}/cancel`, {}, { Authorization: `Bearer ${userBToken}` }),
   );
   await runAndRecord(config, steps, 'negative user B rate user A fault', [403, 404], () =>
-    requestJson(config, 'POST', '/v2/ratings', { itemType: 'fault', itemId: state.faultId, ratingValue: 5 }, { Authorization: `Bearer ${userBToken}` }),
+    requestJson(config, 'POST', '/api/ratings', { itemType: 'fault', itemId: state.faultId, ratingValue: 5 }, { Authorization: `Bearer ${userBToken}` }),
   );
   await runAndRecord(config, steps, 'negative user A duplicate fault rating', 400, () =>
-    requestJson(config, 'POST', '/v2/ratings', { itemType: 'fault', itemId: state.faultId, ratingValue: 4 }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'POST', '/api/ratings', { itemType: 'fault', itemId: state.faultId, ratingValue: 4 }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative user A update after processing', 400, () =>
-    requestJson(config, 'PATCH', `/v2/faults/${state.faultId}`, { description: 'Late update blocked' }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'PATCH', `/api/faults/${state.faultId}`, { description: 'Late update blocked' }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative user A cancel after processing', 400, () =>
-    requestJson(config, 'POST', `/v2/faults/${state.faultId}/cancel`, {}, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'POST', `/api/faults/${state.faultId}/cancel`, {}, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative admin invalid backward transition', 400, () =>
-    requestJson(config, 'PATCH', `/v2/admin/faults/${state.faultId}/status`, { status: 'received' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/faults/${state.faultId}/status`, { status: 'received' }, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'negative create fault with missing image file id', 400, () =>
-    requestJson(config, 'POST', '/v2/faults', {
+    requestJson(config, 'POST', '/api/faults', {
       title: 'Missing image file',
       description: 'Should fail',
       severity: 'normal',
@@ -544,7 +688,7 @@ export async function runKayanFaultsNegativeCases(
     }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative create fault with pending image file', 400, () =>
-    requestJson(config, 'POST', '/v2/faults', {
+    requestJson(config, 'POST', '/api/faults', {
       title: 'Pending image file',
       description: 'Should fail',
       severity: 'normal',
@@ -553,7 +697,7 @@ export async function runKayanFaultsNegativeCases(
     }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative create fault with document file', 400, () =>
-    requestJson(config, 'POST', '/v2/faults', {
+    requestJson(config, 'POST', '/api/faults', {
       title: 'Document file',
       description: 'Should fail',
       severity: 'normal',

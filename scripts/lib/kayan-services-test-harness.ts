@@ -356,7 +356,7 @@ export async function runKayanServicesHappyPath(
   const adminToken = state.adminTokens.accessToken;
 
   const createService = await runAndRecord(config, steps, 'user A create service order', [200, 201, 404], () =>
-    requestJson(config, 'POST', '/v2/services', {
+    requestJson(config, 'POST', '/api/services', {
       serviceType: 'maintenance',
       description: 'Fix AC noise issue in bedroom.',
       address: 'Cairo, Nasr City',
@@ -365,7 +365,7 @@ export async function runKayanServicesHappyPath(
 
   if (createService.status === 404) {
     const recoverList = await runAndRecord(config, steps, 'user A recover created service id from my services list', 200, () =>
-      requestJson(config, 'GET', '/v2/services/me?sortBy=createdAt&sortDirection=desc', undefined, { Authorization: `Bearer ${userAToken}` }),
+      requestJson(config, 'GET', '/api/services/me?sortBy=createdAt&sortDirection=desc', undefined, { Authorization: `Bearer ${userAToken}` }),
     );
     state.serviceId = pickLatestServiceIdFromMyList(recoverList.body);
   } else {
@@ -373,38 +373,38 @@ export async function runKayanServicesHappyPath(
   }
 
   await runAndRecord(config, steps, 'user A update service while not_started', 200, () =>
-    requestJson(config, 'PATCH', `/v2/services/${state.serviceId}`, {
+    requestJson(config, 'PATCH', `/api/services/${state.serviceId}`, {
       description: 'Updated: AC noise issue plus weak cooling in living room.',
     }, { Authorization: `Bearer ${userAToken}` }),
   );
 
   await runAndRecord(config, steps, 'user A list my services default', 200, () =>
-    requestJson(config, 'GET', '/v2/services/me', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/services/me', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user A list my services by type', 200, () =>
-    requestJson(config, 'GET', '/v2/services/me?serviceType=maintenance', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/services/me?serviceType=maintenance', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user A list my services by date range', 200, () =>
-    requestJson(config, 'GET', '/v2/services/me?fromDate=2026-01-01&toDate=2026-12-31', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/services/me?fromDate=2026-01-01&toDate=2026-12-31', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user A list my services sorted asc', 200, () =>
-    requestJson(config, 'GET', '/v2/services/me?sortBy=createdAt&sortDirection=asc', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/services/me?sortBy=createdAt&sortDirection=asc', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user A list my services sorted desc', 200, () =>
-    requestJson(config, 'GET', '/v2/services/me?sortBy=createdAt&sortDirection=desc', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/services/me?sortBy=createdAt&sortDirection=desc', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
 
   const adminList = await runAndRecord(config, steps, 'admin list all services default', 200, () =>
-    requestJson(config, 'GET', '/v2/admin/services', undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'GET', '/api/admin/services', undefined, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'admin list services by type', 200, () =>
-    requestJson(config, 'GET', '/v2/admin/services?serviceType=maintenance', undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'GET', '/api/admin/services?serviceType=maintenance', undefined, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'admin list services by date range', 200, () =>
-    requestJson(config, 'GET', '/v2/admin/services?fromDate=2026-01-01&toDate=2026-12-31', undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'GET', '/api/admin/services?fromDate=2026-01-01&toDate=2026-12-31', undefined, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'admin list services sorted asc', 200, () =>
-    requestJson(config, 'GET', '/v2/admin/services?sortBy=createdAt&sortDirection=asc', undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'GET', '/api/admin/services?sortBy=createdAt&sortDirection=asc', undefined, { Authorization: `Bearer ${adminToken}` }),
   );
 
   const adminItems = extractItems(adminList.body);
@@ -414,14 +414,14 @@ export async function runKayanServicesHappyPath(
   }
 
   await runAndRecord(config, steps, 'admin update service status to in_progress', 200, () =>
-    requestJson(config, 'PATCH', `/v2/admin/services/${state.serviceId}/status`, { status: 'in_progress' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/services/${state.serviceId}/status`, { status: 'in_progress' }, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'admin update service status to finished', 200, () =>
-    requestJson(config, 'PATCH', `/v2/admin/services/${state.serviceId}/status`, { status: 'finished' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/services/${state.serviceId}/status`, { status: 'finished' }, { Authorization: `Bearer ${adminToken}` }),
   );
 
   await runAndRecord(config, steps, 'user A rate finished service', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/ratings', {
+    requestJson(config, 'POST', '/api/ratings', {
       itemType: 'service',
       itemId: state.serviceId,
       ratingValue: 5,
@@ -442,31 +442,31 @@ export async function runKayanServicesNegativeCases(
   const userBToken = state.userBTokens.accessToken;
 
   await runAndRecord(config, steps, 'negative unauthorized list my services', 401, () =>
-    requestJson(config, 'GET', '/v2/services/me'),
+    requestJson(config, 'GET', '/api/services/me'),
   );
   await runAndRecord(config, steps, 'negative user B update user A service', [403, 404], () =>
-    requestJson(config, 'PATCH', `/v2/services/${state.serviceId}`, { description: 'Intrusion update' }, { Authorization: `Bearer ${userBToken}` }),
+    requestJson(config, 'PATCH', `/api/services/${state.serviceId}`, { description: 'Intrusion update' }, { Authorization: `Bearer ${userBToken}` }),
   );
   await runAndRecord(config, steps, 'negative user B cancel user A service', [403, 404], () =>
-    requestJson(config, 'POST', `/v2/services/${state.serviceId}/cancel`, {}, { Authorization: `Bearer ${userBToken}` }),
+    requestJson(config, 'POST', `/api/services/${state.serviceId}/cancel`, {}, { Authorization: `Bearer ${userBToken}` }),
   );
   await runAndRecord(config, steps, 'negative user B rate user A service', [403, 404], () =>
-    requestJson(config, 'POST', '/v2/ratings', { itemType: 'service', itemId: state.serviceId, ratingValue: 5 }, { Authorization: `Bearer ${userBToken}` }),
+    requestJson(config, 'POST', '/api/ratings', { itemType: 'service', itemId: state.serviceId, ratingValue: 5 }, { Authorization: `Bearer ${userBToken}` }),
   );
   await runAndRecord(config, steps, 'negative user A duplicate service rating', 400, () =>
-    requestJson(config, 'POST', '/v2/ratings', { itemType: 'service', itemId: state.serviceId, ratingValue: 4 }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'POST', '/api/ratings', { itemType: 'service', itemId: state.serviceId, ratingValue: 4 }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative user A update after processing', 400, () =>
-    requestJson(config, 'PATCH', `/v2/services/${state.serviceId}`, { description: 'Late update blocked' }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'PATCH', `/api/services/${state.serviceId}`, { description: 'Late update blocked' }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative user A cancel after processing', 400, () =>
-    requestJson(config, 'POST', `/v2/services/${state.serviceId}/cancel`, {}, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'POST', `/api/services/${state.serviceId}/cancel`, {}, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative admin invalid enum status', [400, 422], () =>
-    requestJson(config, 'PATCH', `/v2/admin/services/${state.serviceId}/status`, { status: 'bad_status' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/services/${state.serviceId}/status`, { status: 'bad_status' }, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'negative create service invalid payload', [400, 422], () =>
-    requestJson(config, 'POST', '/v2/services', { serviceType: 'maintenance' }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'POST', '/api/services', { serviceType: 'maintenance' }, { Authorization: `Bearer ${userAToken}` }),
   );
 
   return { steps };

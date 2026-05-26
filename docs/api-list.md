@@ -852,38 +852,38 @@ _No request body._
 |---|---|---|
 | 503 | Database unavailable | ErrorResponseDto |
 
-### Kayan V2
+### Kayan API
 
 | Method | Path | Auth | Summary |
 |---|---|---|---|
-| GET | /v2/cart | bearer | List cart items |
-| POST | /v2/cart/checkout | bearer | KayanController_checkoutCart |
-| POST | /v2/cart/items | bearer | Add cart item |
-| DELETE | /v2/cart/items/{id} | bearer | KayanController_deleteCartItem |
-| PATCH | /v2/cart/items/{id} | bearer | KayanController_updateCartItem |
-| POST | /v2/faults | bearer | KayanController_createFault |
-| PATCH | /v2/faults/{id} | bearer | KayanController_updateFault |
-| POST | /v2/faults/{id}/cancel | bearer | KayanController_cancelFault |
-| GET | /v2/faults/me | bearer | KayanController_listMyFaults |
-| POST | /v2/followups/{itemType}/{itemId}/chat/conversations | bearer | KayanController_createConversation |
-| GET | /v2/followups/{itemType}/{itemId}/chat/conversations/{id}/messages | bearer | KayanController_listMessages |
-| POST | /v2/followups/{itemType}/{itemId}/chat/conversations/{id}/messages | bearer | KayanController_sendMessage |
-| GET | /v2/followups/{itemType}/{itemId}/steps | bearer | KayanController_listFollowupSteps |
-| GET | /v2/gallery | public | KayanController_listGallery |
-| POST | /v2/orders | bearer | Create order |
-| GET | /v2/orders/{id} | bearer | KayanController_getOrder |
-| PATCH | /v2/orders/{id}/address | bearer | KayanController_updateOrderAddress |
-| POST | /v2/orders/{id}/cancel | bearer | KayanController_cancelOrder |
-| GET | /v2/orders/me | bearer | KayanController_listMyOrders |
-| GET | /v2/products | public | List public Kayan products |
-| GET | /v2/products/{id} | public | Get Kayan product by id |
-| POST | /v2/ratings | bearer | KayanController_createItemRating |
-| POST | /v2/services | bearer | KayanController_createService |
-| PATCH | /v2/services/{id} | bearer | KayanController_updateService |
-| POST | /v2/services/{id}/cancel | bearer | KayanController_cancelService |
-| GET | /v2/services/me | bearer | KayanController_listMyServices |
+| GET | /api/cart | bearer | List cart items |
+| POST | /api/cart/checkout | bearer | KayanController_checkoutCart |
+| POST | /api/cart/items | bearer | Add cart item |
+| DELETE | /api/cart/items/{id} | bearer | KayanController_deleteCartItem |
+| PATCH | /api/cart/items/{id} | bearer | KayanController_updateCartItem |
+| POST | /api/faults | bearer | KayanController_createFault |
+| PATCH | /api/faults/{id} | bearer | KayanController_updateFault |
+| POST | /api/faults/{id}/cancel | bearer | KayanController_cancelFault |
+| GET | /api/faults/me | bearer | KayanController_listMyFaults |
+| POST | /api/followups/{itemType}/{itemId}/chat/conversations | bearer | KayanController_createConversation |
+| GET | /api/followups/{itemType}/{itemId}/chat/conversations/{id}/messages | bearer | KayanController_listMessages |
+| POST | /api/followups/{itemType}/{itemId}/chat/conversations/{id}/messages | bearer | KayanController_sendMessage |
+| GET | /api/followups/{itemType}/{itemId}/steps | bearer | KayanController_listFollowupSteps |
+| GET | /api/gallery | public | KayanController_listGallery |
+| POST | /api/orders | bearer | Create order |
+| GET | /api/orders/{id} | bearer | KayanController_getOrder |
+| PATCH | /api/orders/{id}/address | bearer | KayanController_updateOrderAddress |
+| POST | /api/orders/{id}/cancel | bearer | KayanController_cancelOrder |
+| GET | /api/orders/me | bearer | KayanController_listMyOrders |
+| GET | /api/products | public | List public Kayan products |
+| GET | /api/products/{id} | public | Get Kayan product by id |
+| POST | /api/ratings | bearer | KayanController_createItemRating |
+| POST | /api/services | bearer | KayanController_createService |
+| PATCH | /api/services/{id} | bearer | KayanController_updateService |
+| POST | /api/services/{id}/cancel | bearer | KayanController_cancelService |
+| GET | /api/services/me | bearer | KayanController_listMyServices |
 
-#### GET /v2/cart
+#### GET /api/cart
 
 - Name: `KayanController_listCart`
 - Auth: `bearer`
@@ -909,7 +909,7 @@ _No request body._
 
 _No documented error responses._
 
-#### POST /v2/cart/checkout
+#### POST /api/cart/checkout
 
 - Name: `KayanController_checkoutCart`
 - Auth: `bearer`
@@ -937,7 +937,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### POST /v2/cart/items
+#### POST /api/cart/items
 
 - Name: `KayanController_addCartItem`
 - Auth: `bearer`
@@ -965,7 +965,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### DELETE /v2/cart/items/{id}
+#### DELETE /api/cart/items/{id}
 
 - Name: `KayanController_deleteCartItem`
 - Auth: `bearer`
@@ -991,7 +991,7 @@ _No request body._
 
 _No documented error responses._
 
-#### PATCH /v2/cart/items/{id}
+#### PATCH /api/cart/items/{id}
 
 - Name: `KayanController_updateCartItem`
 - Auth: `bearer`
@@ -1012,7 +1012,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### POST /v2/faults
+#### POST /api/faults
 
 - Name: `KayanController_createFault`
 - Auth: `bearer`
@@ -1040,7 +1040,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### PATCH /v2/faults/{id}
+#### PATCH /api/faults/{id}
 
 - Name: `KayanController_updateFault`
 - Auth: `bearer`
@@ -1061,7 +1061,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### POST /v2/faults/{id}/cancel
+#### POST /api/faults/{id}/cancel
 
 - Name: `KayanController_cancelFault`
 - Auth: `bearer`
@@ -1087,7 +1087,7 @@ _No request body._
 
 _No documented error responses._
 
-#### GET /v2/faults/me
+#### GET /api/faults/me
 
 - Name: `KayanController_listMyFaults`
 - Auth: `bearer`
@@ -1113,7 +1113,7 @@ _No request body._
 
 _No documented error responses._
 
-#### POST /v2/followups/{itemType}/{itemId}/chat/conversations
+#### POST /api/followups/{itemType}/{itemId}/chat/conversations
 
 - Name: `KayanController_createConversation`
 - Auth: `bearer`
@@ -1134,7 +1134,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### GET /v2/followups/{itemType}/{itemId}/chat/conversations/{id}/messages
+#### GET /api/followups/{itemType}/{itemId}/chat/conversations/{id}/messages
 
 - Name: `KayanController_listMessages`
 - Auth: `bearer`
@@ -1153,7 +1153,7 @@ _No request body._
 
 _No documented error responses._
 
-#### POST /v2/followups/{itemType}/{itemId}/chat/conversations/{id}/messages
+#### POST /api/followups/{itemType}/{itemId}/chat/conversations/{id}/messages
 
 - Name: `KayanController_sendMessage`
 - Auth: `bearer`
@@ -1174,7 +1174,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### GET /v2/followups/{itemType}/{itemId}/steps
+#### GET /api/followups/{itemType}/{itemId}/steps
 
 - Name: `KayanController_listFollowupSteps`
 - Auth: `bearer`
@@ -1193,7 +1193,7 @@ _No request body._
 
 _No documented error responses._
 
-#### GET /v2/gallery
+#### GET /api/gallery
 
 - Name: `KayanController_listGallery`
 - Auth: `public`
@@ -1219,7 +1219,7 @@ _No request body._
 
 _No documented error responses._
 
-#### POST /v2/orders
+#### POST /api/orders
 
 - Name: `KayanController_createOrder`
 - Auth: `bearer`
@@ -1247,7 +1247,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### GET /v2/orders/{id}
+#### GET /api/orders/{id}
 
 - Name: `KayanController_getOrder`
 - Auth: `bearer`
@@ -1273,7 +1273,7 @@ _No request body._
 
 _No documented error responses._
 
-#### PATCH /v2/orders/{id}/address
+#### PATCH /api/orders/{id}/address
 
 - Name: `KayanController_updateOrderAddress`
 - Auth: `bearer`
@@ -1294,7 +1294,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### POST /v2/orders/{id}/cancel
+#### POST /api/orders/{id}/cancel
 
 - Name: `KayanController_cancelOrder`
 - Auth: `bearer`
@@ -1320,7 +1320,7 @@ _No request body._
 
 _No documented error responses._
 
-#### GET /v2/orders/me
+#### GET /api/orders/me
 
 - Name: `KayanController_listMyOrders`
 - Auth: `bearer`
@@ -1346,7 +1346,7 @@ _No request body._
 
 _No documented error responses._
 
-#### GET /v2/products
+#### GET /api/products
 
 - Name: `KayanController_listProducts`
 - Auth: `public`
@@ -1372,7 +1372,7 @@ _No request body._
 
 _No documented error responses._
 
-#### GET /v2/products/{id}
+#### GET /api/products/{id}
 
 - Name: `KayanController_getProduct`
 - Auth: `public`
@@ -1400,7 +1400,7 @@ _No request body._
 |---|---|---|
 | 404 |  | ErrorResponseDto |
 
-#### POST /v2/ratings
+#### POST /api/ratings
 
 - Name: `KayanController_createItemRating`
 - Auth: `bearer`
@@ -1428,7 +1428,7 @@ _No request body._
 
 _No documented error responses._
 
-#### POST /v2/services
+#### POST /api/services
 
 - Name: `KayanController_createService`
 - Auth: `bearer`
@@ -1456,7 +1456,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### PATCH /v2/services/{id}
+#### PATCH /api/services/{id}
 
 - Name: `KayanController_updateService`
 - Auth: `bearer`
@@ -1477,7 +1477,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### POST /v2/services/{id}/cancel
+#### POST /api/services/{id}/cancel
 
 - Name: `KayanController_cancelService`
 - Auth: `bearer`
@@ -1503,7 +1503,7 @@ _No request body._
 
 _No documented error responses._
 
-#### GET /v2/services/me
+#### GET /api/services/me
 
 - Name: `KayanController_listMyServices`
 - Auth: `bearer`
@@ -1529,28 +1529,28 @@ _No request body._
 
 _No documented error responses._
 
-### Kayan V2 Admin
+### Kayan API Admin
 
 | Method | Path | Auth | Summary |
 |---|---|---|---|
-| GET | /v2/admin/faults | bearer | KayanAdminController_listFaults |
-| PATCH | /v2/admin/faults/{id}/status | bearer | KayanAdminController_updateFaultStatus |
-| POST | /v2/admin/followups/{itemType}/{itemId}/steps | bearer | KayanAdminController_createStep |
-| DELETE | /v2/admin/followups/{itemType}/{itemId}/steps/{id} | bearer | KayanAdminController_deleteStep |
-| PATCH | /v2/admin/followups/{itemType}/{itemId}/steps/{id} | bearer | KayanAdminController_updateStep |
-| GET | /v2/admin/gallery | bearer | KayanAdminController_listGallery |
-| POST | /v2/admin/gallery | bearer | KayanAdminController_createGalleryItem |
-| DELETE | /v2/admin/gallery/{id} | bearer | KayanAdminController_deleteGalleryItem |
-| PATCH | /v2/admin/gallery/{id} | bearer | KayanAdminController_updateGalleryItem |
-| GET | /v2/admin/orders | bearer | KayanAdminController_listOrders |
-| PATCH | /v2/admin/orders/{id}/status | bearer | KayanAdminController_updateOrderStatus |
-| POST | /v2/admin/products | bearer | KayanAdminController_createProduct |
-| DELETE | /v2/admin/products/{id} | bearer | KayanAdminController_deleteProduct |
-| PATCH | /v2/admin/products/{id} | bearer | KayanAdminController_updateProduct |
-| GET | /v2/admin/services | bearer | KayanAdminController_listServices |
-| PATCH | /v2/admin/services/{id}/status | bearer | KayanAdminController_updateServiceStatus |
+| GET | /api/admin/faults | bearer | KayanAdminController_listFaults |
+| PATCH | /api/admin/faults/{id}/status | bearer | KayanAdminController_updateFaultStatus |
+| POST | /api/admin/followups/{itemType}/{itemId}/steps | bearer | KayanAdminController_createStep |
+| DELETE | /api/admin/followups/{itemType}/{itemId}/steps/{id} | bearer | KayanAdminController_deleteStep |
+| PATCH | /api/admin/followups/{itemType}/{itemId}/steps/{id} | bearer | KayanAdminController_updateStep |
+| GET | /api/admin/gallery | bearer | KayanAdminController_listGallery |
+| POST | /api/admin/gallery | bearer | KayanAdminController_createGalleryItem |
+| DELETE | /api/admin/gallery/{id} | bearer | KayanAdminController_deleteGalleryItem |
+| PATCH | /api/admin/gallery/{id} | bearer | KayanAdminController_updateGalleryItem |
+| GET | /api/admin/orders | bearer | KayanAdminController_listOrders |
+| PATCH | /api/admin/orders/{id}/status | bearer | KayanAdminController_updateOrderStatus |
+| POST | /api/admin/products | bearer | KayanAdminController_createProduct |
+| DELETE | /api/admin/products/{id} | bearer | KayanAdminController_deleteProduct |
+| PATCH | /api/admin/products/{id} | bearer | KayanAdminController_updateProduct |
+| GET | /api/admin/services | bearer | KayanAdminController_listServices |
+| PATCH | /api/admin/services/{id}/status | bearer | KayanAdminController_updateServiceStatus |
 
-#### GET /v2/admin/faults
+#### GET /api/admin/faults
 
 - Name: `KayanAdminController_listFaults`
 - Auth: `bearer`
@@ -1576,7 +1576,7 @@ _No request body._
 
 _No documented error responses._
 
-#### PATCH /v2/admin/faults/{id}/status
+#### PATCH /api/admin/faults/{id}/status
 
 - Name: `KayanAdminController_updateFaultStatus`
 - Auth: `bearer`
@@ -1597,7 +1597,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### POST /v2/admin/followups/{itemType}/{itemId}/steps
+#### POST /api/admin/followups/{itemType}/{itemId}/steps
 
 - Name: `KayanAdminController_createStep`
 - Auth: `bearer`
@@ -1618,7 +1618,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### DELETE /v2/admin/followups/{itemType}/{itemId}/steps/{id}
+#### DELETE /api/admin/followups/{itemType}/{itemId}/steps/{id}
 
 - Name: `KayanAdminController_deleteStep`
 - Auth: `bearer`
@@ -1637,7 +1637,7 @@ _No request body._
 
 _No documented error responses._
 
-#### PATCH /v2/admin/followups/{itemType}/{itemId}/steps/{id}
+#### PATCH /api/admin/followups/{itemType}/{itemId}/steps/{id}
 
 - Name: `KayanAdminController_updateStep`
 - Auth: `bearer`
@@ -1658,7 +1658,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### GET /v2/admin/gallery
+#### GET /api/admin/gallery
 
 - Name: `KayanAdminController_listGallery`
 - Auth: `bearer`
@@ -1684,7 +1684,7 @@ _No request body._
 
 _No documented error responses._
 
-#### POST /v2/admin/gallery
+#### POST /api/admin/gallery
 
 - Name: `KayanAdminController_createGalleryItem`
 - Auth: `bearer`
@@ -1712,7 +1712,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### DELETE /v2/admin/gallery/{id}
+#### DELETE /api/admin/gallery/{id}
 
 - Name: `KayanAdminController_deleteGalleryItem`
 - Auth: `bearer`
@@ -1738,7 +1738,7 @@ _No request body._
 
 _No documented error responses._
 
-#### PATCH /v2/admin/gallery/{id}
+#### PATCH /api/admin/gallery/{id}
 
 - Name: `KayanAdminController_updateGalleryItem`
 - Auth: `bearer`
@@ -1759,7 +1759,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### GET /v2/admin/orders
+#### GET /api/admin/orders
 
 - Name: `KayanAdminController_listOrders`
 - Auth: `bearer`
@@ -1785,7 +1785,7 @@ _No request body._
 
 _No documented error responses._
 
-#### PATCH /v2/admin/orders/{id}/status
+#### PATCH /api/admin/orders/{id}/status
 
 - Name: `KayanAdminController_updateOrderStatus`
 - Auth: `bearer`
@@ -1806,7 +1806,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### POST /v2/admin/products
+#### POST /api/admin/products
 
 - Name: `KayanAdminController_createProduct`
 - Auth: `bearer`
@@ -1834,7 +1834,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### DELETE /v2/admin/products/{id}
+#### DELETE /api/admin/products/{id}
 
 - Name: `KayanAdminController_deleteProduct`
 - Auth: `bearer`
@@ -1860,7 +1860,7 @@ _No request body._
 
 _No documented error responses._
 
-#### PATCH /v2/admin/products/{id}
+#### PATCH /api/admin/products/{id}
 
 - Name: `KayanAdminController_updateProduct`
 - Auth: `bearer`
@@ -1881,7 +1881,7 @@ _No documented error responses._
 
 _No documented error responses._
 
-#### GET /v2/admin/services
+#### GET /api/admin/services
 
 - Name: `KayanAdminController_listServices`
 - Auth: `bearer`
@@ -1907,7 +1907,7 @@ _No request body._
 
 _No documented error responses._
 
-#### PATCH /v2/admin/services/{id}/status
+#### PATCH /api/admin/services/{id}/status
 
 - Name: `KayanAdminController_updateServiceStatus`
 - Auth: `bearer`

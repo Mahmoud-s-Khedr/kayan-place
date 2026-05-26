@@ -35,6 +35,7 @@ export type FollowupTestConfig = {
   adminPhone?: string;
   adminPassword?: string;
   reportDir: string;
+  checkDeprecatedAliases: boolean;
 };
 
 type AuthIdentity = {
@@ -485,7 +486,7 @@ async function runSocketFlow(
 
 async function createOrder(config: FollowupTestConfig, steps: StepResult[], adminToken: string, userToken: string): Promise<number> {
   const createProduct = await runAndRecord(config, steps, 'setup order: admin create product', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/admin/products', {
+    requestJson(config, 'POST', '/api/admin/products', {
       title: `Followup Sim Product ${Date.now()}`,
       description: 'Followup simulation product.',
       amount: 5,
@@ -498,18 +499,18 @@ async function createOrder(config: FollowupTestConfig, steps: StepResult[], admi
   const productId = pickId(createProduct.body, 'product');
 
   await runAndRecord(config, steps, 'setup order: user add cart item', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/cart/items', { productId, quantity: 1 }, { Authorization: `Bearer ${userToken}` }),
+    requestJson(config, 'POST', '/api/cart/items', { productId, quantity: 1 }, { Authorization: `Bearer ${userToken}` }),
   );
 
   const checkout = await runAndRecord(config, steps, 'setup order: user checkout', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/cart/checkout', { deliveryAddress: 'Cairo, Maadi, Street 1' }, { Authorization: `Bearer ${userToken}` }),
+    requestJson(config, 'POST', '/api/cart/checkout', { deliveryAddress: 'Cairo, Maadi, Street 1' }, { Authorization: `Bearer ${userToken}` }),
   );
   return pickId(checkout.body, 'order');
 }
 
 async function createFault(config: FollowupTestConfig, steps: StepResult[], userToken: string): Promise<number> {
   const created = await runAndRecord(config, steps, 'setup fault: user report fault', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/faults', {
+    requestJson(config, 'POST', '/api/faults', {
       title: `Followup Fault ${Date.now()}`,
       description: 'Fault for followup simulation',
       severity: 'normal',
@@ -522,7 +523,7 @@ async function createFault(config: FollowupTestConfig, steps: StepResult[], user
 
 async function createService(config: FollowupTestConfig, steps: StepResult[], userToken: string): Promise<number> {
   const created = await runAndRecord(config, steps, 'setup service: user create service order', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/services', {
+    requestJson(config, 'POST', '/api/services', {
       serviceType: 'maintenance',
       description: 'Service for followup simulation',
       address: 'Cairo, Nasr City',
@@ -563,21 +564,21 @@ async function runPerItemFlow(
   adminToken: string,
 ): Promise<ItemContext> {
   const stepA = await runAndRecord(config, steps, `${itemType}: admin add step A`, [200, 201], () =>
-    requestJson(config, 'POST', `/v2/admin/followups/${itemType}/${itemId}/steps`, { title: `${itemType} step A`, sortOrder: 2 }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'POST', `/api/admin/followups/${itemType}/${itemId}/steps`, { title: `${itemType} step A`, sortOrder: 2 }, { Authorization: `Bearer ${adminToken}` }),
   );
   const stepAId = pickId(stepA.body, 'step');
 
   const stepB = await runAndRecord(config, steps, `${itemType}: admin add step B`, [200, 201], () =>
-    requestJson(config, 'POST', `/v2/admin/followups/${itemType}/${itemId}/steps`, { title: `${itemType} step B`, sortOrder: 1 }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'POST', `/api/admin/followups/${itemType}/${itemId}/steps`, { title: `${itemType} step B`, sortOrder: 1 }, { Authorization: `Bearer ${adminToken}` }),
   );
   const stepBId = pickId(stepB.body, 'step');
 
   await runAndRecord(config, steps, `${itemType}: admin update step A`, 200, () =>
-    requestJson(config, 'PATCH', `/v2/admin/followups/${itemType}/${itemId}/steps/${stepAId}`, { title: `${itemType} step A updated` }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/followups/${itemType}/${itemId}/steps/${stepAId}`, { title: `${itemType} step A updated` }, { Authorization: `Bearer ${adminToken}` }),
   );
 
   const listed = await runAndRecord(config, steps, `${itemType}: owner list followup steps`, 200, () =>
-    requestJson(config, 'GET', `/v2/followups/${itemType}/${itemId}/steps`, undefined, { Authorization: `Bearer ${ownerToken}` }),
+    requestJson(config, 'GET', `/api/followups/${itemType}/${itemId}/steps`, undefined, { Authorization: `Bearer ${ownerToken}` }),
   );
 
   const listItems = (((listed.body?.data as any)?.items) ?? []) as Array<Record<string, unknown>>;
@@ -590,12 +591,12 @@ async function runPerItemFlow(
   }
 
   const convoCreate = await runAndRecord(config, steps, `${itemType}: owner create followup conversation`, [200, 201], () =>
-    requestJson(config, 'POST', `/v2/followups/${itemType}/${itemId}/chat/conversations`, {}, { Authorization: `Bearer ${ownerToken}` }),
+    requestJson(config, 'POST', `/api/followups/${itemType}/${itemId}/chat/conversations`, {}, { Authorization: `Bearer ${ownerToken}` }),
   );
   const conversationId = pickId(convoCreate.body, 'conversation');
 
   const convoCreateAgain = await runAndRecord(config, steps, `${itemType}: owner create conversation idempotent`, [200, 201], () =>
-    requestJson(config, 'POST', `/v2/followups/${itemType}/${itemId}/chat/conversations`, {}, { Authorization: `Bearer ${ownerToken}` }),
+    requestJson(config, 'POST', `/api/followups/${itemType}/${itemId}/chat/conversations`, {}, { Authorization: `Bearer ${ownerToken}` }),
   );
   const conversationIdAgain = pickId(convoCreateAgain.body, 'conversation');
   const idemOk = conversationId === conversationIdAgain;
@@ -610,18 +611,18 @@ async function runPerItemFlow(
   }
 
   await runAndRecord(config, steps, `${itemType}: owner send rest message`, [200, 201], () =>
-    requestJson(config, 'POST', `/v2/followups/${itemType}/${itemId}/chat/conversations/${conversationId}/messages`, {
+    requestJson(config, 'POST', `/api/followups/${itemType}/${itemId}/chat/conversations/${conversationId}/messages`, {
       messageText: `rest-owner-${itemType}-${Date.now()}`,
     }, { Authorization: `Bearer ${ownerToken}` }),
   );
   await runAndRecord(config, steps, `${itemType}: admin send rest message`, [200, 201], () =>
-    requestJson(config, 'POST', `/v2/followups/${itemType}/${itemId}/chat/conversations/${conversationId}/messages`, {
+    requestJson(config, 'POST', `/api/followups/${itemType}/${itemId}/chat/conversations/${conversationId}/messages`, {
       messageText: `rest-admin-${itemType}-${Date.now()}`,
     }, { Authorization: `Bearer ${adminToken}` }),
   );
 
   const messages = await runAndRecord(config, steps, `${itemType}: owner list rest messages`, 200, () =>
-    requestJson(config, 'GET', `/v2/followups/${itemType}/${itemId}/chat/conversations/${conversationId}/messages`, undefined, { Authorization: `Bearer ${ownerToken}` }),
+    requestJson(config, 'GET', `/api/followups/${itemType}/${itemId}/chat/conversations/${conversationId}/messages`, undefined, { Authorization: `Bearer ${ownerToken}` }),
   );
   const msgItems = (((messages.body?.data as any)?.items) ?? []) as Array<Record<string, unknown>>;
   const ascendingOk = msgItems.every((m, idx) => {
@@ -638,37 +639,37 @@ async function runPerItemFlow(
   }
 
   await runAndRecord(config, steps, `${itemType}: non-owner forbidden steps list`, 403, () =>
-    requestJson(config, 'GET', `/v2/followups/${itemType}/${itemId}/steps`, undefined, { Authorization: `Bearer ${nonOwnerToken}` }),
+    requestJson(config, 'GET', `/api/followups/${itemType}/${itemId}/steps`, undefined, { Authorization: `Bearer ${nonOwnerToken}` }),
   );
   await runAndRecord(config, steps, `${itemType}: non-owner forbidden conversation create`, 403, () =>
-    requestJson(config, 'POST', `/v2/followups/${itemType}/${itemId}/chat/conversations`, {}, { Authorization: `Bearer ${nonOwnerToken}` }),
+    requestJson(config, 'POST', `/api/followups/${itemType}/${itemId}/chat/conversations`, {}, { Authorization: `Bearer ${nonOwnerToken}` }),
   );
   await runAndRecord(config, steps, `${itemType}: non-participant forbidden list messages`, 403, () =>
-    requestJson(config, 'GET', `/v2/followups/${itemType}/${itemId}/chat/conversations/${conversationId}/messages`, undefined, { Authorization: `Bearer ${nonOwnerToken}` }),
+    requestJson(config, 'GET', `/api/followups/${itemType}/${itemId}/chat/conversations/${conversationId}/messages`, undefined, { Authorization: `Bearer ${nonOwnerToken}` }),
   );
   await runAndRecord(config, steps, `${itemType}: non-participant forbidden send message`, 403, () =>
-    requestJson(config, 'POST', `/v2/followups/${itemType}/${itemId}/chat/conversations/${conversationId}/messages`, {
+    requestJson(config, 'POST', `/api/followups/${itemType}/${itemId}/chat/conversations/${conversationId}/messages`, {
       messageText: `rest-non-participant-${itemType}`,
     }, { Authorization: `Bearer ${nonOwnerToken}` }),
   );
 
   const wrongType: ItemType = itemType === 'order' ? 'fault' : 'order';
   await runAndRecord(config, steps, `${itemType}: mismatched scope returns not found`, 404, () =>
-    requestJson(config, 'GET', `/v2/followups/${wrongType}/${itemId}/chat/conversations/${conversationId}/messages`, undefined, { Authorization: `Bearer ${ownerToken}` }),
+    requestJson(config, 'GET', `/api/followups/${wrongType}/${itemId}/chat/conversations/${conversationId}/messages`, undefined, { Authorization: `Bearer ${ownerToken}` }),
   );
 
   await runAndRecord(config, steps, `${itemType}: admin unknown step update 404`, 404, () =>
-    requestJson(config, 'PATCH', `/v2/admin/followups/${itemType}/${itemId}/steps/999999999`, { title: 'missing' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/followups/${itemType}/${itemId}/steps/999999999`, { title: 'missing' }, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, `${itemType}: admin unknown step delete 404`, 404, () =>
-    requestJson(config, 'DELETE', `/v2/admin/followups/${itemType}/${itemId}/steps/999999999`, undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'DELETE', `/api/admin/followups/${itemType}/${itemId}/steps/999999999`, undefined, { Authorization: `Bearer ${adminToken}` }),
   );
 
   await runAndRecord(config, steps, `${itemType}: admin delete step A`, 200, () =>
-    requestJson(config, 'DELETE', `/v2/admin/followups/${itemType}/${itemId}/steps/${stepAId}`, undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'DELETE', `/api/admin/followups/${itemType}/${itemId}/steps/${stepAId}`, undefined, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, `${itemType}: admin delete step B`, 200, () =>
-    requestJson(config, 'DELETE', `/v2/admin/followups/${itemType}/${itemId}/steps/${stepBId}`, undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'DELETE', `/api/admin/followups/${itemType}/${itemId}/steps/${stepBId}`, undefined, { Authorization: `Bearer ${adminToken}` }),
   );
 
   await runSocketFlow(config, steps, itemType, wsConversationId, ownerToken, adminToken);
@@ -690,7 +691,7 @@ async function runDeprecatedAliasSanity(
   ownerToken: string,
 ): Promise<void> {
   const aliasRead = await runAndRecord(config, steps, 'alias steps read responds + deprecation header', 200, () =>
-    requestJson(config, 'GET', `/v2/followup/steps?itemType=order&itemId=${orderId}`, undefined, { Authorization: `Bearer ${ownerToken}` }),
+    requestJson(config, 'GET', `/api/followup/steps?itemType=order&itemId=${orderId}`, undefined, { Authorization: `Bearer ${ownerToken}` }),
   );
   const aliasReadHeader = aliasRead.headers.get('x-deprecated-route');
   const aliasReadOk = typeof aliasReadHeader === 'string' && aliasReadHeader.length > 0;
@@ -699,7 +700,7 @@ async function runDeprecatedAliasSanity(
   logStep(config, aliasReadStep);
 
   const aliasCreateStep = await runAndRecord(config, steps, 'alias admin step create responds + deprecation header', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/admin/followup-steps', { itemType: 'order', itemId: orderId, title: 'alias step', sortOrder: 0 }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'POST', '/api/admin/followup-steps', { itemType: 'order', itemId: orderId, title: 'alias step', sortOrder: 0 }, { Authorization: `Bearer ${adminToken}` }),
   );
   const aliasCreateHeader = aliasCreateStep.headers.get('x-deprecated-route');
   const createdStepId = pickId(aliasCreateStep.body, 'step');
@@ -709,11 +710,11 @@ async function runDeprecatedAliasSanity(
   logStep(config, aliasCreateHeaderStep);
 
   await runAndRecord(config, steps, 'alias admin step delete cleanup', 200, () =>
-    requestJson(config, 'DELETE', `/v2/admin/followup-steps/${createdStepId}`, undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'DELETE', `/api/admin/followup-steps/${createdStepId}`, undefined, { Authorization: `Bearer ${adminToken}` }),
   );
 
   const aliasChatRead = await runAndRecord(config, steps, 'alias chat list messages responds + deprecation header', 200, () =>
-    requestJson(config, 'GET', `/v2/followup/chat/conversations/${conversationId}/messages`, undefined, { Authorization: `Bearer ${ownerToken}` }),
+    requestJson(config, 'GET', `/api/followup/chat/conversations/${conversationId}/messages`, undefined, { Authorization: `Bearer ${ownerToken}` }),
   );
   const aliasChatHeader = aliasChatRead.headers.get('x-deprecated-route');
   const aliasChatOk = typeof aliasChatHeader === 'string' && aliasChatHeader.length > 0;
@@ -737,6 +738,7 @@ export function createFollowupTestContext(overrides?: Partial<FollowupTestConfig
     adminPhone: overrides?.adminPhone ?? process.env.ADMIN_PHONE,
     adminPassword: overrides?.adminPassword ?? process.env.ADMIN_PASSWORD,
     reportDir: overrides?.reportDir ?? path.join(process.cwd(), 'logs', 'kayan-followup-test'),
+    checkDeprecatedAliases: overrides?.checkDeprecatedAliases ?? parseBool(process.env.KAYAN_FOLLOWUP_TEST_CHECK_DEPRECATED_ALIASES, false),
   };
 
   if (!config.adminPassword) throw new Error('ADMIN_PASSWORD is required.');
@@ -785,7 +787,18 @@ export async function runFollowupHappyPath(
   const serviceCtx = await runPerItemFlow(config, steps, 'service', state.serviceId, wsConversationId, ownerToken, nonOwnerToken, adminToken);
   state.itemContexts = [orderCtx, faultCtx, serviceCtx];
 
-  await runDeprecatedAliasSanity(config, steps, state.orderId, orderCtx.conversationId, adminToken, ownerToken);
+  if (config.checkDeprecatedAliases) {
+    await runDeprecatedAliasSanity(config, steps, state.orderId, orderCtx.conversationId, adminToken, ownerToken);
+  } else {
+    const aliasStep = makeStep(
+      'alias route sanity checks skipped',
+      true,
+      200,
+      'Skipped because KAYAN_FOLLOWUP_TEST_CHECK_DEPRECATED_ALIASES=false',
+    );
+    steps.push(aliasStep);
+    logStep(config, aliasStep);
+  }
 
   assertHappyState(state);
   return { steps, state };
@@ -802,7 +815,7 @@ export async function runFollowupNegativeCases(
 
   for (const ctx of state.itemContexts) {
     await runAndRecord(config, steps, `negative ${ctx.itemType}: invalid conversation id list`, 404, () =>
-      requestJson(config, 'GET', `/v2/followups/${ctx.itemType}/${ctx.itemId}/chat/conversations/999999999/messages`, undefined, { Authorization: `Bearer ${ownerToken}` }),
+      requestJson(config, 'GET', `/api/followups/${ctx.itemType}/${ctx.itemId}/chat/conversations/999999999/messages`, undefined, { Authorization: `Bearer ${ownerToken}` }),
     );
   }
 

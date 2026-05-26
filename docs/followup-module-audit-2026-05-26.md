@@ -4,12 +4,12 @@
 
 | Use Case | API/Code Path | DB Tables | Result |
 | --- | --- | --- | --- |
-| Item Follow-Up | `GET /v2/followups/:itemType/:itemId/steps` -> `KayanService.listFollowupSteps` | `followup_steps`, ownership tables (`product_orders`, `fault_reports`, `service_orders`) | Implemented and verified |
+| Item Follow-Up | `GET /api/followups/:itemType/:itemId/steps` -> `KayanService.listFollowupSteps` | `followup_steps`, ownership tables (`product_orders`, `fault_reports`, `service_orders`) | Implemented and verified |
 | List Steps | same as above | same | Implemented and verified |
-| Add Step | `POST /v2/admin/followups/:itemType/:itemId/steps` -> `KayanService.adminCreateFollowupStep` | `followup_steps` | Implemented and verified |
-| Delete Step | `DELETE /v2/admin/followups/:itemType/:itemId/steps/:id` -> `KayanService.adminDeleteFollowupStep` | `followup_steps` | Implemented and verified |
-| Update Step | `PATCH /v2/admin/followups/:itemType/:itemId/steps/:id` -> `KayanService.adminUpdateFollowupStep` | `followup_steps` | Implemented and verified |
-| Item Chat | `POST /v2/followups/:itemType/:itemId/chat/conversations`, `GET/POST /v2/followups/:itemType/:itemId/chat/conversations/:id/messages` | `followup_conversations`, `followup_messages` | Implemented and verified |
+| Add Step | `POST /api/admin/followups/:itemType/:itemId/steps` -> `KayanService.adminCreateFollowupStep` | `followup_steps` | Implemented and verified |
+| Delete Step | `DELETE /api/admin/followups/:itemType/:itemId/steps/:id` -> `KayanService.adminDeleteFollowupStep` | `followup_steps` | Implemented and verified |
+| Update Step | `PATCH /api/admin/followups/:itemType/:itemId/steps/:id` -> `KayanService.adminUpdateFollowupStep` | `followup_steps` | Implemented and verified |
+| Item Chat | `POST /api/followups/:itemType/:itemId/chat/conversations`, `GET/POST /api/followups/:itemType/:itemId/chat/conversations/:id/messages` | `followup_conversations`, `followup_messages` | Implemented and verified |
 
 ## Gap Classification
 

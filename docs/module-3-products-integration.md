@@ -22,7 +22,7 @@ It covers:
 
 ### 3.1 Product Catalog (Public/User)
 
-1. Client loads products using `GET /v2/products`.
+1. Client loads products using `GET /api/products`.
 2. Client optionally passes query/filter/sort params:
    - `query`
    - `minPrice`, `maxPrice`
@@ -30,16 +30,16 @@ It covers:
    - `availability` (`active`, `inactive`, `all`)
    - `sortBy` (`createdAt`, `price`)
    - `sortDirection` (`asc`, `desc`)
-3. User opens a product details page using `GET /v2/products/:id`.
+3. User opens a product details page using `GET /api/products/:id`.
 4. Product payloads returned by list/details include assets split into:
    - `images`
    - `files`
 
 ### 3.2 Admin Product Management
 
-1. Admin creates product with `POST /v2/admin/products`.
-2. Admin updates product fields with `PATCH /v2/admin/products/:id`.
-3. Admin soft-deletes product with `DELETE /v2/admin/products/:id`.
+1. Admin creates product with `POST /api/admin/products`.
+2. Admin updates product fields with `PATCH /api/admin/products/:id`.
+3. Admin soft-deletes product with `DELETE /api/admin/products/:id`.
 
 Typical create payload:
 
@@ -60,11 +60,11 @@ Typical create payload:
 
 ### 3.3 Cart and Checkout (User)
 
-1. Add product to cart: `POST /v2/cart/items`.
-2. Update quantity: `PATCH /v2/cart/items/:id`.
-3. Remove item: `DELETE /v2/cart/items/:id`.
-4. List current cart: `GET /v2/cart`.
-5. Checkout cart: `POST /v2/cart/checkout` with `deliveryAddress`.
+1. Add product to cart: `POST /api/cart/items`.
+2. Update quantity: `PATCH /api/cart/items/:id`.
+3. Remove item: `DELETE /api/cart/items/:id`.
+4. List current cart: `GET /api/cart`.
+5. Checkout cart: `POST /api/cart/checkout` with `deliveryAddress`.
 
 Checkout payload:
 
@@ -77,14 +77,14 @@ Checkout payload:
 ### 3.4 Orders and Follow-up
 
 User:
-- `GET /v2/orders/me` for order list (supports `status`, `fromDate`, `toDate`, `sortBy=createdAt`, `sortDirection`)
-- `GET /v2/orders/:id` for details
-- `PATCH /v2/orders/:id/address` (allowed before processing starts)
-- `POST /v2/orders/:id/cancel` (allowed before processing starts)
+- `GET /api/orders/me` for order list (supports `status`, `fromDate`, `toDate`, `sortBy=createdAt`, `sortDirection`)
+- `GET /api/orders/:id` for details
+- `PATCH /api/orders/:id/address` (allowed before processing starts)
+- `POST /api/orders/:id/cancel` (allowed before processing starts)
 
 Admin:
-- `GET /v2/admin/orders` to review all orders
-- `PATCH /v2/admin/orders/:id/status` to progress order
+- `GET /api/admin/orders` to review all orders
+- `PATCH /api/admin/orders/:id/status` to progress order
 
 Order statuses:
 - `received`
@@ -98,7 +98,7 @@ Order statuses:
 Users can rate a delivered ordered product once.
 
 Endpoint:
-- `POST /v2/ratings`
+- `POST /api/ratings`
 
 Payload for product rating:
 
@@ -112,31 +112,31 @@ Payload for product rating:
 ```
 
 Contract nuance:
-- Direct order creation (`POST /v2/orders`) remains supported for compatibility alongside cart checkout (`POST /v2/cart/checkout`).
+- Direct order creation (`POST /api/orders`) remains supported for compatibility alongside cart checkout (`POST /api/cart/checkout`).
 
 ## 4. Endpoint Map (High Level)
 
 Public/User:
-- `GET /v2/products`
-- `GET /v2/products/:id`
-- `GET /v2/cart`
-- `POST /v2/cart/items`
-- `PATCH /v2/cart/items/:id`
-- `DELETE /v2/cart/items/:id`
-- `POST /v2/cart/checkout`
-- `POST /v2/orders`
-- `GET /v2/orders/me`
-- `GET /v2/orders/:id`
-- `PATCH /v2/orders/:id/address`
-- `POST /v2/orders/:id/cancel`
-- `POST /v2/ratings`
+- `GET /api/products`
+- `GET /api/products/:id`
+- `GET /api/cart`
+- `POST /api/cart/items`
+- `PATCH /api/cart/items/:id`
+- `DELETE /api/cart/items/:id`
+- `POST /api/cart/checkout`
+- `POST /api/orders`
+- `GET /api/orders/me`
+- `GET /api/orders/:id`
+- `PATCH /api/orders/:id/address`
+- `POST /api/orders/:id/cancel`
+- `POST /api/ratings`
 
 Admin:
-- `POST /v2/admin/products`
-- `PATCH /v2/admin/products/:id`
-- `DELETE /v2/admin/products/:id`
-- `GET /v2/admin/orders`
-- `PATCH /v2/admin/orders/:id/status`
+- `POST /api/admin/products`
+- `PATCH /api/admin/products/:id`
+- `DELETE /api/admin/products/:id`
+- `GET /api/admin/orders`
+- `PATCH /api/admin/orders/:id/status`
 
 ## 5. Client Validation and Error Handling
 

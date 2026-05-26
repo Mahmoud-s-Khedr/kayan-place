@@ -115,31 +115,31 @@ For frontend and mobile implementation guidance, see [Module 2 Profile Integrati
 **Implementation Notes (Current Backend Contract)**
 
 - Product endpoints:
-  - `GET /v2/products`
-  - `GET /v2/products/:id`
-  - `POST /v2/admin/products`
-  - `PATCH /v2/admin/products/:id`
-  - `DELETE /v2/admin/products/:id`
+  - `GET /api/products`
+  - `GET /api/products/:id`
+  - `POST /api/admin/products`
+  - `PATCH /api/admin/products/:id`
+  - `DELETE /api/admin/products/:id`
 - Cart endpoints:
-  - `GET /v2/cart`
-  - `POST /v2/cart/items`
-  - `PATCH /v2/cart/items/:id`
-  - `DELETE /v2/cart/items/:id`
-  - `POST /v2/cart/checkout`
+  - `GET /api/cart`
+  - `POST /api/cart/items`
+  - `PATCH /api/cart/items/:id`
+  - `DELETE /api/cart/items/:id`
+  - `POST /api/cart/checkout`
 - Order endpoints:
-  - `POST /v2/orders` (direct order creation)
-  - `GET /v2/orders/me`
-  - `GET /v2/orders/:id`
-  - `PATCH /v2/orders/:id/address`
-  - `POST /v2/orders/:id/cancel`
-  - `GET /v2/admin/orders`
-  - `PATCH /v2/admin/orders/:id/status`
+  - `POST /api/orders` (direct order creation)
+  - `GET /api/orders/me`
+  - `GET /api/orders/:id`
+  - `PATCH /api/orders/:id/address`
+  - `POST /api/orders/:id/cancel`
+  - `GET /api/admin/orders`
+  - `PATCH /api/admin/orders/:id/status`
 - Product rating endpoint:
-  - `POST /v2/ratings`
+  - `POST /api/ratings`
   - Product rating uses: `itemType=order`, `orderId`, `productId`, `ratingValue`
 - Product response contract:
-  - `GET /v2/products` and `GET /v2/products/:id` include product assets split into `images` and `files`.
-- `GET /v2/orders/me` query shape:
+  - `GET /api/products` and `GET /api/products/:id` include product assets split into `images` and `files`.
+- `GET /api/orders/me` query shape:
   - `status`
   - `fromDate`, `toDate`
   - `sortBy` (currently `createdAt`)
@@ -173,21 +173,21 @@ For frontend and mobile implementation guidance, see [Module 3 Products Integrat
 **Implementation Notes (Current Backend Contract)**
 
 - Fault user endpoints:
-  - `POST /v2/faults`
-  - `PATCH /v2/faults/:id`
-  - `GET /v2/faults/me`
-  - `POST /v2/faults/:id/cancel`
+  - `POST /api/faults`
+  - `PATCH /api/faults/:id`
+  - `GET /api/faults/me`
+  - `POST /api/faults/:id/cancel`
 - Fault admin endpoints:
-  - `GET /v2/admin/faults`
-  - `PATCH /v2/admin/faults/:id/status`
+  - `GET /api/admin/faults`
+  - `PATCH /api/admin/faults/:id/status`
 - Fault rating endpoint:
-  - `POST /v2/ratings`
+  - `POST /api/ratings`
   - Fault rating uses: `itemType=fault`, `itemId`, `ratingValue`
 - Supported fault severities:
   - `normal`, `high`, `urgent`, `emergent`
 - Supported fault statuses:
   - `received`, `assigned`, `on_the_way`, `in_progress`, `finished`, `cancelled`
-- `GET /v2/faults/me` query shape:
+- `GET /api/faults/me` query shape:
   - `status`
   - `severity`
   - `fromDate`, `toDate`
@@ -218,17 +218,17 @@ For frontend and mobile implementation guidance, see [Module 4 Faults Integratio
 
 Implementation notes:
 - Service endpoints:
-  - `POST /v2/services`
-  - `PATCH /v2/services/:id`
-  - `POST /v2/services/:id/cancel`
-  - `GET /v2/services/me`
-  - `GET /v2/admin/services`
-  - `PATCH /v2/admin/services/:id/status`
+  - `POST /api/services`
+  - `PATCH /api/services/:id`
+  - `POST /api/services/:id/cancel`
+  - `GET /api/services/me`
+  - `GET /api/admin/services`
+  - `PATCH /api/admin/services/:id/status`
 - Supported service types:
   - `designing`, `maintenance`, `renewal`
 - Supported service statuses:
   - `not_started`, `in_progress`, `cancelled`, `finished`
-- Service list query shape (`GET /v2/services/me`, `GET /v2/admin/services`):
+- Service list query shape (`GET /api/services/me`, `GET /api/admin/services`):
   - `serviceType`
   - `fromDate`, `toDate`
   - `sortBy` (`createdAt`)
@@ -262,25 +262,25 @@ For frontend and mobile implementation guidance, see [Module 5 Services Integrat
 **Implementation Notes (Current Backend Contract)**
 
 - Follow-up step endpoints:
-  - `GET /v2/followups/:itemType/:itemId/steps`
-  - `POST /v2/admin/followups/:itemType/:itemId/steps`
-  - `PATCH /v2/admin/followups/:itemType/:itemId/steps/:stepId`
-  - `DELETE /v2/admin/followups/:itemType/:itemId/steps/:stepId`
+  - `GET /api/followups/:itemType/:itemId/steps`
+  - `POST /api/admin/followups/:itemType/:itemId/steps`
+  - `PATCH /api/admin/followups/:itemType/:itemId/steps/:stepId`
+  - `DELETE /api/admin/followups/:itemType/:itemId/steps/:stepId`
 - Step rules:
   - Follow-up steps are scoped to a valid item.
   - Users can read steps for their own item only; admins can read steps for any existing item.
   - Step list ordering is deterministic: `sort_order ASC`, then `id ASC`.
 - Follow-up chat REST endpoints:
-  - `POST /v2/followups/:itemType/:itemId/chat/conversations`
-  - `GET /v2/followups/:itemType/:itemId/chat/conversations/:conversationId/messages`
-  - `POST /v2/followups/:itemType/:itemId/chat/conversations/:conversationId/messages`
+  - `POST /api/followups/:itemType/:itemId/chat/conversations`
+  - `GET /api/followups/:itemType/:itemId/chat/conversations/:conversationId/messages`
+  - `POST /api/followups/:itemType/:itemId/chat/conversations/:conversationId/messages`
 - Chat rules:
   - Requester must own the target item unless requester is admin.
   - One conversation per `(itemType, itemId, userId)`; repeated create is idempotent.
   - `adminId` is optional on create; when omitted, backend assigns the first active admin by ascending id.
   - Only conversation participants (`user_id`, `admin_id`) can list/send messages.
 - Deprecated alias routes remain available during transition window:
-  - `/v2/followup/*` and `/v2/admin/followup-steps*`
+  - `/api/followup/*` and `/api/admin/followup-steps*`
   - Sunset date: `2026-12-31`
 - Key expected errors in module flows:
   - `401` invalid/missing bearer token
@@ -304,15 +304,15 @@ For frontend and mobile implementation guidance, see [Module 6 Follow-Up Integra
 
 Implementation notes:
 - Public gallery listing endpoint:
-  - `GET /v2/gallery`
+  - `GET /api/gallery`
   - Returns active items only (`is_active=true`) and excludes soft-deleted items.
 - Admin gallery listing endpoint:
-  - `GET /v2/admin/gallery`
+  - `GET /api/admin/gallery`
   - Returns active and inactive items, excluding soft-deleted items.
 - Admin gallery management endpoints:
-  - `POST /v2/admin/gallery`
-  - `PATCH /v2/admin/gallery/:id`
-  - `DELETE /v2/admin/gallery/:id` (soft delete via `deleted_at`)
+  - `POST /api/admin/gallery`
+  - `PATCH /api/admin/gallery/:id`
+  - `DELETE /api/admin/gallery/:id` (soft delete via `deleted_at`)
 - Gallery item response contract includes:
   - `title`
   - `description`
@@ -507,7 +507,7 @@ Define what each role can access.
 
 | Use Case | Status | Evidence |
 | --- | --- | --- |
-| Item Follow-Up | Implemented and verified | `GET /v2/followups/:itemType/:itemId/steps` ownership + not-found enforcement for `order/fault/service`, covered in `src/kayan/kayan.service.spec.ts`. |
+| Item Follow-Up | Implemented and verified | `GET /api/followups/:itemType/:itemId/steps` ownership + not-found enforcement for `order/fault/service`, covered in `src/kayan/kayan.service.spec.ts`. |
 | List Steps | Implemented and verified | Deterministic ordering (`sort_order`, `id`) and owner/admin authorization covered in `src/kayan/kayan.service.spec.ts` and `src/kayan/kayan.controller.spec.ts`. |
 | Add Step | Implemented and verified | Admin create now validates target item exists before insert; covered in `src/kayan/kayan.service.spec.ts` and controller forwarding tests. |
 | Delete Step | Implemented and verified | Not-found handling and admin path covered in existing and follow-up controller/service tests. |

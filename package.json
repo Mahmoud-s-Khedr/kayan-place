@@ -25,7 +25,6 @@
     "seed:prod:run": "npm run seed:prod",
     "seed:dev": "ts-node --transpile-only scripts/seed-dev.ts",
     "seed:dev:prod": "node dist/scripts/seed-dev.js",
-    "simulate": "ts-node --transpile-only scripts/simulate-flows.ts",
     "simulate:kayan": "ts-node --transpile-only scripts/simulate-kayan-flows.ts",
     "simulate:kayan:faults": "ts-node --transpile-only scripts/simulate-kayan-faults-flows.ts",
     "simulate:kayan:services": "ts-node --transpile-only scripts/simulate-kayan-services-flows.ts",

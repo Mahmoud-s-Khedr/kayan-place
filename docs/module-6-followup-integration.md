@@ -2,11 +2,11 @@
 
 ## Endpoints
 
-Canonical Module 6 routes use the `/v2/followups/...` family. Legacy `/v2/followup/...` routes are deprecated aliases only.
+Canonical Module 6 routes use the `/api/followups/...` family. Legacy `/api/followup/...` routes are deprecated aliases only.
 
 ### User / Admin read
 
-- `GET /v2/followups/{itemType}/{itemId}/steps`
+- `GET /api/followups/{itemType}/{itemId}/steps`
   - Auth required.
   - User: allowed only for own item.
   - Admin: allowed for existing item only.
@@ -14,24 +14,24 @@ Canonical Module 6 routes use the `/v2/followups/...` family. Legacy `/v2/follow
 
 ### Admin step management
 
-- `POST /v2/admin/followups/{itemType}/{itemId}/steps`
-- `PATCH /v2/admin/followups/{itemType}/{itemId}/steps/{stepId}`
-- `DELETE /v2/admin/followups/{itemType}/{itemId}/steps/{stepId}`
+- `POST /api/admin/followups/{itemType}/{itemId}/steps`
+- `PATCH /api/admin/followups/{itemType}/{itemId}/steps/{stepId}`
+- `DELETE /api/admin/followups/{itemType}/{itemId}/steps/{stepId}`
   - Admin JWT required.
   - Create validates referenced item exists.
   - Update/Delete return `404` when step does not exist.
 
 ### Follow-up item chat (REST)
 
-- `POST /v2/followups/{itemType}/{itemId}/chat/conversations`
+- `POST /api/followups/{itemType}/{itemId}/chat/conversations`
   - Auth required.
   - Requester must own the target item unless requester is admin.
   - One conversation per `(itemType, itemId, userId)`; repeated create is idempotent.
   - `adminId` is optional; when passed, it must reference an active admin user.
   - If no `adminId`, server selects first active admin by ascending id.
 
-- `GET /v2/followups/{itemType}/{itemId}/chat/conversations/{conversationId}/messages`
-- `POST /v2/followups/{itemType}/{itemId}/chat/conversations/{conversationId}/messages`
+- `GET /api/followups/{itemType}/{itemId}/chat/conversations/{conversationId}/messages`
+- `POST /api/followups/{itemType}/{itemId}/chat/conversations/{conversationId}/messages`
   - Auth required.
   - Access limited to conversation `user_id` and `admin_id` only.
   - Non-participants receive `403`.
@@ -45,13 +45,13 @@ Canonical Module 6 routes use the `/v2/followups/...` family. Legacy `/v2/follow
 
 ## Deprecated aliases (transition window)
 
-- `GET /v2/followup/steps?itemType=...&itemId=...`
-- `POST /v2/admin/followup-steps`
-- `PATCH /v2/admin/followup-steps/:id`
-- `DELETE /v2/admin/followup-steps/:id`
-- `POST /v2/followup/chat/conversations`
-- `GET /v2/followup/chat/conversations/:id/messages`
-- `POST /v2/followup/chat/conversations/:id/messages`
+- `GET /api/followup/steps?itemType=...&itemId=...`
+- `POST /api/admin/followup-steps`
+- `PATCH /api/admin/followup-steps/:id`
+- `DELETE /api/admin/followup-steps/:id`
+- `POST /api/followup/chat/conversations`
+- `GET /api/followup/chat/conversations/:id/messages`
+- `POST /api/followup/chat/conversations/:id/messages`
 
 Deprecated aliases emit deprecation headers and are scheduled for removal after the transition cycle (sunset date: 2026-12-31).
 

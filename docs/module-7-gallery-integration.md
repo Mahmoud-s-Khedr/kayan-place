@@ -23,7 +23,7 @@ It covers:
 
 ### 3.1 Public Gallery Browsing
 
-1. Client calls `GET /v2/gallery`.
+1. Client calls `GET /api/gallery`.
 2. Backend returns gallery items visible to public/users.
 3. Client renders each item using:
    - `title`
@@ -39,7 +39,7 @@ Behavior:
 1. Admin requests upload intent: `POST /files/upload-intent`.
 2. Client uploads binary to signed storage URL from the intent response.
 3. Client confirms upload: `PATCH /files/:id/mark-uploaded`.
-4. Admin creates gallery item: `POST /v2/admin/gallery` with `title`, `description`, and `imageFileIds`.
+4. Admin creates gallery item: `POST /api/admin/gallery` with `title`, `description`, and `imageFileIds`.
 5. Backend returns created item with `images` payload.
 
 Typical create payload:
@@ -54,7 +54,7 @@ Typical create payload:
 
 ### 3.3 Admin Visibility Update Flow
 
-1. Admin updates item: `PATCH /v2/admin/gallery/:id`.
+1. Admin updates item: `PATCH /api/admin/gallery/:id`.
 2. Admin can set `isActive=false` to hide from public list.
 3. Admin can later set `isActive=true` to show again.
 
@@ -71,20 +71,20 @@ Typical update payload:
 
 ### 3.4 Admin Delete Flow (Soft Delete)
 
-1. Admin deletes item via `DELETE /v2/admin/gallery/:id`.
+1. Admin deletes item via `DELETE /api/admin/gallery/:id`.
 2. Backend soft-deletes item (`deleted_at` set).
 3. Item no longer appears in public or admin list endpoints.
 
 ## 4. Endpoint Map (High Level)
 
 Public/User:
-- `GET /v2/gallery`
+- `GET /api/gallery`
 
 Admin:
-- `GET /v2/admin/gallery`
-- `POST /v2/admin/gallery`
-- `PATCH /v2/admin/gallery/:id`
-- `DELETE /v2/admin/gallery/:id`
+- `GET /api/admin/gallery`
+- `POST /api/admin/gallery`
+- `PATCH /api/admin/gallery/:id`
+- `DELETE /api/admin/gallery/:id`
 
 File flow dependency:
 - `POST /files/upload-intent`
@@ -113,8 +113,8 @@ File flow dependency:
 
 ## 6. Minimal QA Integration Checklist
 
-- Public `GET /v2/gallery` loads items and renders `images` correctly.
-- Admin `GET /v2/admin/gallery` returns both active and inactive items.
+- Public `GET /api/gallery` loads items and renders `images` correctly.
+- Admin `GET /api/admin/gallery` returns both active and inactive items.
 - Admin can create gallery item after upload intent + upload + mark-uploaded flow.
 - Admin can update title/description/images successfully.
 - Setting `isActive=false` hides item from public list and keeps it in admin list.

@@ -358,7 +358,7 @@ export async function runKayanHappyPath(
   const userAToken = state.userATokens.accessToken;
 
   const createProduct = await runAndRecord(config, steps, 'admin create product', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/admin/products', {
+    requestJson(config, 'POST', '/api/admin/products', {
       title: `Kayan Sim Product ${Date.now()}`,
       description: 'Simulation product for client-like flow.',
       amount: 10,
@@ -371,17 +371,17 @@ export async function runKayanHappyPath(
   state.productId = pickId(createProduct.body, 'product');
 
   await runAndRecord(config, steps, 'public list products filtered', 200, () =>
-    requestJson(config, 'GET', '/v2/products?query=Sim&sortBy=price&sortDirection=asc'),
+    requestJson(config, 'GET', '/api/products?query=Sim&sortBy=price&sortDirection=asc'),
   );
   await runAndRecord(config, steps, 'user list products by date', 200, () =>
-    requestJson(config, 'GET', '/v2/products?availability=active&sortBy=createdAt&sortDirection=desc'),
+    requestJson(config, 'GET', '/api/products?availability=active&sortBy=createdAt&sortDirection=desc'),
   );
   await runAndRecord(config, steps, 'user get product details', 200, () =>
-    requestJson(config, 'GET', `/v2/products/${state.productId}`),
+    requestJson(config, 'GET', `/api/products/${state.productId}`),
   );
 
   const addCart = await runAndRecord(config, steps, 'user add product to cart', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/cart/items', { productId: state.productId, quantity: 1 }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'POST', '/api/cart/items', { productId: state.productId, quantity: 1 }, { Authorization: `Bearer ${userAToken}` }),
   );
   const addData = addCart.body?.data as Record<string, unknown> | Array<Record<string, unknown>> | undefined;
   const cartItems = Array.isArray(addData)
@@ -393,47 +393,47 @@ export async function runKayanHappyPath(
   state.cartItemId = cartId;
 
   await runAndRecord(config, steps, 'user update cart quantity', 200, () =>
-    requestJson(config, 'PATCH', `/v2/cart/items/${state.cartItemId}`, { quantity: 2 }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'PATCH', `/api/cart/items/${state.cartItemId}`, { quantity: 2 }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user read cart', 200, () =>
-    requestJson(config, 'GET', '/v2/cart', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/cart', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user remove cart item', 200, () =>
-    requestJson(config, 'DELETE', `/v2/cart/items/${state.cartItemId}`, undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'DELETE', `/api/cart/items/${state.cartItemId}`, undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user re-add product to cart', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/cart/items', { productId: state.productId, quantity: 1 }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'POST', '/api/cart/items', { productId: state.productId, quantity: 1 }, { Authorization: `Bearer ${userAToken}` }),
   );
 
   const checkout = await runAndRecord(config, steps, 'user checkout cart', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/cart/checkout', { deliveryAddress: 'Cairo, Nasr City, Abbas Al Akkad' }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'POST', '/api/cart/checkout', { deliveryAddress: 'Cairo, Nasr City, Abbas Al Akkad' }, { Authorization: `Bearer ${userAToken}` }),
   );
   state.orderId = pickId(checkout.body, 'order');
 
   await runAndRecord(config, steps, 'user list my orders sorted', 200, () =>
-    requestJson(config, 'GET', '/v2/orders/me?sortBy=createdAt&sortDirection=desc', undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', '/api/orders/me?sortBy=createdAt&sortDirection=desc', undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user get order details', 200, () =>
-    requestJson(config, 'GET', `/v2/orders/${state.orderId}`, undefined, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'GET', `/api/orders/${state.orderId}`, undefined, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user update order address while received', 200, () =>
-    requestJson(config, 'PATCH', `/v2/orders/${state.orderId}/address`, { deliveryAddress: 'Cairo, New Cairo, Fifth Settlement' }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'PATCH', `/api/orders/${state.orderId}/address`, { deliveryAddress: 'Cairo, New Cairo, Fifth Settlement' }, { Authorization: `Bearer ${userAToken}` }),
   );
 
   await runAndRecord(config, steps, 'admin list all orders', 200, () =>
-    requestJson(config, 'GET', '/v2/admin/orders', undefined, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'GET', '/api/admin/orders', undefined, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'admin set order ready_to_ship', 200, () =>
-    requestJson(config, 'PATCH', `/v2/admin/orders/${state.orderId}/status`, { status: 'ready_to_ship' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/orders/${state.orderId}/status`, { status: 'ready_to_ship' }, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'admin set order on_the_way', 200, () =>
-    requestJson(config, 'PATCH', `/v2/admin/orders/${state.orderId}/status`, { status: 'on_the_way' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/orders/${state.orderId}/status`, { status: 'on_the_way' }, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'admin set order delivered', 200, () =>
-    requestJson(config, 'PATCH', `/v2/admin/orders/${state.orderId}/status`, { status: 'delivered' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/orders/${state.orderId}/status`, { status: 'delivered' }, { Authorization: `Bearer ${adminToken}` }),
   );
   await runAndRecord(config, steps, 'user rate delivered product', [200, 201], () =>
-    requestJson(config, 'POST', '/v2/ratings', {
+    requestJson(config, 'POST', '/api/ratings', {
       itemType: 'order',
       orderId: state.orderId,
       productId: state.productId,
@@ -441,7 +441,7 @@ export async function runKayanHappyPath(
     }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative duplicate rating', 400, () =>
-    requestJson(config, 'POST', '/v2/ratings', {
+    requestJson(config, 'POST', '/api/ratings', {
       itemType: 'order',
       orderId: state.orderId,
       productId: state.productId,
@@ -449,7 +449,7 @@ export async function runKayanHappyPath(
     }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'user B list products', 200, () =>
-    requestJson(config, 'GET', '/v2/products?query=Product'),
+    requestJson(config, 'GET', '/api/products?query=Product'),
   );
 
   assertHappyState(state);
@@ -465,16 +465,16 @@ export async function runKayanNegativeCases(
   const userAToken = state.userATokens.accessToken;
 
   await runAndRecord(config, steps, 'negative unauthorized cart read', 401, () =>
-    requestJson(config, 'GET', '/v2/cart'),
+    requestJson(config, 'GET', '/api/cart'),
   );
   await runAndRecord(config, steps, 'negative add invalid product to cart', [400, 404], () =>
-    requestJson(config, 'POST', '/v2/cart/items', { productId: 999999999, quantity: 1 }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'POST', '/api/cart/items', { productId: 999999999, quantity: 1 }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative update address after processing', 400, () =>
-    requestJson(config, 'PATCH', `/v2/orders/${state.orderId}/address`, { deliveryAddress: 'Invalid after processing' }, { Authorization: `Bearer ${userAToken}` }),
+    requestJson(config, 'PATCH', `/api/orders/${state.orderId}/address`, { deliveryAddress: 'Invalid after processing' }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative rating before delivered', [400, 403], () =>
-    requestJson(config, 'POST', '/v2/ratings', {
+    requestJson(config, 'POST', '/api/ratings', {
       itemType: 'order',
       orderId: state.orderId,
       productId: state.productId,
@@ -482,7 +482,7 @@ export async function runKayanNegativeCases(
     }, { Authorization: `Bearer ${state.userBTokens.accessToken}` }),
   );
   await runAndRecord(config, steps, 'negative rating product not in order', 400, () =>
-    requestJson(config, 'POST', '/v2/ratings', {
+    requestJson(config, 'POST', '/api/ratings', {
       itemType: 'order',
       orderId: state.orderId,
       productId: 99999999,
@@ -490,7 +490,7 @@ export async function runKayanNegativeCases(
     }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative admin invalid status', [400, 422], () =>
-    requestJson(config, 'PATCH', `/v2/admin/orders/${state.orderId}/status`, { status: 'bad_status' }, { Authorization: `Bearer ${adminToken}` }),
+    requestJson(config, 'PATCH', `/api/admin/orders/${state.orderId}/status`, { status: 'bad_status' }, { Authorization: `Bearer ${adminToken}` }),
   );
 
   return { steps };
