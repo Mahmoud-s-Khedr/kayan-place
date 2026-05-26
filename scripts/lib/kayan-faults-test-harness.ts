@@ -354,7 +354,7 @@ async function loginWithAdaptiveIdentifier(
   if (!email && !phone) throw new Error(`${name}: missing login identifier (email or phone).`);
 
   if (email) {
-    const byEmail = await requestJson(config, 'POST', '/auth/login', { email, password });
+    const byEmail = await requestJson(config, 'POST', '/api/auth/login', { email, password });
     const canFallback = byEmail.status === 400 && payloadRequiresPhoneOnly(byEmail.body);
     const emailOk = byEmail.status === 201 || canFallback;
     const emailStep = makeStep(
@@ -371,7 +371,7 @@ async function loginWithAdaptiveIdentifier(
   }
 
   if (phone) {
-    const byPhone = await requestJson(config, 'POST', '/auth/login', { phone, password });
+    const byPhone = await requestJson(config, 'POST', '/api/auth/login', { phone, password });
     const phoneStep = makeStep(`${name} login (phone)`, byPhone.status === 201, byPhone.status, getMessage(byPhone.body), byPhone.body);
     steps.push(phoneStep);
     logStep(config, phoneStep);
@@ -389,11 +389,11 @@ async function registerAndLoginUser(
   label: 'A' | 'B',
 ): Promise<Tokens> {
   const register = await runAndRecord(config, steps, `user ${label} register`, 201, () =>
-    requestJson(config, 'POST', '/auth/register', identity),
+    requestJson(config, 'POST', '/api/auth/register', identity),
   );
   const otp = pickOtp(register.body);
   await runAndRecord(config, steps, `user ${label} verify otp`, 201, () =>
-    requestJson(config, 'POST', '/auth/register/verify', { email: identity.email, otp }),
+    requestJson(config, 'POST', '/api/auth/register/verify', { email: identity.email, otp }),
   );
   return loginWithAdaptiveIdentifier(config, steps, `user ${label}`, identity.email, identity.phone, identity.password);
 }
@@ -411,7 +411,7 @@ async function createUploadedImageFile(
   }
   const seeded = config.imageSeed ? globalSeedState ?? undefined : undefined;
   const createIntent = await runAndRecord(config, steps, `${name} create image upload intent`, 201, () =>
-    requestJson(config, 'POST', '/files/upload-intent', {
+    requestJson(config, 'POST', '/api/files/upload-intent', {
       ownerType: 'product',
       purpose: 'product_image',
       filename: `${name.replace(/\s+/g, '-').toLowerCase()}.jpg`,
@@ -433,7 +433,7 @@ async function createUploadedImageFile(
 
   const fileId = pickEntityId(createIntent.body, 'file');
   await runAndRecord(config, steps, `${name} mark image uploaded`, 200, () =>
-    requestJson(config, 'PATCH', `/files/${fileId}/mark-uploaded`, {}, { Authorization: `Bearer ${userToken}` }),
+    requestJson(config, 'PATCH', `/api/files/${fileId}/mark-uploaded`, {}, { Authorization: `Bearer ${userToken}` }),
   );
   return fileId;
 }
@@ -445,7 +445,7 @@ async function createPendingFile(
   name: string,
 ): Promise<number> {
   const createIntent = await runAndRecord(config, steps, `${name} create pending image file`, 201, () =>
-    requestJson(config, 'POST', '/files/upload-intent', {
+    requestJson(config, 'POST', '/api/files/upload-intent', {
       ownerType: 'product',
       purpose: 'product_image',
       filename: `${name.replace(/\s+/g, '-').toLowerCase()}-pending.jpg`,
@@ -463,7 +463,7 @@ async function createUploadedDocumentFile(
   name: string,
 ): Promise<number> {
   const createIntent = await runAndRecord(config, steps, `${name} create doc upload intent`, 201, () =>
-    requestJson(config, 'POST', '/files/upload-intent', {
+    requestJson(config, 'POST', '/api/files/upload-intent', {
       ownerType: 'product',
       purpose: 'document',
       filename: `${name.replace(/\s+/g, '-').toLowerCase()}.pdf`,
@@ -473,7 +473,7 @@ async function createUploadedDocumentFile(
   );
   const fileId = pickEntityId(createIntent.body, 'file');
   await runAndRecord(config, steps, `${name} mark doc uploaded`, 200, () =>
-    requestJson(config, 'PATCH', `/files/${fileId}/mark-uploaded`, {}, { Authorization: `Bearer ${userToken}` }),
+    requestJson(config, 'PATCH', `/api/files/${fileId}/mark-uploaded`, {}, { Authorization: `Bearer ${userToken}` }),
   );
   return fileId;
 }
@@ -514,7 +514,7 @@ export function createKayanFaultsTestContext(overrides?: Partial<KayanFaultsTest
   userB: AuthIdentity;
 } {
   const config: KayanFaultsTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? ''),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
     timeoutMs: overrides?.timeoutMs ?? parsePositiveInt(process.env.SIM_KAYAN_FAULTS_TIMEOUT_MS, 20000),
     verbose: overrides?.verbose ?? parseBool(process.env.SIM_KAYAN_FAULTS_VERBOSE, true),
     negativeTests: overrides?.negativeTests ?? parseBool(process.env.SIM_KAYAN_FAULTS_NEGATIVE_TESTS, true),

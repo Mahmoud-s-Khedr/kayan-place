@@ -42,6 +42,8 @@ async function bootstrap(): Promise<void> {
     app.get(FkExpansionInterceptor),
   );
 
+  app.setGlobalPrefix('api');
+
   if (appConfig.corsOrigins.length > 0) {
     const hasWildcardOrigin = appConfig.corsOrigins.includes('*');
     app.enableCors({
@@ -67,8 +69,8 @@ async function bootstrap(): Promise<void> {
     deepScanRoutes: true,
     extraModels: [ErrorResponseDto, ErrorDetailDto],
   });
-  SwaggerModule.setup('api/docs', app, document, {
-    jsonDocumentUrl: 'api/docs-json',
+  SwaggerModule.setup('docs', app, document, {
+    jsonDocumentUrl: 'docs-json',
     swaggerOptions: { persistAuthorization: true },
   });
   writeFileSync('openapi.json', JSON.stringify(document, null, 2));

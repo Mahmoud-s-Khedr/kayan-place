@@ -177,7 +177,7 @@ export function createProfileTestContext(overrides?: Partial<ProfileTestConfig>)
   identity: ProfileIdentity;
 } {
   const config: ProfileTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:3000'),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
     timeoutMs: overrides?.timeoutMs ?? Number(process.env.PROFILE_TEST_TIMEOUT_MS ?? 15000),
     verbose: overrides?.verbose ?? (process.argv.includes('--verbose') || process.argv.includes('-v')),
     password: overrides?.password ?? process.env.PROFILE_TEST_PASSWORD ?? 'ProfilePass123',
@@ -195,7 +195,7 @@ async function bootstrapUser(
   identity: ProfileIdentity,
   steps: StepResult[],
 ): Promise<{ accessToken: string; refreshToken: string }> {
-  const register = await requestJson(config, 'POST', '/auth/register', {
+  const register = await requestJson(config, 'POST', '/api/auth/register', {
     name: identity.name,
     ssn: identity.ssn,
     email: identity.email,
@@ -208,7 +208,7 @@ async function bootstrapUser(
   logStep(config, registerStep);
   if (!registerStep.ok) throw new Error('Bootstrap failed at register');
 
-  const verify = await requestJson(config, 'POST', '/auth/register/verify', {
+  const verify = await requestJson(config, 'POST', '/api/auth/register/verify', {
     email: identity.email,
     otp: registerOtp,
   });
@@ -228,7 +228,7 @@ export async function runProfileHappyPath(
   const steps: StepResult[] = [];
   const tokens = await bootstrapUser(config, identity, steps);
 
-  const meBefore = await requestJson(config, 'GET', '/me', undefined, {
+  const meBefore = await requestJson(config, 'GET', '/api/me', undefined, {
     Authorization: `Bearer ${tokens.accessToken}`,
   });
   const meBeforeUser = pickUser(meBefore.body);
@@ -242,7 +242,7 @@ export async function runProfileHappyPath(
   const updatedPhone = buildAltPhone(identity.phone);
   const updatedContactInfo = '+201000000777';
 
-  const patchProfile = await requestJson(config, 'PATCH', '/me', {
+  const patchProfile = await requestJson(config, 'PATCH', '/api/me', {
     name: updatedName,
     phone: updatedPhone,
     contactInfo: updatedContactInfo,
@@ -259,7 +259,7 @@ export async function runProfileHappyPath(
   logStep(config, patchStep);
   if (!patchStep.ok) throw new Error('Happy path failed at PATCH /me');
 
-  const meAfter = await requestJson(config, 'GET', '/me', undefined, {
+  const meAfter = await requestJson(config, 'GET', '/api/me', undefined, {
     Authorization: `Bearer ${tokens.accessToken}`,
   });
   const meAfterUser = pickUser(meAfter.body);
@@ -272,7 +272,7 @@ export async function runProfileHappyPath(
   logStep(config, meAfterStep);
   if (!meAfterStep.ok) throw new Error('Happy path failed at GET /me verify');
 
-  const changePassword = await requestJson(config, 'PATCH', '/me/password', {
+  const changePassword = await requestJson(config, 'PATCH', '/api/me/password', {
     oldPassword: identity.password,
     newPassword: config.newPassword,
   }, {
@@ -283,7 +283,7 @@ export async function runProfileHappyPath(
   logStep(config, changePasswordStep);
   if (!changePasswordStep.ok) throw new Error('Happy path failed at PATCH /me/password');
 
-  const loginNewPassword = await requestJson(config, 'POST', '/auth/login', {
+  const loginNewPassword = await requestJson(config, 'POST', '/api/auth/login', {
     email: identity.email,
     password: config.newPassword,
   });
@@ -315,14 +315,14 @@ export async function runProfileNegativeCases(
 ): Promise<ProfileNegativePathResult> {
   const steps: StepResult[] = [];
 
-  const emptyPatch = await requestJson(config, 'PATCH', '/me', {}, {
+  const emptyPatch = await requestJson(config, 'PATCH', '/api/me', {}, {
     Authorization: `Bearer ${state.accessToken}`,
   });
   const emptyStep = makeStep('negative: PATCH /me empty payload', emptyPatch.status === 400, emptyPatch.status, getMessage(emptyPatch.body), emptyPatch.body);
   steps.push(emptyStep);
   logStep(config, emptyStep);
 
-  const invalidPhonePatch = await requestJson(config, 'PATCH', '/me', {
+  const invalidPhonePatch = await requestJson(config, 'PATCH', '/api/me', {
     phone: '123',
   }, {
     Authorization: `Bearer ${state.accessToken}`,
@@ -331,7 +331,7 @@ export async function runProfileNegativeCases(
   steps.push(invalidPhoneStep);
   logStep(config, invalidPhoneStep);
 
-  const wrongOldPassword = await requestJson(config, 'PATCH', '/me/password', {
+  const wrongOldPassword = await requestJson(config, 'PATCH', '/api/me/password', {
     oldPassword: 'WrongPass123',
     newPassword: 'AnotherPass123',
   }, {
@@ -347,7 +347,7 @@ export async function runProfileNegativeCases(
   const otherTokens = await bootstrapUser(config, otherIdentity, bootstrapSteps);
   steps.push(...bootstrapSteps);
 
-  const phoneConflict = await requestJson(config, 'PATCH', '/me', {
+  const phoneConflict = await requestJson(config, 'PATCH', '/api/me', {
     phone: state.updatedPhone,
   }, {
     Authorization: `Bearer ${otherTokens.accessToken}`,

@@ -246,7 +246,7 @@ async function loginWithAdaptiveIdentifier(
   }
 
   if (email) {
-    const byEmail = await requestJson(config, 'POST', '/auth/login', { email, password });
+    const byEmail = await requestJson(config, 'POST', '/api/auth/login', { email, password });
     const canFallback = byEmail.status === 400 && payloadRequiresPhoneOnly(byEmail.body);
     const emailOk = byEmail.status === 201 || canFallback;
     const emailStep = makeStep(
@@ -265,7 +265,7 @@ async function loginWithAdaptiveIdentifier(
   }
 
   if (phone) {
-    const byPhone = await requestJson(config, 'POST', '/auth/login', { phone, password });
+    const byPhone = await requestJson(config, 'POST', '/api/auth/login', { phone, password });
     const phoneStep = makeStep(`${name} login (phone)`, byPhone.status === 201, byPhone.status, getMessage(byPhone.body), byPhone.body);
     steps.push(phoneStep);
     logStep(config, phoneStep);
@@ -283,11 +283,11 @@ async function registerAndLoginUser(
   label: 'A' | 'B',
 ): Promise<Tokens> {
   const register = await runAndRecord(config, steps, `user ${label} register`, 201, () =>
-    requestJson(config, 'POST', '/auth/register', identity),
+    requestJson(config, 'POST', '/api/auth/register', identity),
   );
   const otp = pickOtp(register.body);
   await runAndRecord(config, steps, `user ${label} verify otp`, 201, () =>
-    requestJson(config, 'POST', '/auth/register/verify', { email: identity.email, otp }),
+    requestJson(config, 'POST', '/api/auth/register/verify', { email: identity.email, otp }),
   );
 
   return loginWithAdaptiveIdentifier(config, steps, `user ${label}`, identity.email, identity.phone, identity.password);
@@ -314,7 +314,7 @@ export function createKayanTestContext(overrides?: Partial<KayanTestConfig>): {
   userB: AuthIdentity;
 } {
   const config: KayanTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? ''),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
     timeoutMs: overrides?.timeoutMs ?? parsePositiveInt(process.env.SIM_KAYAN_TIMEOUT_MS, 20000),
     verbose: overrides?.verbose ?? parseBool(process.env.SIM_KAYAN_VERBOSE, true),
     negativeTests: overrides?.negativeTests ?? parseBool(process.env.SIM_KAYAN_NEGATIVE_TESTS, true),

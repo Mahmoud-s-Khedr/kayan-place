@@ -253,7 +253,7 @@ async function loginWithAdaptiveIdentifier(
   }
 
   if (email) {
-    const byEmail = await requestJson(config, 'POST', '/auth/login', { email, password });
+    const byEmail = await requestJson(config, 'POST', '/api/auth/login', { email, password });
     const canFallback = byEmail.status === 400 && payloadRequiresPhoneOnly(byEmail.body);
     const emailOk = byEmail.status === 201 || canFallback;
     const emailStep = makeStep(
@@ -272,7 +272,7 @@ async function loginWithAdaptiveIdentifier(
   }
 
   if (phone) {
-    const byPhone = await requestJson(config, 'POST', '/auth/login', { phone, password });
+    const byPhone = await requestJson(config, 'POST', '/api/auth/login', { phone, password });
     const phoneStep = makeStep(`${name} login (phone)`, byPhone.status === 201, byPhone.status, getMessage(byPhone.body), byPhone.body);
     steps.push(phoneStep);
     logStep(config, phoneStep);
@@ -289,11 +289,11 @@ async function registerAndLoginUser(
   identity: AuthIdentity,
 ): Promise<Tokens> {
   const register = await runAndRecord(config, steps, 'gallery user register', 201, () =>
-    requestJson(config, 'POST', '/auth/register', identity),
+    requestJson(config, 'POST', '/api/auth/register', identity),
   );
   const otp = pickOtp(register.body);
   await runAndRecord(config, steps, 'gallery user verify otp', 201, () =>
-    requestJson(config, 'POST', '/auth/register/verify', { email: identity.email, otp }),
+    requestJson(config, 'POST', '/api/auth/register/verify', { email: identity.email, otp }),
   );
 
   return loginWithAdaptiveIdentifier(config, steps, 'gallery user', identity.email, identity.phone, identity.password);
@@ -424,7 +424,7 @@ export function createGalleryTestContext(overrides?: Partial<GalleryTestConfig>)
   const uploadMode: 'real' | 'skip' = uploadModeEnv === 'skip' ? 'skip' : 'real';
 
   const config: GalleryTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? ''),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
     timeoutMs: overrides?.timeoutMs ?? parsePositiveInt(process.env.SIM_KAYAN_GALLERY_TIMEOUT_MS, 30000),
     verbose: overrides?.verbose ?? parseBool(process.env.SIM_KAYAN_GALLERY_VERBOSE, true),
     negativeTests: overrides?.negativeTests ?? parseBool(process.env.SIM_KAYAN_GALLERY_NEGATIVE_TESTS, true),
@@ -456,7 +456,7 @@ export async function runGalleryHappyPath(
   let healthy = false;
   for (let i = 0; i < config.preflightMaxAttempts; i += 1) {
     try {
-      const health = await requestJson(config, 'GET', '/health/ready');
+      const health = await requestJson(config, 'GET', '/api/health/ready');
       if (health.status === 200) {
         healthy = true;
         break;
@@ -510,7 +510,7 @@ export async function runGalleryHappyPath(
       requestJson(
         config,
         'POST',
-        '/files/upload-intent',
+        '/api/files/upload-intent',
         {
           ownerType: 'product',
           purpose: 'product_image',
@@ -545,7 +545,7 @@ export async function runGalleryHappyPath(
     requestJson(
       config,
       'PATCH',
-      `/files/${fileId}/mark-uploaded`,
+      `/api/files/${fileId}/mark-uploaded`,
       {
         checksumSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
       },

@@ -260,7 +260,7 @@ async function loginWithAdaptiveIdentifier(
   }
 
   if (email) {
-    const byEmail = await requestJson(config, 'POST', '/auth/login', { email, password });
+    const byEmail = await requestJson(config, 'POST', '/api/auth/login', { email, password });
     const canFallback = byEmail.status === 400 && payloadRequiresPhoneOnly(byEmail.body);
     const emailOk = byEmail.status === 201 || canFallback;
     const emailStep = makeStep(
@@ -277,7 +277,7 @@ async function loginWithAdaptiveIdentifier(
   }
 
   if (phone) {
-    const byPhone = await requestJson(config, 'POST', '/auth/login', { phone, password });
+    const byPhone = await requestJson(config, 'POST', '/api/auth/login', { phone, password });
     const phoneStep = makeStep(`${name} login (phone)`, byPhone.status === 201, byPhone.status, getMessage(byPhone.body), byPhone.body);
     steps.push(phoneStep);
     logStep(config, phoneStep);
@@ -295,11 +295,11 @@ async function registerAndLoginUser(
   label: 'A' | 'B',
 ): Promise<Tokens> {
   const register = await runAndRecord(config, steps, `user ${label} register`, 201, () =>
-    requestJson(config, 'POST', '/auth/register', identity),
+    requestJson(config, 'POST', '/api/auth/register', identity),
   );
   const otp = pickOtp(register.body);
   await runAndRecord(config, steps, `user ${label} verify otp`, 201, () =>
-    requestJson(config, 'POST', '/auth/register/verify', { email: identity.email, otp }),
+    requestJson(config, 'POST', '/api/auth/register/verify', { email: identity.email, otp }),
   );
 
   return loginWithAdaptiveIdentifier(config, steps, `user ${label}`, identity.email, identity.phone, identity.password);
@@ -533,7 +533,7 @@ async function createService(config: FollowupTestConfig, steps: StepResult[], us
 }
 
 async function getCurrentUserId(config: FollowupTestConfig, token: string): Promise<number> {
-  const me = await requestJson(config, 'GET', '/me', undefined, { Authorization: `Bearer ${token}` });
+  const me = await requestJson(config, 'GET', '/api/me', undefined, { Authorization: `Bearer ${token}` });
   if (me.status !== 200) throw new Error(`Failed to fetch /me (status=${me.status})`);
   const data = me.body?.data as Record<string, unknown> | undefined;
   const id = toNumericId(data?.id);
@@ -548,7 +548,7 @@ async function createGenericChatConversation(
   participantId: number,
 ): Promise<number> {
   const created = await runAndRecord(config, steps, 'setup socket: create generic chat conversation', [200, 201], () =>
-    requestJson(config, 'POST', '/chat/conversations', { participantId }, { Authorization: `Bearer ${ownerToken}` }),
+    requestJson(config, 'POST', '/api/chat/conversations', { participantId }, { Authorization: `Bearer ${ownerToken}` }),
   );
   return pickId(created.body, 'conversation');
 }
@@ -729,7 +729,7 @@ export function createFollowupTestContext(overrides?: Partial<FollowupTestConfig
   userB: AuthIdentity;
 } {
   const config: FollowupTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost'),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
     timeoutMs: overrides?.timeoutMs ?? parsePositiveInt(process.env.KAYAN_FOLLOWUP_TEST_TIMEOUT_MS, 20000),
     verbose: overrides?.verbose ?? parseBool(process.env.KAYAN_FOLLOWUP_TEST_VERBOSE, true),
     negativeTests: overrides?.negativeTests ?? parseBool(process.env.KAYAN_FOLLOWUP_TEST_NEGATIVE, true),

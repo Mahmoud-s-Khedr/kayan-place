@@ -10,11 +10,17 @@ import { ChatModule } from './chat/chat.module';
 import { DatabaseModule } from './database/database.module';
 import { FilesModule } from './files/files.module';
 import { HealthModule } from './health/health.module';
+import { OrdersModule } from './orders/orders.module';
+import { CartModule } from './cart/cart.module';
+import { FaultsModule } from './faults/faults.module';
+import { ServicesModule } from './services/services.module';
+import { FollowupsModule } from './followups/followups.module';
+import { GalleryModule } from './gallery/gallery.module';
+import { KayanCoreModule } from './kayan/kayan-core.module';
 import { ProductsModule } from './products/products.module';
 import { RatingsModule } from './ratings/ratings.module';
 import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/users.module';
-import { KayanModule } from './kayan/kayan.module';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { AppThrottlerGuard } from './common/guards/app-throttler.guard';
 import { FkExpansionService } from './common/relations/fk-expansion.service';
@@ -51,7 +57,13 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
     ChatModule,
     RatingsModule,
     AdminModule,
-    KayanModule,
+    OrdersModule,
+    CartModule,
+    FaultsModule,
+    ServicesModule,
+    FollowupsModule,
+    GalleryModule,
+    KayanCoreModule,
     HealthModule,
   ],
   providers: [

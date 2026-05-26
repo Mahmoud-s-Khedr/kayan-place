@@ -37,7 +37,7 @@ type EventAck = {
 };
 
 const CONFIG = {
-  baseUrl: process.env.BASE_URL ?? 'http://165.227.138.228:800',
+  baseUrl: process.env.BASE_URL ?? 'http://localhost:800',
   timeoutMs: parsePositiveInt(process.env.CHAT_TEST_TIMEOUT_MS, 12000),
   messageCount: parsePositiveInt(process.env.CHAT_TEST_MESSAGE_COUNT, 2),
   messageTextPrefix: process.env.CHAT_TEST_MESSAGE_PREFIX ?? 'chat-test-message',
@@ -246,7 +246,7 @@ async function registerAndVerifyUser(actor: Extract<Actor, 'buyer' | 'seller'>, 
 
   const reg = await apiCall({
     method: 'POST',
-    path: '/auth/register',
+    path: '/api/auth/register',
     body: {
       name: profile.name,
       email: profile.email,
@@ -268,7 +268,7 @@ async function registerAndVerifyUser(actor: Extract<Actor, 'buyer' | 'seller'>, 
 
   const verify = await apiCall({
     method: 'POST',
-    path: '/auth/register/verify',
+    path: '/api/auth/register/verify',
     body: {
       email: profile.email,
       otp,
@@ -301,7 +301,7 @@ async function registerAndVerifyUser(actor: Extract<Actor, 'buyer' | 'seller'>, 
 async function createConversation(buyerToken: string, sellerUserId: number): Promise<number> {
   const res = await apiCall({
     method: 'POST',
-    path: '/chat/conversations',
+    path: '/api/chat/conversations',
     token: buyerToken,
     body: {
       participantId: sellerUserId,

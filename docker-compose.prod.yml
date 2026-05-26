@@ -17,7 +17,7 @@ services:
     expose:
       - '${PORT:-3000}'
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:${PORT:-3000}/health/ready >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${PORT:-3000}/api/health/ready >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -45,7 +45,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:${NGINX_LISTEN_PORT:-80}/health/live >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:${NGINX_LISTEN_PORT:-80}/api/health/live >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10

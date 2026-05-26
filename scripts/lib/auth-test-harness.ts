@@ -152,7 +152,7 @@ export function createAuthTestContext(overrides?: Partial<AuthTestConfig>): {
   newPassword: string;
 } {
   const config: AuthTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:3000'),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
     timeoutMs: overrides?.timeoutMs ?? Number(process.env.AUTH_TEST_TIMEOUT_MS ?? 15000),
     verbose: overrides?.verbose ?? (process.argv.includes('--verbose') || process.argv.includes('-v')),
     password: overrides?.password ?? process.env.AUTH_TEST_PASSWORD ?? 'AuthPass123',
@@ -173,7 +173,7 @@ export async function runAuthHappyPath(
 ): Promise<AuthHappyPathResult> {
   const steps: StepResult[] = [];
 
-  const register = await requestJson(config, 'POST', '/auth/register', {
+  const register = await requestJson(config, 'POST', '/api/auth/register', {
     name: identity.name,
     ssn: identity.ssn,
     email: identity.email,
@@ -186,7 +186,7 @@ export async function runAuthHappyPath(
   logStep(config, registerStep);
   if (!registerStep.ok) throw new Error('Happy path failed at register');
 
-  const resend = await requestJson(config, 'POST', '/auth/register/resend-otp', {
+  const resend = await requestJson(config, 'POST', '/api/auth/register/resend-otp', {
     email: identity.email,
   });
   const resendOtp = pickOtp(resend.body);
@@ -195,7 +195,7 @@ export async function runAuthHappyPath(
   logStep(config, resendStep);
   if (!resendStep.ok) throw new Error('Happy path failed at resend OTP');
 
-  const verify = await requestJson(config, 'POST', '/auth/register/verify', {
+  const verify = await requestJson(config, 'POST', '/api/auth/register/verify', {
     email: identity.email,
     otp: resendOtp,
   });
@@ -205,7 +205,7 @@ export async function runAuthHappyPath(
   logStep(config, verifyStep);
   if (!verifyStep.ok || !verifyTokens) throw new Error('Happy path failed at verify');
 
-  const login = await requestJson(config, 'POST', '/auth/login', {
+  const login = await requestJson(config, 'POST', '/api/auth/login', {
     email: identity.email,
     password: identity.password,
   });
@@ -215,7 +215,7 @@ export async function runAuthHappyPath(
   logStep(config, loginStep);
   if (!loginStep.ok || !loginTokens) throw new Error('Happy path failed at login');
 
-  const resetRequest = await requestJson(config, 'POST', '/auth/password/request-otp', {
+  const resetRequest = await requestJson(config, 'POST', '/api/auth/password/request-otp', {
     email: identity.email,
   });
   const resetOtp = pickOtp(resetRequest.body);
@@ -224,7 +224,7 @@ export async function runAuthHappyPath(
   logStep(config, resetReqStep);
   if (!resetReqStep.ok || !resetOtp) throw new Error('Happy path failed at password request OTP');
 
-  const reset = await requestJson(config, 'POST', '/auth/password/reset', {
+  const reset = await requestJson(config, 'POST', '/api/auth/password/reset', {
     email: identity.email,
     otp: resetOtp,
     newPassword,
@@ -236,7 +236,7 @@ export async function runAuthHappyPath(
   logStep(config, resetStep);
   if (!resetStep.ok || !resetTokens) throw new Error('Happy path failed at password reset');
 
-  const loginAfterReset = await requestJson(config, 'POST', '/auth/login', {
+  const loginAfterReset = await requestJson(config, 'POST', '/api/auth/login', {
     email: identity.email,
     password: newPassword,
   });
@@ -246,7 +246,7 @@ export async function runAuthHappyPath(
   logStep(config, resetLoginStep);
   if (!resetLoginStep.ok || !resetLoginTokens) throw new Error('Happy path failed at login with new password');
 
-  const refresh = await requestJson(config, 'POST', '/auth/refresh', {
+  const refresh = await requestJson(config, 'POST', '/api/auth/refresh', {
     refreshToken: resetLoginTokens.refreshToken,
   });
   const refreshTokens = pickTokens(refresh.body);
@@ -255,7 +255,7 @@ export async function runAuthHappyPath(
   logStep(config, refreshStep);
   if (!refreshStep.ok || !refreshTokens) throw new Error('Happy path failed at refresh');
 
-  const logout = await requestJson(config, 'POST', '/auth/logout', {
+  const logout = await requestJson(config, 'POST', '/api/auth/logout', {
     refreshToken: refreshTokens.refreshToken,
   }, {
     Authorization: `Bearer ${refreshTokens.accessToken}`,
@@ -288,7 +288,7 @@ export async function runAuthNegativeCases(
 ): Promise<AuthNegativePathResult> {
   const steps: StepResult[] = [];
 
-  const duplicateRegistration = await requestJson(config, 'POST', '/auth/register', {
+  const duplicateRegistration = await requestJson(config, 'POST', '/api/auth/register', {
     name: identity.name,
     ssn: identity.ssn,
     email: identity.email,
@@ -299,7 +299,7 @@ export async function runAuthNegativeCases(
   steps.push(duplicateStep);
   logStep(config, duplicateStep);
 
-  const wrongOtpVerify = await requestJson(config, 'POST', '/auth/register/verify', {
+  const wrongOtpVerify = await requestJson(config, 'POST', '/api/auth/register/verify', {
     email: identity.email,
     otp: '111111',
   });
@@ -307,7 +307,7 @@ export async function runAuthNegativeCases(
   steps.push(wrongOtpStep);
   logStep(config, wrongOtpStep);
 
-  const badLogin = await requestJson(config, 'POST', '/auth/login', {
+  const badLogin = await requestJson(config, 'POST', '/api/auth/login', {
     email: identity.email,
     password: 'WrongPass123',
   });
@@ -315,7 +315,7 @@ export async function runAuthNegativeCases(
   steps.push(badLoginStep);
   logStep(config, badLoginStep);
 
-  const mismatchReset = await requestJson(config, 'POST', '/auth/password/reset', {
+  const mismatchReset = await requestJson(config, 'POST', '/api/auth/password/reset', {
     email: identity.email,
     otp: '000000',
     newPassword: 'Mismatch123',
@@ -325,7 +325,7 @@ export async function runAuthNegativeCases(
   steps.push(mismatchStep);
   logStep(config, mismatchStep);
 
-  const invalidRefresh = await requestJson(config, 'POST', '/auth/refresh', {
+  const invalidRefresh = await requestJson(config, 'POST', '/api/auth/refresh', {
     refreshToken: 'invalid.token.value',
   });
   const refreshStep = makeStep('negative: invalid refresh token', invalidRefresh.status === 401, invalidRefresh.status, getMessage(invalidRefresh.body), invalidRefresh.body);

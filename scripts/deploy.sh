@@ -18,7 +18,7 @@ echo "3) Run migrations"
 docker compose -f "$COMPOSE_FILE" exec -T app npm run db:migrate
 
 echo "4) Health check"
-curl -fsS http://localhost:800/health/live >/dev/null
-curl -fsS http://localhost:800/health/ready >/dev/null
+curl -fsS http://localhost:800/api/health/live >/dev/null
+curl -fsS http://localhost:800/api/health/ready >/dev/null
 
 echo "Deployment completed"

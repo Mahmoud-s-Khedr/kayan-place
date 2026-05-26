@@ -1,35 +1,18 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { AuthUser } from '../common/types/auth-user.type';
+import { Controller, Get, Param } from '@nestjs/common';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ErrorResponseDto } from '../common/dto/error-response.dto';
-import { CreateRatingDto } from './dto/create-rating.dto';
-import { RatingResponseDto, RatingSummaryResponseDto } from './dto/rating-response.dto';
+import { RatingSummaryResponseDto } from './dto/rating-response.dto';
 import { RatingsService } from './ratings.service';
 import { UserIdParamDto } from './dto/user-id-param.dto';
 
-@ApiTags('Ratings')
-@Controller('ratings')
+@ApiTags('Ratings (Legacy)')
+@Controller('ratings/summary')
 export class RatingsController {
   constructor(private readonly ratingsService: RatingsService) {}
 
-  @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Rate a user (1–5 stars)' })
-  @ApiResponse({ status: 201, description: 'Rating submitted or updated', type: RatingResponseDto })
-  @ApiResponse({ status: 400, description: 'Cannot rate yourself', type: ErrorResponseDto })
-  rateUser(
-    @CurrentUser() user: AuthUser,
-    @Body() dto: CreateRatingDto,
-  ): Promise<Record<string, unknown>> {
-    return this.ratingsService.rateUser(user, dto);
-  }
-
   @Get(':userId')
   @ApiParam({ name: 'userId', type: Number, description: 'Target user ID' })
-  @ApiOperation({ summary: 'Get rating summary for a user' })
+  @ApiOperation({ summary: 'Get legacy user rating summary' })
   @ApiResponse({ status: 200, description: 'Average rating and review count', type: RatingSummaryResponseDto })
   @ApiResponse({ status: 404, description: 'User not found', type: ErrorResponseDto })
   getUserRatingSummary(@Param() params: UserIdParamDto): Promise<Record<string, unknown>> {
