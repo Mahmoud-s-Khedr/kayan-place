@@ -85,26 +85,6 @@ export class UsersService {
     dto: GetPublicUserQueryDto,
     viewerUserId?: number,
   ): Promise<Record<string, unknown>> {
-    let blockedByMe = false;
-    let blockedMe = false;
-
-    if (viewerUserId) {
-      const block = await this.databaseService.query<{ blocked_by_me: boolean; blocked_me: boolean }>(
-        `SELECT EXISTS(
-            SELECT 1 FROM user_blocks WHERE blocker_id = $1 AND blocked_id = $2
-          ) AS blocked_by_me,
-          EXISTS(
-            SELECT 1 FROM user_blocks WHERE blocker_id = $2 AND blocked_id = $1
-          ) AS blocked_me`,
-        [viewerUserId, userId],
-      );
-      blockedByMe = block.rows[0]?.blocked_by_me ?? false;
-      blockedMe = block.rows[0]?.blocked_me ?? false;
-      if (blockedByMe || blockedMe) {
-        throw new NotFoundException('User not found');
-      }
-    }
-
     const user = await this.databaseService.query<{
       id: number;
       ssn: string | null;
@@ -158,16 +138,10 @@ export class UsersService {
     const limit = dto.limit ?? DEFAULT_PAGE_SIZE;
     const offset = dto.offset ?? 0;
     const products = await this.databaseService.query(
-            `SELECT plv.id, plv.owner_id, plv.category, plv.subcategory, plv.name, plv.description, plv.price, plv.city, plv.address_text,
+      `SELECT plv.id, plv.owner_id, plv.category, plv.subcategory, plv.name, plv.description, plv.price, plv.city, plv.address_text,
               plv.details, plv.status, plv.is_negotiable, plv.preferred_contact_method,
               plv.created_at::text AS created_at, plv.updated_at::text AS updated_at,
               plv.seller_rate,
-              CASE WHEN $2::bigint IS NULL THEN NULL
-                   ELSE EXISTS(
-                     SELECT 1 FROM user_favorites uf
-                     WHERE uf.user_id = $2::bigint AND uf.product_id = plv.id
-                   )
-              END AS is_favorite,
               COALESCE((
                 SELECT json_agg(row_to_json(img) ORDER BY img.sort_order ASC)
                 FROM (
@@ -180,8 +154,8 @@ export class UsersService {
        FROM product_listing_view plv
        WHERE plv.owner_id = $1 AND plv.status = 'available'
        ORDER BY plv.created_at DESC
-       LIMIT $3 OFFSET $4`,
-      [userId, viewerUserId ?? null, limit, offset],
+       LIMIT $2 OFFSET $3`,
+      [userId, limit, offset],
     );
 
     const row = user.rows[0];
@@ -194,8 +168,6 @@ export class UsersService {
         rate,
         contactInfo: row.contact_info,
         avatar: this.buildAvatarFile(row),
-        blocked_by_me: viewerUserId ? blockedByMe : null,
-        blocked_me: viewerUserId ? blockedMe : null,
       },
       products: products.rows,
     };

@@ -78,28 +78,6 @@ describe('ChatService', () => {
     }
   });
 
-  it('throws forbidden with CONVERSATION_BLOCKED reason when participants are blocked', async () => {
-    databaseService.query
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ id: 14, user_a_id: 1, user_b_id: 2 }],
-      })
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ exists: true }],
-      });
-
-    try {
-      await service.sendMessage(1, 14, 'hello');
-      throw new Error('Expected forbidden exception');
-    } catch (error) {
-      expect(error).toBeInstanceOf(ForbiddenException);
-      const response = (error as ForbiddenException).getResponse() as Record<string, unknown>;
-      expect(response.reason).toBe('CONVERSATION_BLOCKED');
-      expect(response.context).toMatchObject({ conversationId: 14, userId: 1, userAId: 1, userBId: 2 });
-    }
-  });
-
   it('normalizes BIGINT participant IDs to numbers in getConversationParticipants', async () => {
     databaseService.query.mockResolvedValueOnce({
       rowCount: 1,
@@ -112,15 +90,10 @@ describe('ChatService', () => {
   });
 
   it('accepts participant membership when conversation participant IDs are BIGINT strings', async () => {
-    databaseService.query
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ id: 216, user_a_id: '544', user_b_id: '550' }],
-      })
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ exists: false }],
-      });
+    databaseService.query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ id: 216, user_a_id: '544', user_b_id: '550' }],
+    });
 
     await expect(service.assertConversationParticipant(216, 550)).resolves.toBeUndefined();
   });

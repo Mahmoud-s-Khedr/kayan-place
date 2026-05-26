@@ -10,12 +10,7 @@ describe('AdminService', () => {
     del: jest.fn().mockResolvedValue(undefined),
   };
 
-  const categoriesService = {
-    createCategory: jest.fn(),
-    deleteCategory: jest.fn(),
-  };
-
-  const service = new AdminService(databaseService as any, redisService as any, categoriesService as any);
+  const service = new AdminService(databaseService as any, redisService as any);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -32,7 +27,7 @@ describe('AdminService', () => {
     ).rejects.toThrow(NotFoundException);
   });
 
-  it('lists users with published products and reports counts', async () => {
+  it('lists users with published products count', async () => {
     databaseService.query.mockResolvedValueOnce({
       rowCount: 1,
       rows: [{
@@ -43,7 +38,6 @@ describe('AdminService', () => {
         status: 'active',
         is_admin: false,
         published_products_count: 7,
-        reports_count: 4,
         created_at: '2026-01-01T00:00:00.000Z',
         updated_at: '2026-01-02T00:00:00.000Z',
       }],
@@ -61,7 +55,6 @@ describe('AdminService', () => {
         profileState: 'active',
         is_admin: false,
         published_products_count: 7,
-        reports_count: 4,
         created_at: '2026-01-01T00:00:00.000Z',
         updated_at: '2026-01-02T00:00:00.000Z',
       }],
@@ -79,7 +72,6 @@ describe('AdminService', () => {
         status: 'active',
         is_admin: false,
         published_products_count: null,
-        reports_count: null,
         created_at: '2026-01-03T00:00:00.000Z',
         updated_at: '2026-01-04T00:00:00.000Z',
       }],
@@ -97,7 +89,6 @@ describe('AdminService', () => {
         profileState: 'active',
         is_admin: false,
         published_products_count: 0,
-        reports_count: 0,
         created_at: '2026-01-03T00:00:00.000Z',
         updated_at: '2026-01-04T00:00:00.000Z',
       }],
@@ -256,102 +247,4 @@ describe('AdminService', () => {
     });
   });
 
-  it('lists user reports in v1 read-only projection', async () => {
-    databaseService.query
-      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 9 }] })
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [
-          {
-            id: 3,
-            reporter_id: 7,
-            reported_user_id: 9,
-            description: 'fraud',
-            created_at: '2026-02-01T00:00:00.000Z',
-          },
-        ],
-      });
-
-    const result = await service.listUserReports(9, {});
-    expect((result.reports as Array<{ created_at?: string }>).every((report) => typeof report.created_at === 'string')).toBe(true);
-    expect(result).toEqual({
-      reports: [
-        {
-          id: 3,
-          reporter_id: 7,
-          reported_user_id: 9,
-          description: 'fraud',
-          created_at: '2026-02-01T00:00:00.000Z',
-        },
-      ],
-    });
-  });
-
-  it('lists global reports in v1 read-only projection', async () => {
-    databaseService.query.mockResolvedValueOnce({
-      rowCount: 1,
-      rows: [
-        {
-          id: 11,
-          reporter_id: 2,
-          reported_user_id: 8,
-          description: 'spam',
-          created_at: '2026-03-01T00:00:00.000Z',
-        },
-      ],
-    });
-
-    const result = await service.listReports({});
-    expect((result.reports as Array<{ created_at?: string }>).every((report) => typeof report.created_at === 'string')).toBe(true);
-    expect(result).toEqual({
-      reports: [
-        {
-          id: 11,
-          reporter_id: 2,
-          reported_user_id: 8,
-          description: 'spam',
-          created_at: '2026-03-01T00:00:00.000Z',
-        },
-      ],
-    });
-  });
-
-  it('updates report status and keeps created_at in response', async () => {
-    databaseService.query
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{
-          id: 12,
-          reporter_id: 2,
-          reported_user_id: 8,
-          reason: 'spam',
-          status: 'reviewing',
-          reviewed_by: 1,
-          created_at: '2026-03-01T00:00:00.000Z',
-          reviewed_at: '2026-03-02T00:00:00.000Z',
-          updated_at: '2026-03-02T00:00:00.000Z',
-        }],
-      })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] });
-
-    const result = await service.updateReportStatus(
-      { sub: 1, phone: '+201000000001', isAdmin: true },
-      12,
-      { status: 'reviewing' },
-    );
-
-    expect(result).toEqual({
-      report: {
-        id: 12,
-        reporter_id: 2,
-        reported_user_id: 8,
-        reason: 'spam',
-        status: 'reviewing',
-        reviewed_by: 1,
-        created_at: '2026-03-01T00:00:00.000Z',
-        reviewed_at: '2026-03-02T00:00:00.000Z',
-        updated_at: '2026-03-02T00:00:00.000Z',
-      },
-    });
-  });
 });

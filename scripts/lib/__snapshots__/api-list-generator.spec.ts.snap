@@ -1,0 +1,25 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`api-list-generator renders deterministic markdown sections for rest and websocket 1`] = `
+"# API List
+
+Generated from \`openapi.json\` (REST) and \`src/**/*.gateway.ts\` (WebSocket).
+
+## REST APIs
+
+### Auth
+
+| Method | Path | Auth | Name | Summary | Request | Response | Notes |
+|---|---|---|---|---|---|---|---|
+| POST | /auth/login | public | AuthController_login | Login | LoginDto | 201:TokenResponseDto |  |
+
+## WebSocket APIs
+
+### ChatGateway
+
+| Event | Channel | Auth | Handler | Summary | Request | Response | Notes |
+|---|---|---|---|---|---|---|---|
+| message.send | /chat | bearer | sendMessage | Handle message.send | SendMessageDto | message.received | JWT required in Socket auth/header during connection. |
+
+"
+`;

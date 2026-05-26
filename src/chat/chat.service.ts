@@ -9,8 +9,7 @@ import { DatabaseService } from '../database/database.service';
 import { assertUserExists, isForeignKeyViolation } from '../common/helpers/db.helpers';
 
 type ChatForbiddenReason =
-  | 'NOT_PARTICIPANT'
-  | 'CONVERSATION_BLOCKED';
+  | 'NOT_PARTICIPANT';
 
 @Injectable()
 export class ChatService {
@@ -30,13 +29,6 @@ export class ChatService {
     }
 
     await assertUserExists(this.databaseService, participantId, 'Participant');
-
-    if (await this.hasBlockBetweenUsers(userId, participantId)) {
-      throw this.forbiddenChatException('CONVERSATION_BLOCKED', 'Conversation is not allowed', {
-        userId,
-        participantId,
-      });
-    }
 
     const [userAId, userBId] = userId < participantId ? [userId, participantId] : [participantId, userId];
 
@@ -133,12 +125,6 @@ export class ChatService {
            AND um.read_at IS NULL
        ) unread ON TRUE
        WHERE (c.user_a_id = $1 OR c.user_b_id = $1)
-         AND NOT EXISTS (
-           SELECT 1
-           FROM user_blocks ub
-           WHERE (ub.blocker_id = $1 AND ub.blocked_id = CASE WHEN c.user_a_id = $1 THEN c.user_b_id ELSE c.user_a_id END)
-              OR (ub.blocked_id = $1 AND ub.blocker_id = CASE WHEN c.user_a_id = $1 THEN c.user_b_id ELSE c.user_a_id END)
-         )
          AND (
            $2::text = 'all'
            OR ($2::text = 'buy' AND c.product_id IS NOT NULL AND p.owner_id <> $1)
@@ -379,15 +365,6 @@ export class ChatService {
       });
     }
 
-    const otherUserId = userAId === userId ? userBId : userAId;
-    if (await this.hasBlockBetweenUsers(userId, otherUserId)) {
-      throw this.forbiddenChatException('CONVERSATION_BLOCKED', 'Conversation is not available', {
-        conversationId,
-        userId,
-        userAId,
-        userBId,
-      });
-    }
   }
 
   private forbiddenChatException(
@@ -400,20 +377,6 @@ export class ChatService {
       reason,
       context,
     });
-  }
-
-  private async hasBlockBetweenUsers(userAId: number, userBId: number): Promise<boolean> {
-    const block = await this.databaseService.query<{ exists: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1
-         FROM user_blocks
-         WHERE (blocker_id = $1 AND blocked_id = $2)
-            OR (blocker_id = $2 AND blocked_id = $1)
-       ) AS exists`,
-      [userAId, userBId],
-    );
-
-    return block.rows[0]?.exists ?? false;
   }
 
   private toPositiveInt(value: unknown): number | null {

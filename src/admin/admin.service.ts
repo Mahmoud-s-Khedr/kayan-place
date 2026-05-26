@@ -3,14 +3,11 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { DatabaseService } from '../database/database.service';
 import { assertUserExists, escapeLike, isForeignKeyViolation } from '../common/helpers/db.helpers';
 import { RedisService } from '../redis/redis.service';
-import { CategoriesService } from '../categories/categories.service';
 import { DEFAULT_PAGE_SIZE } from '../common/constants';
-import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateWarningDto } from './dto/create-warning.dto';
 import { ListAdminPaginationQueryDto } from './dto/list-admin-pagination-query.dto';
 import { ListUserListingsQueryDto } from './dto/list-user-listings-query.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
-import { UpdateReportStatusDto } from './dto/update-report-status.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import { mapToAppUser } from '../common/mappers/app-user.mapper';
 
@@ -21,7 +18,6 @@ export class AdminService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly redisService: RedisService,
-    private readonly categoriesService: CategoriesService,
   ) {}
 
   async listUsers(queryDto: ListUsersQueryDto): Promise<Record<string, unknown>> {
@@ -62,12 +58,7 @@ export class AdminService {
                 FROM products p
                 WHERE p.owner_id = u.id
                   AND p.deleted_at IS NULL
-              )::int AS published_products_count,
-              (
-                SELECT COUNT(*)
-                FROM user_reports ur
-                WHERE ur.reported_user_id = u.id
-              )::int AS reports_count
+              )::int AS published_products_count
        FROM users u
        ${whereClause}
        ORDER BY u.created_at DESC
@@ -80,7 +71,6 @@ export class AdminService {
         ...mapToAppUser(row),
         is_admin: row.is_admin,
         published_products_count: Number(row.published_products_count ?? 0),
-        reports_count: Number(row.reports_count ?? 0),
         created_at: row.created_at,
         updated_at: row.updated_at,
       })),
@@ -315,81 +305,6 @@ export class AdminService {
 
     return { warning: query.rows[0],
     };
-  }
-
-  async listReports(queryDto: ListAdminPaginationQueryDto): Promise<Record<string, unknown>> {
-    const limit = queryDto.limit ?? DEFAULT_PAGE_SIZE;
-    const offset = queryDto.offset ?? 0;
-    const query = await this.databaseService.query(
-      `SELECT id, reporter_id, reported_user_id, reason AS description,
-              created_at::text AS created_at
-       FROM user_reports
-       ORDER BY created_at DESC
-       LIMIT $1 OFFSET $2`,
-      [limit, offset],
-    );
-
-    return { reports: query.rows };
-  }
-
-  async listUserReports(userId: number, queryDto: ListAdminPaginationQueryDto): Promise<Record<string, unknown>> {
-    await assertUserExists(this.databaseService, userId);
-    const limit = queryDto.limit ?? DEFAULT_PAGE_SIZE;
-    const offset = queryDto.offset ?? 0;
-
-    const query = await this.databaseService.query(
-      `SELECT id, reporter_id, reported_user_id, reason AS description,
-              created_at::text AS created_at
-       FROM user_reports
-       WHERE reported_user_id = $1
-       ORDER BY created_at DESC
-       LIMIT $2 OFFSET $3`,
-      [userId, limit, offset],
-    );
-
-    return { reports: query.rows };
-  }
-
-  async updateReportStatus(
-    admin: AuthUser,
-    reportId: number,
-    dto: UpdateReportStatusDto,
-  ): Promise<Record<string, unknown>> {
-    const query = await this.databaseService.query(
-      `UPDATE user_reports
-       SET status = $1,
-           reviewed_by = $2,
-           reviewed_at = NOW(),
-           updated_at = NOW()
-       WHERE id = $3
-       RETURNING id, reporter_id, reported_user_id, reason, status, reviewed_by,
-                 created_at::text AS created_at,
-                 reviewed_at::text AS reviewed_at,
-                 updated_at::text AS updated_at`,
-      [dto.status, admin.sub, reportId],
-    );
-
-    if (!query.rowCount) {
-      throw new NotFoundException('Report not found');
-    }
-
-    await this.logAdminAction(admin.sub, 'update_report_status', 'report', reportId, { status: dto.status });
-
-    return { report: query.rows[0],
-    };
-  }
-
-  async createCategory(admin: AuthUser, dto: CreateCategoryDto): Promise<Record<string, unknown>> {
-    const result = await this.categoriesService.createCategory(dto.name, dto.parentId ?? null);
-    const category = (result as { category: { id: number } }).category;
-    await this.logAdminAction(admin.sub, 'create_category', 'category', category.id, { name: dto.name, parentId: dto.parentId ?? null });
-    return result;
-  }
-
-  async deleteCategory(admin: AuthUser, categoryId: number): Promise<Record<string, unknown>> {
-    const result = await this.categoriesService.deleteCategory(categoryId);
-    await this.logAdminAction(admin.sub, 'delete_category', 'category', categoryId, {});
-    return result;
   }
 
   private async logAdminAction(

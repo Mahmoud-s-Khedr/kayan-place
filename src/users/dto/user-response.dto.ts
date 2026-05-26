@@ -71,11 +71,6 @@ export class PublicUserDto {
   @ApiPropertyOptional({ example: '+201000000001', nullable: true, readOnly: true })
   contactInfo!: string | null;
 
-  @ApiPropertyOptional({ example: false, nullable: true })
-  blocked_by_me?: boolean | null;
-
-  @ApiPropertyOptional({ example: false, nullable: true })
-  blocked_me?: boolean | null;
 }
 
 export class PublicUserProfileDataDto {

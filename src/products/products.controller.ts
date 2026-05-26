@@ -59,7 +59,8 @@ export class ProductsController {
     @Param('id', ParseIntPipe) productId: number,
     @CurrentUser() user?: AuthUser | null,
   ): Promise<Record<string, unknown>> {
-    return this.productsService.getProductById(productId, user?.sub);
+    void user;
+    return this.productsService.getProductById(productId);
   }
 
   @Patch('products/:id')
@@ -130,6 +131,7 @@ export class ProductsController {
     @Query() query: SearchProductsDto,
     @CurrentUser() user?: AuthUser | null,
   ): Promise<Record<string, unknown>> {
-    return this.productsService.searchProducts(query, user?.sub);
+    void user;
+    return this.productsService.searchProducts(query);
   }
 }

@@ -21,9 +21,6 @@ export class AdminUserDto {
   @ApiProperty({ example: 12 })
   published_products_count!: number;
 
-  @ApiProperty({ example: 3 })
-  reports_count!: number;
-
   @ApiProperty({ example: '2026-03-28T12:00:00.000Z' })
   created_at!: string;
 

@@ -56,20 +56,16 @@ export class ProductsService {
         await this.syncProductImages(client, user.sub, productId, dto.imageFileIds);
       }
 
-      const product = await this.fetchProductWithImages(client, productId, user.sub);
+      const product = await this.fetchProductWithImages(client, productId);
       return { product,
       };
     });
   }
 
-  async getProductById(productId: number, viewerUserId?: number): Promise<Record<string, unknown>> {
-    const product = await this.fetchProductWithImages(this.databaseService, productId, viewerUserId);
+  async getProductById(productId: number): Promise<Record<string, unknown>> {
+    const product = await this.fetchProductWithImages(this.databaseService, productId);
 
     if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    if (viewerUserId && await this.hasBlockBetweenUsers(viewerUserId, Number(product.owner_id))) {
       throw new NotFoundException('Product not found');
     }
 
@@ -134,7 +130,7 @@ export class ProductsService {
         await this.syncProductImages(client, user.sub, productId, dto.imageFileIds);
       }
 
-      const product = await this.fetchProductWithImages(client, productId, user.sub);
+      const product = await this.fetchProductWithImages(client, productId);
       return { product,
       };
     });
@@ -220,7 +216,7 @@ export class ProductsService {
     };
   }
 
-  async searchProducts(dto: SearchProductsDto, viewerUserId?: number): Promise<Record<string, unknown>> {
+  async searchProducts(dto: SearchProductsDto): Promise<Record<string, unknown>> {
     this.assertSearchCategoryPair(dto.category, dto.subcategory);
 
     const leadingParams: unknown[] = [];
@@ -228,7 +224,6 @@ export class ProductsService {
     const allParams = [...params, dto.limit ?? DEFAULT_PAGE_SIZE, dto.offset ?? 0];
     const limitIdx = params.length + 1;
     const offsetIdx = params.length + 2;
-    const viewerIdx = params.length + 3;
 
     const { sortColumn, sortDir } = this.resolveSort(dto, {
       price: 'plv.price',
@@ -241,12 +236,6 @@ export class ProductsService {
       `SELECT plv.id, plv.owner_id, plv.category, plv.subcategory, plv.name, plv.description, plv.price, plv.city, plv.address_text, plv.details,
               plv.status, plv.is_negotiable, plv.preferred_contact_method,
               plv.created_at::text AS created_at, plv.updated_at::text AS updated_at, plv.seller_rate,
-              CASE WHEN $${viewerIdx}::bigint IS NULL THEN NULL
-                   ELSE EXISTS (
-                     SELECT 1 FROM user_favorites uf
-                     WHERE uf.user_id = $${viewerIdx}::bigint AND uf.product_id = plv.id
-                   )
-              END AS is_favorite,
               COALESCE((
                 SELECT json_agg(row_to_json(img) ORDER BY img.sort_order ASC)
                 FROM (
@@ -258,18 +247,9 @@ export class ProductsService {
               ), '[]'::json) AS images
        FROM product_listing_view plv
        WHERE plv.status = 'available' ${whereClause}
-         AND (
-           $${viewerIdx}::bigint IS NULL
-           OR NOT EXISTS (
-             SELECT 1
-             FROM user_blocks ub
-             WHERE (ub.blocker_id = $${viewerIdx}::bigint AND ub.blocked_id = plv.owner_id)
-                OR (ub.blocked_id = $${viewerIdx}::bigint AND ub.blocker_id = plv.owner_id)
-           )
-         )
        ORDER BY ${sortColumn} ${sortDir}, plv.id DESC
        LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
-      [...allParams, viewerUserId ?? null],
+      allParams,
     );
 
     return { items: query.rows,
@@ -341,7 +321,6 @@ export class ProductsService {
   private async fetchProductWithImages(
     runner: QueryRunner,
     productId: number,
-    viewerUserId?: number,
   ): Promise<Record<string, unknown> | null> {
     const product = await runner.query(
       `SELECT id, owner_id, category, subcategory, name, description, price, city, address_text, details,
@@ -365,35 +344,10 @@ export class ProductsService {
       [productId],
     );
 
-    let isFavorite: boolean | null = null;
-    if (viewerUserId) {
-      const favorite = await runner.query<{ exists: boolean }>(
-        `SELECT EXISTS (
-           SELECT 1 FROM user_favorites WHERE user_id = $1 AND product_id = $2
-         ) AS exists`,
-        [viewerUserId, productId],
-      );
-      isFavorite = favorite.rows[0]?.exists ?? false;
-    }
-
     return {
       ...(product.rows[0] as Record<string, unknown>),
-      is_favorite: isFavorite,
       images: images.rows,
     };
-  }
-
-  private async hasBlockBetweenUsers(userId: number, otherUserId: number): Promise<boolean> {
-    const blocked = await this.databaseService.query<{ exists: boolean }>(
-      `SELECT EXISTS (
-         SELECT 1
-         FROM user_blocks
-         WHERE (blocker_id = $1 AND blocked_id = $2)
-            OR (blocker_id = $2 AND blocked_id = $1)
-       ) AS exists`,
-      [userId, otherUserId],
-    );
-    return blocked.rows[0]?.exists ?? false;
   }
 
   private assertCategoryPair(category: string, subcategory: string | null, allowAll: boolean): void {

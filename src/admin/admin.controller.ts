@@ -16,27 +16,20 @@ import { AdminGuard } from '../common/guards/admin.guard';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AuthUser } from '../common/types/auth-user.type';
 import { ErrorResponseDto } from '../common/dto/error-response.dto';
-import { CategoriesService } from '../categories/categories.service';
 import { AdminService } from './admin.service';
-import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateWarningDto } from './dto/create-warning.dto';
 import { ListAdminPaginationQueryDto } from './dto/list-admin-pagination-query.dto';
 import { ListUserListingsQueryDto } from './dto/list-user-listings-query.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
-import { UpdateReportStatusDto } from './dto/update-report-status.dto';
 import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 import {
-  AdminReportResponseDto,
-  AdminReportsListResponseDto,
   AdminAdminsListResponseDto,
   AdminUserDetailsResponseDto,
   AdminUserListingsResponseDto,
-  AdminUserReportsResponseDto,
   AdminUserResponseDto,
   AdminUsersListResponseDto,
   WarningResponseDto,
 } from './dto/admin-response.dto';
-import { CategoryResponseDto } from '../categories/dto/category-response.dto';
 import { SuccessResponseDto } from '../users/dto/user-response.dto';
 
 @ApiTags('Admin')
@@ -44,10 +37,7 @@ import { SuccessResponseDto } from '../users/dto/user-response.dto';
 @Controller('admin')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminController {
-  constructor(
-    private readonly adminService: AdminService,
-    private readonly categoriesService: CategoriesService,
-  ) {}
+  constructor(private readonly adminService: AdminService) {}
 
   @Get('users')
   @ApiOperation({ summary: 'List all users with optional filters (admin only)' })
@@ -76,18 +66,6 @@ export class AdminController {
     @Query() query: ListUserListingsQueryDto,
   ): Promise<Record<string, unknown>> {
     return this.adminService.listUserListings(userId, query);
-  }
-
-  @Get('users/:id/reports')
-  @ApiParam({ name: 'id', type: Number, description: 'User ID' })
-  @ApiOperation({ summary: 'List reports filed against a specific user (admin only)' })
-  @ApiResponse({ status: 200, description: 'Array of reports against user', type: AdminUserReportsResponseDto })
-  @ApiResponse({ status: 404, description: 'User not found', type: ErrorResponseDto })
-  listUserReports(
-    @Param('id', ParseIntPipe) userId: number,
-    @Query() query: ListAdminPaginationQueryDto,
-  ): Promise<Record<string, unknown>> {
-    return this.adminService.listUserReports(userId, query);
   }
 
   @Get('admins')
@@ -157,48 +135,4 @@ export class AdminController {
     return this.adminService.createWarning(admin, dto);
   }
 
-  @Get('reports')
-  @ApiOperation({ summary: 'List user abuse reports (admin only, V1 read-only projection)' })
-  @ApiResponse({ status: 200, description: 'Array of report records', type: AdminReportsListResponseDto })
-  listReports(@Query() query: ListAdminPaginationQueryDto): Promise<Record<string, unknown>> {
-    return this.adminService.listReports(query);
-  }
-
-  @Patch('reports/:id')
-  @ApiParam({ name: 'id', type: Number, description: 'Report ID' })
-  @ApiOperation({ summary: 'Update the status of an abuse report (admin only)' })
-  @ApiResponse({ status: 200, description: 'Report status updated', type: AdminReportResponseDto })
-  @ApiResponse({ status: 404, description: 'Report not found', type: ErrorResponseDto })
-  updateReportStatus(
-    @CurrentUser() admin: AuthUser,
-    @Param('id', ParseIntPipe) reportId: number,
-    @Body() dto: UpdateReportStatusDto,
-  ): Promise<Record<string, unknown>> {
-    return this.adminService.updateReportStatus(admin, reportId, dto);
-  }
-
-  @Post('categories')
-  @ApiOperation({ summary: 'Create a category (admin only)' })
-  @ApiResponse({ status: 201, description: 'Category created', type: CategoryResponseDto })
-  @ApiResponse({ status: 404, description: 'Parent category not found', type: ErrorResponseDto })
-  @ApiResponse({ status: 409, description: 'Duplicate category name', type: ErrorResponseDto })
-  createCategory(
-    @CurrentUser() admin: AuthUser,
-    @Body() dto: CreateCategoryDto,
-  ): Promise<Record<string, unknown>> {
-    return this.adminService.createCategory(admin, dto);
-  }
-
-  @Delete('categories/:id')
-  @ApiParam({ name: 'id', type: Number, description: 'Category ID' })
-  @ApiOperation({ summary: 'Delete a category (admin only)' })
-  @ApiResponse({ status: 200, description: 'Category deleted', type: CategoryResponseDto })
-  @ApiResponse({ status: 404, description: 'Category not found', type: ErrorResponseDto })
-  @ApiResponse({ status: 409, description: 'Category has children or referenced products', type: ErrorResponseDto })
-  deleteCategory(
-    @CurrentUser() admin: AuthUser,
-    @Param('id', ParseIntPipe) categoryId: number,
-  ): Promise<Record<string, unknown>> {
-    return this.adminService.deleteCategory(admin, categoryId);
-  }
 }

@@ -61,8 +61,7 @@ describe('ProductsService', () => {
         .mockResolvedValueOnce({ rowCount: 1, rows: [] })                    // INSERT product_images
         .mockResolvedValueOnce({ rowCount: 1, rows: [] })                    // UPDATE files owner
         .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 5, owner_id: 1, name: 'Phone' }] }) // fetch product
-        .mockResolvedValueOnce({ rowCount: 0, rows: [] })                    // fetch images
-        .mockResolvedValueOnce({ rowCount: 1, rows: [{ exists: false }] }),   // favorite exists
+        .mockResolvedValueOnce({ rowCount: 0, rows: [] }),                   // fetch images
     };
     databaseService.withTransaction.mockImplementation((callback: any) => callback(client));
 
@@ -143,7 +142,7 @@ describe('ProductsService', () => {
       ],
     });
 
-    const result = await service.searchProducts({}, 5);
+    const result = await service.searchProducts({});
 
     expect(result).toEqual({
       items: [

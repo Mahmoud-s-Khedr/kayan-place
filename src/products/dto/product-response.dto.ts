@@ -75,13 +75,6 @@ export class ProductDto {
   })
   seller_rate?: string | null;
 
-  @ApiPropertyOptional({
-    example: true,
-    description: 'Whether this product is favorited by the current authenticated user',
-    nullable: true,
-  })
-  is_favorite?: boolean | null;
-
   @ApiProperty({ type: [ProductImageDto] })
   images!: ProductImageDto[];
 }

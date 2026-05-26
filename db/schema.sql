@@ -8,7 +8,6 @@ BEGIN;
 -- ---------- Enums ----------
 CREATE TYPE user_status AS ENUM ('active', 'paused', 'banned');
 CREATE TYPE product_status AS ENUM ('available', 'sold', 'archived');
-CREATE TYPE report_status AS ENUM ('open', 'reviewing', 'resolved', 'rejected');
 CREATE TYPE file_status AS ENUM ('pending', 'uploaded', 'failed', 'deleted');
 CREATE TYPE file_purpose AS ENUM ('avatar', 'product_image', 'chat_attachment', 'document');
 
@@ -141,19 +140,6 @@ ALTER TABLE users
     FOREIGN KEY (avatar_file_id) REFERENCES files(id) ON DELETE SET NULL;
 
 -- ---------- Product/catalog tables ----------
-CREATE TABLE categories (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    parent_id BIGINT REFERENCES categories(id) ON DELETE RESTRICT,
-    name TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (parent_id IS NULL OR parent_id <> id)
-);
-
--- Unique category name among siblings (case-insensitive).
-CREATE UNIQUE INDEX categories_sibling_name_unique_idx
-    ON categories (COALESCE(parent_id, 0), LOWER(name));
-CREATE INDEX categories_parent_id_idx ON categories (parent_id);
-
 CREATE TABLE products (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     owner_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -251,7 +237,7 @@ ALTER TABLE conversations
     ADD CONSTRAINT conversations_last_message_id_fkey
     FOREIGN KEY (last_message_id) REFERENCES messages(id) ON DELETE SET NULL;
 
--- ---------- Rating/report/admin tables ----------
+-- ---------- Rating/admin tables ----------
 CREATE TABLE user_ratings (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     rater_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -265,43 +251,6 @@ CREATE TABLE user_ratings (
 );
 
 CREATE INDEX user_ratings_rated_user_idx ON user_ratings (rated_user_id);
-
-CREATE TABLE user_favorites (
-    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (user_id, product_id)
-);
-
-CREATE INDEX user_favorites_product_created_idx
-    ON user_favorites (product_id, created_at DESC);
-
-CREATE TABLE user_blocks (
-    blocker_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    blocked_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (blocker_id, blocked_id),
-    CHECK (blocker_id <> blocked_id)
-);
-
-CREATE INDEX user_blocks_blocked_idx
-    ON user_blocks (blocked_id, created_at DESC);
-
-CREATE TABLE user_reports (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    reporter_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    reported_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    reason TEXT NOT NULL,
-    status report_status NOT NULL DEFAULT 'open',
-    reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
-    reviewed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (reporter_id <> reported_user_id)
-);
-
-CREATE INDEX user_reports_status_created_idx
-    ON user_reports (status, created_at DESC);
 
 CREATE TABLE admin_warnings (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

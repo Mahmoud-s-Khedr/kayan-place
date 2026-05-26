@@ -8,7 +8,7 @@ This API covers:
 - Authentication with OTP flows (registration and password reset)
 - User profiles and contact information
 - Product listing, search, and lifecycle updates
-- Categories, ratings, and user reports
+- Ratings and admin moderation flows
 - Admin moderation and warning flows
 - Real-time chat with Socket.io
 - File upload flow with Cloudinary
@@ -108,6 +108,13 @@ npm run seed:admin
 npm run seed:dev
 ```
 
+5. API inventory docs:
+
+```bash
+npm run docs:api-list
+npm run docs:api-list:check
+```
+
 Admin seed requirements (local/dev TS path):
 - `ADMIN_EMAIL` is required.
 - `ADMIN_PASSWORD` is required.
@@ -200,6 +207,7 @@ npm run ci:verify
 ## Documentation Index
 
 - Development setup: [docs/development.md](docs/development.md)
+- API inventory list: [docs/api-list.md](docs/api-list.md)
 - Frontend/mobile integration guide: [docs/integration-guide.md](docs/integration-guide.md)
 - Database schema and validation: [docs/database.md](docs/database.md)
 - Software requirements: [docs/srs.md](docs/srs.md)

@@ -224,7 +224,6 @@ type WsEndpoint = 'conversation.join' | 'message.send' | 'message.read';
 const REST_ENDPOINTS: RestEndpoint[] = [
   'GET /health/live',
   'GET /health/ready',
-  'GET /categories',
   'GET /search/products',
   'POST /auth/register',
   'POST /auth/register/resend-otp',
@@ -243,9 +242,6 @@ const REST_ENDPOINTS: RestEndpoint[] = [
   'DELETE /me/contacts/:id',
   'DELETE /me',
   'GET /users/:id',
-  'POST /blocks/:userId',
-  'DELETE /blocks/:userId',
-  'GET /blocks',
   'POST /files/upload-intent',
   'PATCH /files/:id/mark-uploaded',
   'GET /files/:id',
@@ -255,43 +251,29 @@ const REST_ENDPOINTS: RestEndpoint[] = [
   'DELETE /products/:id',
   'PATCH /products/:id/status',
   'GET /my/products',
-  'POST /favorites/:productId',
-  'DELETE /favorites/:productId',
-  'GET /favorites',
   'POST /chat/conversations',
   'GET /chat/conversations',
   'GET /chat/conversations/:id',
   'GET /chat/conversations/:id/messages',
   'POST /ratings',
   'GET /ratings/:userId',
-  'POST /reports',
-  'GET /reports/me',
   'GET /admin/users',
   'GET /admin/users/:id',
   'GET /admin/users/:id/listings',
-  'GET /admin/users/:id/reports',
   'GET /admin/admins',
   'POST /admin/admins/:id',
   'DELETE /admin/admins/:id',
   'PATCH /admin/users/:id/status',
   'DELETE /admin/users/:id',
   'POST /admin/warnings',
-  'GET /admin/reports',
-  'PATCH /admin/reports/:id',
-  'POST /admin/categories',
-  'DELETE /admin/categories/:id',
 ];
 
 const PM_V1_REQUIRED_ENDPOINTS: RestEndpoint[] = [
   'POST /auth/login',
-  'POST /reports',
-  'GET /reports/me',
   'GET /admin/users',
   'GET /admin/users/:id',
   'GET /admin/users/:id/listings',
-  'GET /admin/users/:id/reports',
   'PATCH /admin/users/:id/status',
-  'GET /admin/reports',
 ];
 
 const PM_V1_OPTIONAL_ADMIN_ENDPOINTS: RestEndpoint[] = [
@@ -300,9 +282,6 @@ const PM_V1_OPTIONAL_ADMIN_ENDPOINTS: RestEndpoint[] = [
   'DELETE /admin/admins/:id',
   'DELETE /admin/users/:id',
   'POST /admin/warnings',
-  'PATCH /admin/reports/:id',
-  'POST /admin/categories',
-  'DELETE /admin/categories/:id',
 ];
 
 const WS_ENDPOINTS: WsEndpoint[] = ['conversation.join', 'message.send', 'message.read'];
@@ -1424,34 +1403,8 @@ async function flow01_anonymous(state: SimState): Promise<void> {
     critical: true,
   });
 
-  const catRes = await apiCall({
-    method: 'GET',
-    path: '/categories',
-    step: 'GET /categories',
-    flow,
-    state,
-    expectedStatus: 200,
-    coverageKey: 'GET /categories',
-  });
-
-  if (catRes.matchedExpected) {
-    const catPayload = responseData<unknown>(catRes.body);
-    const cats = Array.isArray(catPayload)
-      ? catPayload as Array<{ id: number; name?: string; parent?: { id?: number; name?: string } | null }>
-      : (catPayload as { categories?: Array<{ id: number; name?: string; parent?: { id?: number; name?: string } | null }> }).categories ?? [];
-    const parentIds = new Set(
-      cats.map((c) => c.parent?.id ?? null).filter((id): id is number => id !== null),
-    );
-    const leaf = cats.find((c) => !parentIds.has(c.id)) ?? cats[cats.length - 1];
-    if (leaf) {
-      state.productCategoryId = toId(leaf.id);
-      state.productCategory = 'electronics';
-      state.productSubcategory = 'smartphones';
-      console.log(`  → productCategoryId (existing leaf) = ${state.productCategoryId}`);
-    } else {
-      console.log('  → no categories found from /categories; will create one later if admin auth is available');
-    }
-  }
+  state.productCategory = 'electronics';
+  state.productSubcategory = 'smartphones';
 
   await apiCall({
     method: 'GET',
@@ -1901,45 +1854,8 @@ async function flow07_seller(state: SimState): Promise<void> {
   printSection('07 — Seller Journey');
   const flow = '07-seller';
 
-  let category = state.productCategory;
-  let subcategory = state.productSubcategory;
-  if (!category && state.adminToken) {
-    const parentName = `Sim Parent ${RUN_ID}`;
-    const leafName = `Sim Leaf ${RUN_ID}`;
-    const parentRes = await apiCall({
-      method: 'POST',
-      path: '/admin/categories',
-      body: { name: parentName },
-      token: state.adminToken,
-      step: 'POST /admin/categories (parent for seller flow)',
-      flow,
-      state,
-      expectedStatus: 201,
-      coverageKey: 'POST /admin/categories',
-    });
-    state.categoryParentId = extractId(parentRes.body, 'category');
-
-    if (state.categoryParentId) {
-      const leafRes = await apiCall({
-        method: 'POST',
-        path: '/admin/categories',
-        body: { name: leafName, parentId: state.categoryParentId },
-        token: state.adminToken,
-        step: 'POST /admin/categories (leaf for seller flow)',
-        flow,
-        state,
-        expectedStatus: 201,
-        coverageKey: 'POST /admin/categories',
-      });
-      state.categoryLeafId = extractId(leafRes.body, 'category');
-      category = 'electronics';
-      subcategory = 'smartphones';
-    }
-  }
-
-  if (!category) {
-    throw new Error('No usable product category found. /categories returned empty and admin category bootstrap failed.');
-  }
+  const category = state.productCategory ?? 'electronics';
+  const subcategory = state.productSubcategory ?? 'smartphones';
 
   const imageFileIds = state.productImageFileId ? [state.productImageFileId] : undefined;
 
@@ -3911,9 +3827,7 @@ async function main(): Promise<void> {
     await flow07_seller(state);
     await flow08_buyerAndChat(state);
     await flow09_websocket(state);
-    await flow10_blocksAndSafety(state);
     await flow11_ratings(state);
-    await flow12_reportsAndAdmin(state);
     await flow13_negativeChecks(state);
     await flow15_concurrentUsersAndChat(state);
   }
