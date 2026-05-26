@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ErrorResponseDto } from '../common/dto/error-response.dto';
@@ -7,6 +7,7 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { GetPublicUserQueryDto } from './dto/get-public-user-query.dto';
 import { PublicUserProfileResponseDto } from './dto/user-response.dto';
 import { UsersService } from './users.service';
+import { IdParamDto } from '../common/dto/id-param.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -20,10 +21,11 @@ export class PublicUsersController {
   @ApiResponse({ status: 200, description: 'Public profile and products', type: PublicUserProfileResponseDto })
   @ApiResponse({ status: 404, description: 'User not found', type: ErrorResponseDto })
   getPublicProfile(
-    @Param('id', ParseIntPipe) userId: number,
+    @Param() params: IdParamDto,
     @Query() query: GetPublicUserQueryDto,
     @CurrentUser() user?: AuthUser | null,
   ): Promise<Record<string, unknown>> {
-    return this.usersService.getPublicProfile(userId, query, user?.sub);
+    void user;
+    return this.usersService.getPublicProfile(params.id, query);
   }
 }

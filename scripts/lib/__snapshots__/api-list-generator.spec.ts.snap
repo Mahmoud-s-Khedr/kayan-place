@@ -9,17 +9,56 @@ Generated from \`openapi.json\` (REST) and \`src/**/*.gateway.ts\` (WebSocket).
 
 ### Auth
 
-| Method | Path | Auth | Name | Summary | Request | Response | Notes |
-|---|---|---|---|---|---|---|---|
-| POST | /auth/login | public | AuthController_login | Login | LoginDto | 201:TokenResponseDto |  |
+| Method | Path | Auth | Summary |
+|---|---|---|---|
+| POST | /auth/login | public | Login |
+
+#### POST /auth/login
+
+- Name: \`AuthController_login\`
+- Auth: \`public\`
+- Summary: Login
+
+**Request**
+
+- Shape: \`LoginDto\`
+- Type: \`LoginDto\`
+- Fields: _No object fields documented._
+
+**Success Response**
+
+- Status: \`201\`
+- Shape: \`TokenResponseDto\`
+- Type: \`TokenResponseDto\`
+- Fields: _No object fields documented._
+
+**Error Responses**
+
+_No documented error responses._
 
 ## WebSocket APIs
 
 ### ChatGateway
 
-| Event | Channel | Auth | Handler | Summary | Request | Response | Notes |
-|---|---|---|---|---|---|---|---|
-| message.send | /chat | bearer | sendMessage | Handle message.send | SendMessageDto | message.received | JWT required in Socket auth/header during connection. |
+| Event | Channel | Auth | Summary |
+|---|---|---|---|
+| message.send | /chat | bearer | Handle message.send |
+
+#### Event \`message.send\`
+
+- Handler: \`sendMessage\`
+- Channel: \`/chat\`
+- Auth: \`bearer\`
+- Summary: Handle message.send
+- Notes: JWT required in Socket auth/header during connection.
+
+**Request Payload**
+
+- Shape: \`SendMessageDto\`
+
+**Response Payload / Emitted Events**
+
+- Shape: \`message.received\`
 
 "
 `;

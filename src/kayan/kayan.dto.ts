@@ -252,3 +252,40 @@ export class CreateFollowupConversationBodyDto {
 export class SendFollowupMessageDto {
   @IsString() @IsNotEmpty() messageText!: string;
 }
+
+export class ProductIdParamDto {
+  @Type(() => Number) @IsInt() @Min(1) id!: number;
+}
+
+export class CartItemIdParamDto {
+  @Type(() => Number) @IsInt() @Min(1) id!: number;
+}
+
+export class OrderIdParamDto {
+  @Type(() => Number) @IsInt() @Min(1) id!: number;
+}
+
+export class FaultIdParamDto {
+  @Type(() => Number) @IsInt() @Min(1) id!: number;
+}
+
+export class ServiceIdParamDto {
+  @Type(() => Number) @IsInt() @Min(1) id!: number;
+}
+
+export class GalleryIdParamDto {
+  @Type(() => Number) @IsInt() @Min(1) id!: number;
+}
+
+export class FollowupScopeParamDto {
+  @IsEnum(ItemType) itemType!: ItemType;
+  @Type(() => Number) @IsInt() @Min(1) itemId!: number;
+}
+
+export class FollowupConversationMessagesParamDto extends FollowupScopeParamDto {
+  @Type(() => Number) @IsInt() @Min(1) id!: number;
+}
+
+export class FollowupStepParamDto extends FollowupScopeParamDto {
+  @Type(() => Number) @IsInt() @Min(1) id!: number;
+}

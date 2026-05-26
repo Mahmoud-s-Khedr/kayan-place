@@ -26,6 +26,7 @@ import { FkExpansionService } from '../common/relations/fk-expansion.service';
 import { payloadShape, sanitizeForLog } from '../common/logging/logging.utils';
 import { ChatSocketRegistryService } from './chat-socket-registry.service';
 import { ChatJoinedPayloadBuilder } from './chat-joined-payload.builder';
+import { ConversationJoinAckDto, MessageReadAckDto, MessageSentAckDto } from './dto/chat-ws-response.dto';
 
 type WsUserPayload = {
   sub: number | string;
@@ -141,7 +142,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   async joinConversation(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: JoinConversationDto,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<ConversationJoinAckDto> {
     const startedAt = Date.now();
     const user = this.getUser(client);
     const correlationId = this.getCorrelationId(client);
@@ -183,7 +184,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   async sendMessage(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: SendMessageDto,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<MessageSentAckDto> {
     const startedAt = Date.now();
     const user = this.getUser(client);
     const correlationId = this.getCorrelationId(client);
@@ -196,7 +197,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     });
 
     const response = await this.chatService.sendMessage(user.sub, body.conversationId, body.text);
-    const wsPayload = await this.fkExpansionService.expand({ success: true, ...response }) as Record<string, unknown>;
+    const wsPayload = await this.fkExpansionService.expand({ success: true, ...response }) as MessageSentAckDto;
 
     const room = this.roomName(body.conversationId);
     await client.join(room);
@@ -223,7 +224,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
   async markRead(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: MarkMessageReadDto,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<MessageReadAckDto> {
     const startedAt = Date.now();
     const user = this.getUser(client);
     const correlationId = this.getCorrelationId(client);
@@ -236,7 +237,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect, On
     });
 
     const response = await this.chatService.markRead(user.sub, body.messageId);
-    const wsPayload = await this.fkExpansionService.expand({ success: true, ...response }) as Record<string, unknown>;
+    const wsPayload = await this.fkExpansionService.expand({ success: true, ...response }) as MessageReadAckDto;
 
     const conversationId = (response.message as { conversation_id: number }).conversation_id;
     const room = this.roomName(conversationId);

@@ -83,7 +83,6 @@ export class UsersService {
   async getPublicProfile(
     userId: number,
     dto: GetPublicUserQueryDto,
-    viewerUserId?: number,
   ): Promise<Record<string, unknown>> {
     const user = await this.databaseService.query<{
       id: number;

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -8,6 +8,7 @@ import { CreateUploadIntentDto } from './dto/create-upload-intent.dto';
 import { MarkUploadedDto } from './dto/mark-uploaded.dto';
 import { FileMarkUploadedResponseDto, FileResponseDto, UploadIntentResponseDto } from './dto/file-response.dto';
 import { FilesService } from './files.service';
+import { IdParamDto } from '../common/dto/id-param.dto';
 
 @ApiTags('Files')
 @ApiBearerAuth()
@@ -33,10 +34,10 @@ export class FilesController {
   @ApiResponse({ status: 404, description: 'File not found', type: ErrorResponseDto })
   markUploaded(
     @CurrentUser() user: AuthUser,
-    @Param('id', ParseIntPipe) fileId: number,
+    @Param() params: IdParamDto,
     @Body() dto: MarkUploadedDto,
   ): Promise<Record<string, unknown>> {
-    return this.filesService.markUploaded(user, fileId, dto);
+    return this.filesService.markUploaded(user, params.id, dto);
   }
 
   @Get(':id')
@@ -46,8 +47,8 @@ export class FilesController {
   @ApiResponse({ status: 404, description: 'File not found', type: ErrorResponseDto })
   getFile(
     @CurrentUser() user: AuthUser,
-    @Param('id', ParseIntPipe) fileId: number,
+    @Param() params: IdParamDto,
   ): Promise<Record<string, unknown>> {
-    return this.filesService.getFile(user, fileId);
+    return this.filesService.getFile(user, params.id);
   }
 }

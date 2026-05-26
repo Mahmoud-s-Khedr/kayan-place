@@ -4,7 +4,6 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -29,6 +28,7 @@ import {
   ProductStatusResponseDto,
 } from './dto/product-response.dto';
 import { ProductsService } from './products.service';
+import { IdParamDto } from '../common/dto/id-param.dto';
 
 @ApiTags('Products')
 @Controller()
@@ -56,11 +56,11 @@ export class ProductsController {
   @ApiResponse({ status: 200, description: 'Product details with images', type: ProductResponseDto })
   @ApiResponse({ status: 404, description: 'Product not found', type: ErrorResponseDto })
   getProduct(
-    @Param('id', ParseIntPipe) productId: number,
+    @Param() params: IdParamDto,
     @CurrentUser() user?: AuthUser | null,
   ): Promise<Record<string, unknown>> {
     void user;
-    return this.productsService.getProductById(productId);
+    return this.productsService.getProductById(params.id);
   }
 
   @Patch('products/:id')
@@ -73,10 +73,10 @@ export class ProductsController {
   @ApiResponse({ status: 404, description: 'Product not found', type: ErrorResponseDto })
   updateProduct(
     @CurrentUser() user: AuthUser,
-    @Param('id', ParseIntPipe) productId: number,
+    @Param() params: IdParamDto,
     @Body() dto: UpdateProductDto,
   ): Promise<Record<string, unknown>> {
-    return this.productsService.updateProduct(user, productId, dto);
+    return this.productsService.updateProduct(user, params.id, dto);
   }
 
   @Delete('products/:id')
@@ -89,9 +89,9 @@ export class ProductsController {
   @ApiResponse({ status: 404, description: 'Product not found', type: ErrorResponseDto })
   deleteProduct(
     @CurrentUser() user: AuthUser,
-    @Param('id', ParseIntPipe) productId: number,
+    @Param() params: IdParamDto,
   ): Promise<Record<string, unknown>> {
-    return this.productsService.deleteProduct(user, productId);
+    return this.productsService.deleteProduct(user, params.id);
   }
 
   @Patch('products/:id/status')
@@ -104,10 +104,10 @@ export class ProductsController {
   @ApiResponse({ status: 404, description: 'Product not found', type: ErrorResponseDto })
   updateProductStatus(
     @CurrentUser() user: AuthUser,
-    @Param('id', ParseIntPipe) productId: number,
+    @Param() params: IdParamDto,
     @Body() dto: UpdateProductStatusDto,
   ): Promise<Record<string, unknown>> {
-    return this.productsService.updateProductStatus(user, productId, dto);
+    return this.productsService.updateProductStatus(user, params.id, dto);
   }
 
   @Get('my/products')

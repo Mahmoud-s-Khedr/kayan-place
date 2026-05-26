@@ -4,7 +4,6 @@ import {
   Controller,
   Get,
   Param,
-  ParseIntPipe,
   Patch,
   Post,
   Query,
@@ -31,6 +30,7 @@ import {
   WarningResponseDto,
 } from './dto/admin-response.dto';
 import { SuccessResponseDto } from '../users/dto/user-response.dto';
+import { IdParamDto } from '../common/dto/id-param.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -52,8 +52,8 @@ export class AdminController {
   @ApiOperation({ summary: 'Get user details for moderation page (admin only)' })
   @ApiResponse({ status: 200, description: 'Detailed user profile', type: AdminUserDetailsResponseDto })
   @ApiResponse({ status: 404, description: 'User not found', type: ErrorResponseDto })
-  getUserDetails(@Param('id', ParseIntPipe) userId: number): Promise<Record<string, unknown>> {
-    return this.adminService.getUserDetails(userId);
+  getUserDetails(@Param() params: IdParamDto): Promise<Record<string, unknown>> {
+    return this.adminService.getUserDetails(params.id);
   }
 
   @Get('users/:id/listings')
@@ -62,10 +62,10 @@ export class AdminController {
   @ApiResponse({ status: 200, description: 'Paginated user listings', type: AdminUserListingsResponseDto })
   @ApiResponse({ status: 404, description: 'User not found', type: ErrorResponseDto })
   listUserListings(
-    @Param('id', ParseIntPipe) userId: number,
+    @Param() params: IdParamDto,
     @Query() query: ListUserListingsQueryDto,
   ): Promise<Record<string, unknown>> {
-    return this.adminService.listUserListings(userId, query);
+    return this.adminService.listUserListings(params.id, query);
   }
 
   @Get('admins')
@@ -82,9 +82,9 @@ export class AdminController {
   @ApiResponse({ status: 404, description: 'User not found', type: ErrorResponseDto })
   promoteAdmin(
     @CurrentUser() admin: AuthUser,
-    @Param('id', ParseIntPipe) userId: number,
+    @Param() params: IdParamDto,
   ): Promise<Record<string, unknown>> {
-    return this.adminService.promoteAdmin(admin, userId);
+    return this.adminService.promoteAdmin(admin, params.id);
   }
 
   @Delete('admins/:id')
@@ -94,9 +94,9 @@ export class AdminController {
   @ApiResponse({ status: 404, description: 'User not found', type: ErrorResponseDto })
   demoteAdmin(
     @CurrentUser() admin: AuthUser,
-    @Param('id', ParseIntPipe) userId: number,
+    @Param() params: IdParamDto,
   ): Promise<Record<string, unknown>> {
-    return this.adminService.demoteAdmin(admin, userId);
+    return this.adminService.demoteAdmin(admin, params.id);
   }
 
   @Patch('users/:id/status')
@@ -106,10 +106,10 @@ export class AdminController {
   @ApiResponse({ status: 404, description: 'User not found', type: ErrorResponseDto })
   updateUserStatus(
     @CurrentUser() admin: AuthUser,
-    @Param('id', ParseIntPipe) userId: number,
+    @Param() params: IdParamDto,
     @Body() dto: UpdateUserStatusDto,
   ): Promise<Record<string, unknown>> {
-    return this.adminService.updateUserStatus(admin, userId, dto);
+    return this.adminService.updateUserStatus(admin, params.id, dto);
   }
 
   @Delete('users/:id')
@@ -119,9 +119,9 @@ export class AdminController {
   @ApiResponse({ status: 404, description: 'User not found', type: ErrorResponseDto })
   deleteUser(
     @CurrentUser() admin: AuthUser,
-    @Param('id', ParseIntPipe) userId: number,
+    @Param() params: IdParamDto,
   ): Promise<Record<string, unknown>> {
-    return this.adminService.deleteUser(admin, userId);
+    return this.adminService.deleteUser(admin, params.id);
   }
 
   @Post('warnings')

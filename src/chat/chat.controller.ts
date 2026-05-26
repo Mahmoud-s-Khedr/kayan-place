@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -15,6 +15,7 @@ import {
   ConversationsListResponseDto,
   MessagesListResponseDto,
 } from './dto/chat-response.dto';
+import { IdParamDto } from '../common/dto/id-param.dto';
 
 @ApiTags('Chat')
 @ApiBearerAuth()
@@ -67,9 +68,9 @@ export class ChatController {
   @ApiResponse({ status: 404, description: 'Conversation not found', type: ErrorResponseDto })
   getConversation(
     @CurrentUser() user: AuthUser,
-    @Param('id', ParseIntPipe) conversationId: number,
+    @Param() params: IdParamDto,
   ): Promise<Record<string, unknown>> {
-    return this.chatService.getConversationById(user.sub, conversationId);
+    return this.chatService.getConversationById(user.sub, params.id);
   }
 
   @Get('conversations/:id/messages')
@@ -80,9 +81,9 @@ export class ChatController {
   @ApiResponse({ status: 404, description: 'Conversation not found', type: ErrorResponseDto })
   listMessages(
     @CurrentUser() user: AuthUser,
-    @Param('id', ParseIntPipe) conversationId: number,
+    @Param() params: IdParamDto,
     @Query() dto: ListMessagesDto,
   ): Promise<Record<string, unknown>> {
-    return this.chatService.listMessages(user.sub, conversationId, dto.limit ?? 20, dto.before);
+    return this.chatService.listMessages(user.sub, params.id, dto.limit ?? 20, dto.before);
   }
 }

@@ -2,12 +2,25 @@ import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, relative, resolve } from 'node:path';
 
-type OpenApiSchemaRef = {
+type OpenApiSchema = {
   $ref?: string;
+  type?: string;
+  format?: string;
+  description?: string;
+  example?: unknown;
+  enum?: unknown[];
+  nullable?: boolean;
+  required?: string[];
+  properties?: Record<string, OpenApiSchema>;
+  items?: OpenApiSchema;
+  additionalProperties?: boolean | OpenApiSchema;
+  allOf?: OpenApiSchema[];
+  oneOf?: OpenApiSchema[];
+  anyOf?: OpenApiSchema[];
 };
 
 type OpenApiMediaType = {
-  schema?: OpenApiSchemaRef;
+  schema?: OpenApiSchema;
 };
 
 type OpenApiOperation = {
@@ -18,12 +31,31 @@ type OpenApiOperation = {
   requestBody?: {
     content?: Record<string, OpenApiMediaType>;
   };
-  responses?: Record<string, { content?: Record<string, OpenApiMediaType> }>;
+  responses?: Record<string, { content?: Record<string, OpenApiMediaType>; description?: string }>;
 };
 
 type OpenApiDoc = {
   paths?: Record<string, Record<string, OpenApiOperation>>;
   security?: Array<Record<string, unknown>>;
+  components?: {
+    schemas?: Record<string, OpenApiSchema>;
+  };
+};
+
+type SchemaField = {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+  enumValues: string;
+  example: string;
+};
+
+type SchemaDetails = {
+  title: string;
+  type: string;
+  description: string;
+  fields: SchemaField[];
 };
 
 export type RestApiItem = {
@@ -34,8 +66,8 @@ export type RestApiItem = {
   path: string;
   auth: 'bearer' | 'public';
   summary: string;
-  requestShapeRef: string;
-  responseShapeRef: string;
+  requestSchema?: OpenApiSchema;
+  responseSchemas: Array<{ status: string; schema?: OpenApiSchema; description?: string }>;
   notes: string;
 };
 
@@ -69,14 +101,15 @@ export function parseRestApisFromOpenApi(doc: OpenApiDoc): RestApiItem[] {
 
       const module = op?.tags?.[0] ?? 'Untagged';
       const summary = op?.summary?.trim() || operationId || `${method} ${apiPath}`;
-      const requestShapeRef = pickRequestShapeRef(op);
-      const responseShapeRef = pickResponseShapeRef(op);
       const security = op?.security;
       const auth: 'bearer' | 'public' =
         (Array.isArray(security) && security.length > 0) ||
         (!security && Array.isArray(doc.security) && doc.security.length > 0)
           ? 'bearer'
           : 'public';
+
+      const requestSchema = pickRequestSchema(op);
+      const responseSchemas = pickResponseSchemas(op);
 
       items.push({
         type: 'rest',
@@ -86,8 +119,8 @@ export function parseRestApisFromOpenApi(doc: OpenApiDoc): RestApiItem[] {
         path: apiPath,
         auth,
         summary,
-        requestShapeRef,
-        responseShapeRef,
+        requestSchema,
+        responseSchemas,
         notes: '',
       });
     }
@@ -144,12 +177,17 @@ export function parseWsApisFromGatewaySource(source: string, filePath: string): 
   );
 }
 
-export function renderApiListMarkdown(restItems: RestApiItem[], wsItems: WsApiItem[]): string {
+export function renderApiListMarkdown(
+  restItems: RestApiItem[],
+  wsItems: WsApiItem[],
+  doc?: OpenApiDoc,
+): string {
   const lines: string[] = [];
   lines.push('# API List');
   lines.push('');
   lines.push('Generated from `openapi.json` (REST) and `src/**/*.gateway.ts` (WebSocket).');
   lines.push('');
+
   lines.push('## REST APIs');
   lines.push('');
 
@@ -161,14 +199,71 @@ export function renderApiListMarkdown(restItems: RestApiItem[], wsItems: WsApiIt
     for (const [module, items] of [...restGroups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
       lines.push(`### ${module}`);
       lines.push('');
-      lines.push('| Method | Path | Auth | Name | Summary | Request | Response | Notes |');
-      lines.push('|---|---|---|---|---|---|---|---|');
+      lines.push('| Method | Path | Auth | Summary |');
+      lines.push('|---|---|---|---|');
       for (const item of items) {
         lines.push(
-          `| ${item.method} | ${escapePipes(item.path)} | ${item.auth} | ${escapePipes(item.name)} | ${escapePipes(item.summary)} | ${escapePipes(item.requestShapeRef)} | ${escapePipes(item.responseShapeRef)} | ${escapePipes(item.notes)} |`,
+          `| ${item.method} | ${escapePipes(item.path)} | ${item.auth} | ${escapePipes(item.summary)} |`,
         );
       }
       lines.push('');
+
+      for (const item of items) {
+        lines.push(`#### ${item.method} ${item.path}`);
+        lines.push('');
+        lines.push(`- Name: \`${item.name}\``);
+        lines.push(`- Auth: \`${item.auth}\``);
+        lines.push(`- Summary: ${item.summary}`);
+        if (item.notes) {
+          lines.push(`- Notes: ${item.notes}`);
+        }
+        lines.push('');
+
+        lines.push('**Request**');
+        lines.push('');
+        if (!item.requestSchema) {
+          lines.push('_No request body._');
+          lines.push('');
+        } else {
+          renderSchemaBlock(lines, item.requestSchema, doc, 'Request body');
+        }
+
+        const successResponses = item.responseSchemas.filter((r) => isSuccessStatus(r.status));
+        const errorResponses = item.responseSchemas.filter((r) => !isSuccessStatus(r.status));
+
+        lines.push('**Success Response**');
+        lines.push('');
+        if (successResponses.length === 0) {
+          lines.push('_No documented success response body._');
+          lines.push('');
+        } else {
+          for (const response of successResponses) {
+            lines.push(`- Status: \`${response.status}\`${response.description ? ` — ${response.description}` : ''}`);
+            if (response.schema) {
+              renderSchemaBlock(lines, response.schema, doc, `Response ${response.status}`);
+            } else {
+              lines.push('  - _No response body._');
+              lines.push('');
+            }
+          }
+        }
+
+        lines.push('**Error Responses**');
+        lines.push('');
+        if (errorResponses.length === 0) {
+          lines.push('_No documented error responses._');
+          lines.push('');
+        } else {
+          lines.push('| Status | Description | Body |');
+          lines.push('|---|---|---|');
+          for (const response of errorResponses) {
+            lines.push(
+              `| ${response.status} | ${escapePipes(response.description ?? '-')} | ${escapePipes(schemaLabel(response.schema))} |`,
+            );
+          }
+          lines.push('');
+        }
+      }
     }
   }
 
@@ -182,14 +277,37 @@ export function renderApiListMarkdown(restItems: RestApiItem[], wsItems: WsApiIt
     for (const [module, items] of [...wsGroups.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
       lines.push(`### ${module}`);
       lines.push('');
-      lines.push('| Event | Channel | Auth | Handler | Summary | Request | Response | Notes |');
-      lines.push('|---|---|---|---|---|---|---|---|');
+      lines.push('| Event | Channel | Auth | Summary |');
+      lines.push('|---|---|---|---|');
       for (const item of items) {
         lines.push(
-          `| ${escapePipes(item.event)} | ${escapePipes(item.channel)} | ${item.auth} | ${escapePipes(item.name)} | ${escapePipes(item.summary)} | ${escapePipes(item.requestShapeRef)} | ${escapePipes(item.responseShapeRef)} | ${escapePipes(item.notes)} |`,
+          `| ${escapePipes(item.event)} | ${escapePipes(item.channel)} | ${item.auth} | ${escapePipes(item.summary)} |`,
         );
       }
       lines.push('');
+
+      for (const item of items) {
+        lines.push(`#### Event \`${item.event}\``);
+        lines.push('');
+        lines.push(`- Handler: \`${item.name}\``);
+        lines.push(`- Channel: \`${item.channel}\``);
+        lines.push(`- Auth: \`${item.auth}\``);
+        lines.push(`- Summary: ${item.summary}`);
+        if (item.notes) {
+          lines.push(`- Notes: ${item.notes}`);
+        }
+        lines.push('');
+
+        lines.push('**Request Payload**');
+        lines.push('');
+        lines.push(`- Shape: \`${item.requestShapeRef || '-'}\``);
+        lines.push('');
+
+        lines.push('**Response Payload / Emitted Events**');
+        lines.push('');
+        lines.push(`- Shape: \`${item.responseShapeRef || 'ack payload'}\``);
+        lines.push('');
+      }
     }
   }
 
@@ -224,7 +342,7 @@ export function generateApiList(args?: {
     return parseWsApisFromGatewaySource(source, gatewayFile);
   });
 
-  const markdown = renderApiListMarkdown(restItems, wsItems);
+  const markdown = renderApiListMarkdown(restItems, wsItems, doc);
   writeFileSync(outputPath, markdown, 'utf8');
 }
 
@@ -240,23 +358,25 @@ function listGatewayFiles(sourceDir: string): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
-function pickRequestShapeRef(operation: OpenApiOperation): string {
+function pickRequestSchema(operation: OpenApiOperation): OpenApiSchema | undefined {
   const content = operation?.requestBody?.content;
   if (!content) {
-    return '-';
+    return undefined;
   }
   for (const mediaType of ['application/json', ...Object.keys(content)]) {
-    const schemaRef = content[mediaType]?.schema?.$ref;
-    if (schemaRef) {
-      return refName(schemaRef);
+    const schema = content[mediaType]?.schema;
+    if (schema) {
+      return schema;
     }
   }
-  return 'inline/unknown';
+  return undefined;
 }
 
-function pickResponseShapeRef(operation: OpenApiOperation): string {
+function pickResponseSchemas(
+  operation: OpenApiOperation,
+): Array<{ status: string; schema?: OpenApiSchema; description?: string }> {
   const responses = operation?.responses ?? {};
-  const orderedStatus = Object.keys(responses).sort((a, b) => {
+  const statuses = Object.keys(responses).sort((a, b) => {
     const aScore = isSuccessStatus(a) ? 0 : 1;
     const bScore = isSuccessStatus(b) ? 0 : 1;
     if (aScore !== bScore) {
@@ -265,25 +385,227 @@ function pickResponseShapeRef(operation: OpenApiOperation): string {
     return a.localeCompare(b);
   });
 
-  for (const status of orderedStatus) {
+  return statuses.map((status) => {
     const content = responses[status]?.content;
-    if (!content) {
-      continue;
-    }
-    for (const mediaType of ['application/json', ...Object.keys(content)]) {
-      const schemaRef = content[mediaType]?.schema?.$ref;
-      if (schemaRef) {
-        return `${status}:${refName(schemaRef)}`;
+    let schema: OpenApiSchema | undefined;
+    if (content) {
+      for (const mediaType of ['application/json', ...Object.keys(content)]) {
+        schema = content[mediaType]?.schema;
+        if (schema) {
+          break;
+        }
       }
     }
-  }
 
-  return '-';
+    return {
+      status,
+      schema,
+      description: responses[status]?.description,
+    };
+  });
 }
 
-function refName(schemaRef: string): string {
-  const parts = schemaRef.split('/');
-  return parts[parts.length - 1] || schemaRef;
+function renderSchemaBlock(
+  lines: string[],
+  schema: OpenApiSchema,
+  doc: OpenApiDoc | undefined,
+  fallbackTitle: string,
+): void {
+  const details = describeSchema(schema, doc, fallbackTitle);
+  lines.push(`- Shape: \`${details.title}\``);
+  lines.push(`- Type: \`${details.type}\``);
+  if (details.description) {
+    lines.push(`- Description: ${details.description}`);
+  }
+  if (details.fields.length === 0) {
+    lines.push('- Fields: _No object fields documented._');
+    lines.push('');
+    return;
+  }
+
+  lines.push('');
+  lines.push('| Field | Type | Required | Enum | Example | Description |');
+  lines.push('|---|---|---|---|---|---|');
+  for (const field of details.fields) {
+    lines.push(
+      `| ${escapePipes(field.name)} | ${escapePipes(field.type)} | ${field.required ? 'yes' : 'no'} | ${escapePipes(field.enumValues)} | ${escapePipes(field.example)} | ${escapePipes(field.description)} |`,
+    );
+  }
+  lines.push('');
+}
+
+function describeSchema(
+  schema: OpenApiSchema,
+  doc: OpenApiDoc | undefined,
+  fallbackTitle: string,
+): SchemaDetails {
+  const resolved = resolveSchema(schema, doc);
+  const title = schemaLabel(schema) || fallbackTitle;
+  const type = schemaTypeLabel(resolved);
+  const description = resolved.description ?? '';
+
+  const fields = flattenSchemaFields(resolved, doc);
+  return {
+    title,
+    type,
+    description,
+    fields,
+  };
+}
+
+function flattenSchemaFields(schema: OpenApiSchema, doc: OpenApiDoc | undefined): SchemaField[] {
+  const resolved = resolveSchema(schema, doc);
+
+  if (resolved.allOf?.length) {
+    return resolved.allOf.flatMap((child) => flattenSchemaFields(child, doc));
+  }
+
+  if (resolved.oneOf?.length) {
+    return [
+      {
+        name: '(oneOf)',
+        type: resolved.oneOf.map((s) => schemaTypeLabel(resolveSchema(s, doc))).join(' | '),
+        required: false,
+        description: 'One of the listed schema variants.',
+        enumValues: '-',
+        example: '-',
+      },
+    ];
+  }
+
+  if (resolved.anyOf?.length) {
+    return [
+      {
+        name: '(anyOf)',
+        type: resolved.anyOf.map((s) => schemaTypeLabel(resolveSchema(s, doc))).join(' | '),
+        required: false,
+        description: 'Any of the listed schema variants.',
+        enumValues: '-',
+        example: '-',
+      },
+    ];
+  }
+
+  if (resolved.type === 'array' && resolved.items) {
+    return flattenSchemaFields(resolved.items, doc).map((f) => ({ ...f, name: `[]${f.name}` }));
+  }
+
+  const properties = resolved.properties ?? {};
+  const requiredSet = new Set(resolved.required ?? []);
+
+  const fields = Object.entries(properties).map(([name, propertySchema]) => {
+    const prop = resolveSchema(propertySchema, doc);
+    return {
+      name,
+      type: schemaTypeLabel(prop),
+      required: requiredSet.has(name),
+      description: prop.description ?? '',
+      enumValues: Array.isArray(prop.enum) && prop.enum.length > 0 ? prop.enum.map(String).join(', ') : '-',
+      example: formatExample(prop.example),
+    };
+  });
+
+  if (fields.length > 0) {
+    return fields;
+  }
+
+  if (resolved.additionalProperties && typeof resolved.additionalProperties === 'object') {
+    return [
+      {
+        name: '[key: string]',
+        type: schemaTypeLabel(resolveSchema(resolved.additionalProperties, doc)),
+        required: false,
+        description: 'Dictionary value type',
+        enumValues: '-',
+        example: '-',
+      },
+    ];
+  }
+
+  return [];
+}
+
+function resolveSchema(schema: OpenApiSchema, doc: OpenApiDoc | undefined): OpenApiSchema {
+  if (!schema.$ref) {
+    return schema;
+  }
+
+  const ref = schema.$ref;
+  const parts = ref.split('/');
+  const schemaName = parts[parts.length - 1];
+  if (!schemaName) {
+    return schema;
+  }
+
+  const resolved = doc?.components?.schemas?.[schemaName];
+  if (!resolved) {
+    return schema;
+  }
+
+  return resolved;
+}
+
+function schemaLabel(schema?: OpenApiSchema): string {
+  if (!schema) {
+    return '-';
+  }
+  if (schema.$ref) {
+    const parts = schema.$ref.split('/');
+    return parts[parts.length - 1] || schema.$ref;
+  }
+  if (schema.oneOf) {
+    return `oneOf(${schema.oneOf.length})`;
+  }
+  if (schema.anyOf) {
+    return `anyOf(${schema.anyOf.length})`;
+  }
+  if (schema.allOf) {
+    return `allOf(${schema.allOf.length})`;
+  }
+  if (schema.type === 'array') {
+    return `array<${schema.items ? schemaTypeLabel(schema.items) : 'unknown'}>`;
+  }
+  return schema.type ?? 'inline/unknown';
+}
+
+function schemaTypeLabel(schema: OpenApiSchema): string {
+  if (schema.$ref) {
+    const parts = schema.$ref.split('/');
+    return parts[parts.length - 1] || 'ref';
+  }
+  if (schema.oneOf?.length) {
+    return `oneOf<${schema.oneOf.map((s) => schemaTypeLabel(s)).join(' | ')}>`;
+  }
+  if (schema.anyOf?.length) {
+    return `anyOf<${schema.anyOf.map((s) => schemaTypeLabel(s)).join(' | ')}>`;
+  }
+  if (schema.allOf?.length) {
+    return `allOf<${schema.allOf.map((s) => schemaTypeLabel(s)).join(' & ')}>`;
+  }
+  if (schema.type === 'array') {
+    return `array<${schema.items ? schemaTypeLabel(schema.items) : 'unknown'}>`;
+  }
+  if (schema.type === 'object') {
+    return 'object';
+  }
+  if (schema.type) {
+    return schema.format ? `${schema.type}(${schema.format})` : schema.type;
+  }
+  return 'unknown';
+}
+
+function formatExample(example: unknown): string {
+  if (example === undefined) {
+    return '-';
+  }
+  if (typeof example === 'string') {
+    return example;
+  }
+  try {
+    return JSON.stringify(example);
+  } catch {
+    return String(example);
+  }
 }
 
 function isSuccessStatus(status: string): boolean {

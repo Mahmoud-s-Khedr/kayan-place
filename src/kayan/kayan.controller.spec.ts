@@ -56,7 +56,7 @@ describe('KayanController', () => {
     kayanService.listFollowupSteps.mockResolvedValueOnce({ items: [] });
     const user = { sub: 3, phone: '+201000000003', isAdmin: false };
 
-    await controller.listFollowupSteps(user as any, 'order' as any, 15);
+    await controller.listFollowupSteps(user as any, { itemType: 'order', itemId: 15 } as any);
 
     expect(kayanService.listFollowupSteps).toHaveBeenCalledWith(user, 'order', 15);
   });
@@ -67,29 +67,15 @@ describe('KayanController', () => {
     kayanService.listFollowupMessages.mockResolvedValueOnce({ items: [] });
     kayanService.sendFollowupMessage.mockResolvedValueOnce({ message: { id: 5 } });
 
-    await controller.createConversation(user as any, 'order' as any, 15, {} as any);
-    await controller.listMessages(user as any, 'order' as any, 15, 11);
-    await controller.sendMessage(user as any, 'order' as any, 15, 11, { messageText: 'hi' } as any);
+    await controller.createConversation(user as any, { itemType: 'order', itemId: 15 } as any, {} as any);
+    await controller.listMessages(user as any, { itemType: 'order', itemId: 15, id: 11 } as any);
+    await controller.sendMessage(user as any, { itemType: 'order', itemId: 15, id: 11 } as any, { messageText: 'hi' } as any);
 
     expect(kayanService.createFollowupConversation).toHaveBeenCalledWith(user, { itemType: 'order', itemId: 15 });
     expect(kayanService.listFollowupMessages).toHaveBeenCalledWith(user, 11, 'order', 15);
     expect(kayanService.sendFollowupMessage).toHaveBeenCalledWith(user, 11, { messageText: 'hi' }, 'order', 15);
   });
 
-  it('keeps deprecated followup chat aliases forwarding to legacy service signatures', async () => {
-    const user = { sub: 3, phone: '+201000000003', isAdmin: false };
-    kayanService.createFollowupConversation.mockResolvedValueOnce({ conversation: { id: 11 } });
-    kayanService.listFollowupMessages.mockResolvedValueOnce({ items: [] });
-    kayanService.sendFollowupMessage.mockResolvedValueOnce({ message: { id: 5 } });
-
-    await controller.createConversationDeprecated(user as any, { itemType: 'order', itemId: 15 } as any);
-    await controller.listMessagesDeprecated(user as any, 11);
-    await controller.sendMessageDeprecated(user as any, 11, { messageText: 'hi' } as any);
-
-    expect(kayanService.createFollowupConversation).toHaveBeenCalledWith(user, { itemType: 'order', itemId: 15 });
-    expect(kayanService.listFollowupMessages).toHaveBeenCalledWith(user, 11);
-    expect(kayanService.sendFollowupMessage).toHaveBeenCalledWith(user, 11, { messageText: 'hi' });
-  });
 
   it('forwards admin followup step CRUD to service', async () => {
     const admin = { sub: 1, phone: '+201000000001', isAdmin: true };
@@ -97,27 +83,13 @@ describe('KayanController', () => {
     kayanService.adminUpdateFollowupStep.mockResolvedValueOnce({ step: { id: 71 } });
     kayanService.adminDeleteFollowupStep.mockResolvedValueOnce({ message: 'Step deleted' });
 
-    await adminController.createStep(admin as any, 'order' as any, 15, { title: 'Packed' } as any);
-    await adminController.updateStep('order' as any, 15, 71, { title: 'On the way' } as any);
-    await adminController.deleteStep('order' as any, 15, 71);
+    await adminController.createStep(admin as any, { itemType: 'order', itemId: 15 } as any, { title: 'Packed' } as any);
+    await adminController.updateStep({ itemType: 'order', itemId: 15, id: 71 } as any, { title: 'On the way' } as any);
+    await adminController.deleteStep({ itemType: 'order', itemId: 15, id: 71 } as any);
 
     expect(kayanService.adminCreateFollowupStep).toHaveBeenCalledWith(admin, { itemType: 'order', itemId: 15, title: 'Packed' });
     expect(kayanService.adminUpdateFollowupStep).toHaveBeenCalledWith(71, { title: 'On the way' });
     expect(kayanService.adminDeleteFollowupStep).toHaveBeenCalledWith(71);
   });
 
-  it('keeps deprecated admin followup step aliases forwarding to legacy service signatures', async () => {
-    const admin = { sub: 1, phone: '+201000000001', isAdmin: true };
-    kayanService.adminCreateFollowupStep.mockResolvedValueOnce({ step: { id: 71 } });
-    kayanService.adminUpdateFollowupStep.mockResolvedValueOnce({ step: { id: 71 } });
-    kayanService.adminDeleteFollowupStep.mockResolvedValueOnce({ message: 'Step deleted' });
-
-    await adminController.createStepDeprecated(admin as any, { itemType: 'order', itemId: 15, title: 'Packed' } as any);
-    await adminController.updateStepDeprecated(71, { title: 'On the way' } as any);
-    await adminController.deleteStepDeprecated(71);
-
-    expect(kayanService.adminCreateFollowupStep).toHaveBeenCalledWith(admin, { itemType: 'order', itemId: 15, title: 'Packed' });
-    expect(kayanService.adminUpdateFollowupStep).toHaveBeenCalledWith(71, { title: 'On the way' });
-    expect(kayanService.adminDeleteFollowupStep).toHaveBeenCalledWith(71);
-  });
 });

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -7,6 +7,7 @@ import { ErrorResponseDto } from '../common/dto/error-response.dto';
 import { CreateRatingDto } from './dto/create-rating.dto';
 import { RatingResponseDto, RatingSummaryResponseDto } from './dto/rating-response.dto';
 import { RatingsService } from './ratings.service';
+import { UserIdParamDto } from './dto/user-id-param.dto';
 
 @ApiTags('Ratings')
 @Controller('ratings')
@@ -31,7 +32,7 @@ export class RatingsController {
   @ApiOperation({ summary: 'Get rating summary for a user' })
   @ApiResponse({ status: 200, description: 'Average rating and review count', type: RatingSummaryResponseDto })
   @ApiResponse({ status: 404, description: 'User not found', type: ErrorResponseDto })
-  getUserRatingSummary(@Param('userId', ParseIntPipe) userId: number): Promise<Record<string, unknown>> {
-    return this.ratingsService.getUserRatingSummary(userId);
+  getUserRatingSummary(@Param() params: UserIdParamDto): Promise<Record<string, unknown>> {
+    return this.ratingsService.getUserRatingSummary(params.userId);
   }
 }

@@ -5,7 +5,7 @@ import {
 } from './api-list-generator';
 
 describe('api-list-generator', () => {
-  it('maps REST operations with sorting/auth/request/response refs', () => {
+  it('maps REST operations with sorting/auth/request/response schemas', () => {
     const rest = parseRestApisFromOpenApi({
       paths: {
         '/z': {
@@ -55,12 +55,14 @@ describe('api-list-generator', () => {
     expect(rest[0].method).toBe('GET');
     expect(rest[0].path).toBe('/a');
     expect(rest[0].auth).toBe('public');
-    expect(rest[0].responseShapeRef).toBe('200:ARes');
+    expect(rest[0].responseSchemas[0]?.status).toBe('200');
+    expect(rest[0].responseSchemas[0]?.schema?.$ref).toBe('#/components/schemas/ARes');
 
     expect(rest[1].module).toBe('ZModule');
     expect(rest[1].auth).toBe('bearer');
-    expect(rest[1].requestShapeRef).toBe('ZReq');
-    expect(rest[1].responseShapeRef).toBe('201:ZRes');
+    expect(rest[1].requestSchema?.$ref).toBe('#/components/schemas/ZReq');
+    expect(rest[1].responseSchemas[0]?.status).toBe('201');
+    expect(rest[1].responseSchemas[0]?.schema?.$ref).toBe('#/components/schemas/ZRes');
   });
 
   it('extracts websocket events and emitted events from gateway source', () => {
@@ -109,8 +111,10 @@ describe('api-list-generator', () => {
           path: '/auth/login',
           auth: 'public',
           summary: 'Login',
-          requestShapeRef: 'LoginDto',
-          responseShapeRef: '201:TokenResponseDto',
+          requestSchema: { $ref: '#/components/schemas/LoginDto' },
+          responseSchemas: [
+            { status: '201', schema: { $ref: '#/components/schemas/TokenResponseDto' } },
+          ],
           notes: '',
         },
       ],
