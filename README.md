@@ -134,16 +134,28 @@ docker compose exec -T app sh -lc 'ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=
 
 ## Environment Configuration
 
-Use `.env.example` as the source of truth for all variables.
+Choose an environment template, then copy it to `.env`:
 
-Required configuration groups:
-- Database: `DATABASE_URL`, `DATABASE_SSL`, `DATABASE_POOL_MAX`
-- JWT: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, token TTL values
-- OTP/Auth: `OTP_PROVIDER`, `OTP_TTL_MINUTES`, `OTP_SIGNING_SECRET`, `OTP_DEV_MODE`
-- Rate limiting: `THROTTLE_TTL`, `THROTTLE_LIMIT`, `THROTTLE_DEV_BYPASS`
-- Akedly Shield (required when `OTP_PROVIDER=akedly`): `AKEDLY_API_KEY`, `AKEDLY_PIPELINE_ID`, optional `AKEDLY_BASE_URL`
-- Storage/Cloudinary: `STORAGE_PROVIDER`, signing/upload settings, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
-- Redis: `REDIS_URL`
+```bash
+cp .env.dev.example .env   # local development defaults
+# or
+cp .env.prod.example .env  # production-oriented defaults
+```
+
+`.env.example` is a complete reference that includes:
+- App runtime keys read by `src/config/configuration.ts`
+- Infra/tooling keys used by Docker Compose and seed scripts (`NGINX_*`, `POSTGRES_*`, `BASE_URL`, `SEED_*`)
+- Script/test/simulation keys used by CLI harnesses (`ADMIN_EMAIL`, `AUTH_TEST_*`, `PROFILE_TEST_*`, `CHAT_TEST_*`, `KAYAN_FOLLOWUP_TEST_*`, `SIM_*`)
+
+Runtime-required keys:
+- Always required: `DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `OTP_SIGNING_SECRET`, `STORAGE_SIGNING_SECRET`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
+- Conditionally required: `RESEND_API_KEY`, `RESEND_FROM_EMAIL` when `OTP_PROVIDER=resend`
+
+Notes:
+- `OTP_PROVIDER` supports only `console` or `resend`.
+- `STORAGE_PROVIDER` currently supports only `cloudinary`.
+- `ADMIN_PHONES` is deprecated; prefer `users.is_admin` as source of truth.
+- Script/test/simulation keys are optional for normal API runtime, but included for full CLI reproducibility.
 
 ## Full Flow Simulation (Dev)
 
