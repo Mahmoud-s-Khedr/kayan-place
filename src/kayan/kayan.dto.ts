@@ -108,6 +108,8 @@ export class ListProductsQueryDto {
   @IsOptional() @IsEnum(ProductAvailabilityFilter) availability?: ProductAvailabilityFilter;
   @IsOptional() @IsEnum(ProductSortBy) sortBy?: ProductSortBy;
   @IsOptional() @IsEnum(SortDirection) sortDirection?: SortDirection;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5) minRate?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5) maxRate?: number;
 }
 
 export class CreateOrderDto {
@@ -129,6 +131,8 @@ export class ListOrdersQueryDto {
   @IsOptional() @IsDateString() toDate?: string;
   @IsOptional() @IsEnum(OrderSortBy) sortBy?: OrderSortBy;
   @IsOptional() @IsEnum(SortDirection) sortDirection?: SortDirection;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }
 
 export class CreateCartItemDto {
@@ -181,6 +185,7 @@ export class CreateServiceOrderDto {
 
 export class UpdateServiceOrderDto {
   @IsOptional() @IsString() @IsNotEmpty() description?: string;
+  @IsOptional() @IsString() @IsNotEmpty() address?: string;
 }
 
 export class AdminUpdateServiceStatusDto {
@@ -193,6 +198,8 @@ export class ListServicesQueryDto {
   @IsOptional() @IsDateString() toDate?: string;
   @IsOptional() @IsEnum(ServiceSortBy) sortBy?: ServiceSortBy;
   @IsOptional() @IsEnum(SortDirection) sortDirection?: SortDirection;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }
 
 export class CreateFollowupStepDto {
@@ -237,6 +244,7 @@ export class CreateItemRatingDto {
   @ValidateIf((dto: CreateItemRatingDto) => dto.itemType === ItemType.ORDER)
   @IsInt() @Min(1) productId?: number;
   @IsInt() @Min(1) @Max(5) ratingValue!: number;
+  @IsOptional() @IsString() @Min(1) @Max(2000) comment?: string;
 }
 
 export class CreateFollowupConversationDto {
@@ -288,4 +296,36 @@ export class FollowupConversationMessagesParamDto extends FollowupScopeParamDto 
 
 export class FollowupStepParamDto extends FollowupScopeParamDto {
   @Type(() => Number) @IsInt() @Min(1) id!: number;
+}
+
+export class ListGalleryQueryDto {
+  @IsOptional() @IsString() @IsNotEmpty() query?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
+}
+
+export class ListFollowupStepsQueryDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
+}
+
+export class GetItemReviewsQueryDto {
+  @IsEnum(ItemType) itemType!: ItemType;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
+}
+
+export class ItemIdParamDto {
+  @Type(() => Number) @IsInt() @Min(1) itemId!: number;
+}
+
+export class ListAdminFaultsQueryDto {
+  @IsOptional() @IsEnum(FaultStatus) status?: FaultStatus;
+  @IsOptional() @IsEnum(FaultSeverity) severity?: FaultSeverity;
+  @IsOptional() @IsDateString() fromDate?: string;
+  @IsOptional() @IsDateString() toDate?: string;
+  @IsOptional() @IsEnum(FaultSortBy) sortBy?: FaultSortBy;
+  @IsOptional() @IsEnum(SortDirection) sortDirection?: SortDirection;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }

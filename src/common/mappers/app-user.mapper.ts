@@ -2,7 +2,6 @@ type AppUserSource = Record<string, unknown>;
 
 export type AppUser = {
   id: number;
-  ssn: string | null;
   name: string;
   phone: string;
   email: string;
@@ -14,7 +13,6 @@ export function mapToAppUser(source: AppUserSource): AppUser {
 
   return {
     id: toNumber(source.id),
-    ssn: asNullableString(source.ssn),
     name: asString(source.name),
     phone: asString(source.phone),
     email: asString(source.email),

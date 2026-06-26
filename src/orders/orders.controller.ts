@@ -33,6 +33,7 @@ export class OrdersController {
   }
 
   @Patch(':id/address')
+  @ApiResponse({ status: 200, type: KayanOrderResponseDto })
   updateOrderAddress(@CurrentUser() user: AuthUser, @Param() params: OrderIdParamDto, @Body() dto: UpdateOrderAddressDto): Promise<Record<string, unknown>> {
     return this.kayanService.updateOrderAddress(user, params.id, dto);
   }

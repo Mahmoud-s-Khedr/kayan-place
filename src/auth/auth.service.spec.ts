@@ -55,13 +55,12 @@ describe('AuthService', () => {
     jest.restoreAllMocks();
   });
 
-  it('rejects duplicate email/ssn on registration OTP request', async () => {
+  it('rejects duplicate email/phone on registration OTP request', async () => {
     databaseService.query.mockResolvedValue({ rowCount: 1, rows: [{ id: 1 }] });
 
     await expect(
       service.requestRegistrationOtp({
         name: 'User',
-        ssn: '11111111',
         email: 'user@example.com',
         phone: '+201000000001',
         password: 'abc12345',
@@ -72,12 +71,11 @@ describe('AuthService', () => {
   it('rejects duplicate phone on registration OTP request', async () => {
     databaseService.query
       .mockResolvedValueOnce({ rowCount: 0, rows: [] })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [{ email: 'another@example.com', phone: '+201000000001', ssn: '22222222' }] });
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ email: 'another@example.com', phone: '+201000000001' }] });
 
     await expect(
       service.requestRegistrationOtp({
         name: 'User',
-        ssn: '11111111',
         email: 'user@example.com',
         phone: '+201000000001',
         password: 'abc12345',
@@ -134,7 +132,6 @@ describe('AuthService', () => {
 
     const response = await service.requestRegistrationOtp({
       name: 'User',
-      ssn: '11111111',
       email: 'user@example.com',
       phone: '+201000000001',
       password: 'abc12345',
@@ -164,8 +161,8 @@ describe('AuthService', () => {
     const client = {
       query: jest
         .fn()
-        .mockResolvedValueOnce({ rowCount: 1, rows: [{ name: 'User', phone: '+201000000001', ssn: '111', password_hash: 'hash', email: 'user@example.com' }] })
-        .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 11, ssn: '111', name: 'User', phone: '+201000000001', email: 'user@example.com', status: 'active' }] })
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ name: 'User', phone: '+201000000001', password_hash: 'hash', email: 'user@example.com' }] })
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 11, name: 'User', phone: '+201000000001', email: 'user@example.com', status: 'active' }] })
         .mockResolvedValueOnce({ rowCount: 1, rows: [] }),
     };
     databaseService.withTransaction.mockImplementation((callback: any) => callback(client));

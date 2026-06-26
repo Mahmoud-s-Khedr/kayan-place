@@ -16,7 +16,13 @@
     "skipLibCheck": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "types": ["node", "jest"]
+    "types": ["node", "jest"],
+    "plugins": [
+      {
+        "transform": "@nestjs/swagger/plugin",
+        "introspectComments": true
+      }
+    ]
   },
   "include": ["src/**/*", "test/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist"]

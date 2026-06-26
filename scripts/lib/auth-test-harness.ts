@@ -30,7 +30,6 @@ export type AuthTestConfig = {
 export type AuthIdentity = {
   email: string;
   phone: string;
-  ssn: string;
   name: string;
   password: string;
 };
@@ -67,11 +66,9 @@ function sanitizeBaseUrl(baseUrl: string): string {
 
 function makeIdentity(password: string): AuthIdentity {
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const digits = String(Date.now()).slice(-8);
   return {
     email: `auth.test.${stamp}@example.com`,
     phone: `+2015${String(Date.now()).slice(-8)}`,
-    ssn: `T${digits}`,
     name: 'Auth Test User',
     password,
   };
@@ -175,7 +172,6 @@ export async function runAuthHappyPath(
 
   const register = await requestJson(config, 'POST', '/api/auth/register', {
     name: identity.name,
-    ssn: identity.ssn,
     email: identity.email,
     phone: identity.phone,
     password: identity.password,
@@ -290,7 +286,6 @@ export async function runAuthNegativeCases(
 
   const duplicateRegistration = await requestJson(config, 'POST', '/api/auth/register', {
     name: identity.name,
-    ssn: identity.ssn,
     email: identity.email,
     phone: identity.phone,
     password: identity.password,

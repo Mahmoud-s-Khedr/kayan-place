@@ -46,7 +46,7 @@ services:
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:${NGINX_LISTEN_PORT:-80}/api/health/live >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${NGINX_LISTEN_PORT:-80}/api/health/live >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10

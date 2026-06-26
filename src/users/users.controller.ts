@@ -56,6 +56,13 @@ export class UsersController {
     return this.usersService.changePassword(user, dto);
   }
 
+  @Delete('avatar')
+  @ApiOperation({ summary: 'Remove current user avatar image' })
+  @ApiResponse({ status: 200, description: 'Avatar removed', type: UserProfileResponseDto })
+  deleteAvatar(@CurrentUser() user: AuthUser): Promise<Record<string, unknown>> {
+    return this.usersService.deleteAvatar(user);
+  }
+
   @Delete()
   @ApiOperation({ summary: 'Delete current user account (soft-delete)' })
   @ApiResponse({ status: 200, description: 'Account deleted', type: SuccessResponseDto })

@@ -34,7 +34,6 @@ import { mapToAppUser } from '../common/mappers/app-user.mapper';
 
 type UserRow = {
   id: number;
-  ssn: string | null;
   name: string;
   phone: string | null;
   email: string;
@@ -54,21 +53,21 @@ export class AuthService {
 
   async requestRegistrationOtp(dto: RequestRegistrationOtpDto): Promise<Record<string, unknown>> {
     const existingUser = await this.databaseService.query(
-      'SELECT id FROM users WHERE LOWER(email) = LOWER($1) OR phone = $2 OR ssn = $3 LIMIT 1',
-      [dto.email, dto.phone, dto.ssn],
+      'SELECT id FROM users WHERE LOWER(email) = LOWER($1) OR phone = $2 LIMIT 1',
+      [dto.email, dto.phone],
     );
     if (existingUser.rowCount && existingUser.rowCount > 0) {
-      throw new ConflictException('Email, phone, or SSN already exists');
+      throw new ConflictException('Email or phone already exists');
     }
 
-    const existingPending = await this.databaseService.query<{ email: string; phone: string; ssn: string }>(
-      'SELECT email, phone, ssn FROM pending_registrations WHERE LOWER(email) = LOWER($1) OR phone = $2 OR ssn = $3 LIMIT 1',
-      [dto.email, dto.phone, dto.ssn],
+    const existingPending = await this.databaseService.query<{ email: string; phone: string }>(
+      'SELECT email, phone FROM pending_registrations WHERE LOWER(email) = LOWER($1) OR phone = $2 LIMIT 1',
+      [dto.email, dto.phone],
     );
     if (existingPending.rowCount && existingPending.rowCount > 0) {
       const row = existingPending.rows[0];
       if (row.email.toLowerCase() !== dto.email.toLowerCase()) {
-        throw new ConflictException('Email, phone, or SSN already exists');
+        throw new ConflictException('Email or phone already exists');
       }
     }
 
@@ -76,19 +75,19 @@ export class AuthService {
 
     try {
       await this.databaseService.query(
-        `INSERT INTO pending_registrations (email, phone, ssn, name, password_hash, expires_at)
+        `INSERT INTO pending_registrations (email, phone, name, address, password_hash, expires_at)
          VALUES (LOWER($1), $2, $3, $4, $5, NOW() + ($6::text || ' minutes')::interval)
          ON CONFLICT (email) DO UPDATE
            SET phone         = EXCLUDED.phone,
-               ssn           = EXCLUDED.ssn,
                name          = EXCLUDED.name,
+               address       = EXCLUDED.address,
                password_hash = EXCLUDED.password_hash,
                expires_at    = EXCLUDED.expires_at,
                created_at    = NOW()`,
-        [dto.email, dto.phone, dto.ssn, dto.name, passwordHash, this.appConfig.otpTtlMinutes],
+        [dto.email, dto.phone, dto.name, dto.address ?? null, passwordHash, this.appConfig.otpTtlMinutes],
       );
     } catch {
-      throw new ConflictException('Email, phone, or SSN already exists');
+      throw new ConflictException('Email or phone already exists');
     }
 
     const verificationResult = await this.otpVerificationProvider.startVerification({
@@ -124,8 +123,8 @@ export class AuthService {
     });
 
     return this.databaseService.withTransaction(async (client) => {
-      const pendingQuery = await client.query<{ name: string; phone: string; ssn: string; password_hash: string; email: string }>(
-        `SELECT name, phone, ssn, password_hash, email
+      const pendingQuery = await client.query<{ name: string; phone: string; address: string | null; password_hash: string; email: string }>(
+        `SELECT name, phone, address, password_hash, email
          FROM pending_registrations
          WHERE LOWER(email) = LOWER($1) AND expires_at > NOW()
          FOR UPDATE`,
@@ -138,24 +137,23 @@ export class AuthService {
 
       const pending = pendingQuery.rows[0];
 
-      let createdUser!: { id: number; ssn: string | null; name: string; phone: string | null; email: string; status: string };
+      let createdUser!: { id: number; name: string; phone: string | null; email: string; status: string };
       try {
         const insertUser = await client.query<{
           id: number;
-          ssn: string | null;
           name: string;
           phone: string | null;
           email: string;
           status: string;
         }>(
-          `INSERT INTO users (name, ssn, phone, email, password_hash)
-           VALUES ($1, $2, $3, LOWER($4), $5)
-           RETURNING id, ssn, name, phone, email, status`,
-          [pending.name, pending.ssn, pending.phone, pending.email, pending.password_hash],
+          `INSERT INTO users (name, phone, email, address, password_hash)
+           VALUES ($1, $2, LOWER($3), $4, $5)
+           RETURNING id, name, phone, email, status`,
+          [pending.name, pending.phone, pending.email, pending.address ?? null, pending.password_hash],
         );
         createdUser = insertUser.rows[0];
       } catch {
-        throw new ConflictException('Email, phone, or SSN already exists');
+        throw new ConflictException('Email or phone already exists');
       }
 
       await client.query('DELETE FROM pending_registrations WHERE LOWER(email) = LOWER($1)', [dto.email]);
@@ -170,7 +168,7 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<Record<string, unknown>> {
     const query = await this.databaseService.query<UserRow & { is_admin: boolean; token_version: number }>(
-      'SELECT id, ssn, name, phone, email, password_hash, status, is_admin, token_version FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL LIMIT 1',
+      'SELECT id, name, phone, email, password_hash, status, is_admin, token_version FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL LIMIT 1',
       [dto.email],
     );
 

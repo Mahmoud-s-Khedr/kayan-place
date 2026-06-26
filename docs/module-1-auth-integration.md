@@ -1,110 +1,301 @@
 # Module 1 Integration Guide: Authentication and Registration
 
-## 1. Purpose and Audience
+## Purpose
 
-This guide is for frontend web and mobile teams integrating Module 1 (Authentication and Registration) with the backend at a high level.
+This guide covers all frontend work for:
 
-It covers:
-- user-facing auth flows
-- backend endpoint mapping
-- client integration model and state handling
-- common error handling branches
+- registration
+- OTP verification and resend
+- login
+- password reset
+- refresh and logout
 
-## 2. Prerequisites
+Read the shared contract first:
 
-- Backend base URL is reachable (example: `http://localhost:800` in local Docker dev).
-- App knows where to store session tokens securely.
-- For QA/dev automation only, backend may run with `OTP_DEV_MODE=true` to expose OTP in response data.
-  - Production must keep `OTP_DEV_MODE=false`.
+- [frontend-integration-shared-contract.md](./frontend-integration-shared-contract.md)
 
-## 3. End-to-End Flows
+## Flow-by-Flow Implementation
 
-### 3.1 Registration Flow
+### Registration
 
-1. User submits: `name`, `email`, `phone`, `password` (and `ssn` where required by business rules).
-2. Frontend calls `POST /auth/register`.
-3. Backend sends OTP to email.
-4. User enters OTP.
-5. Frontend calls `POST /auth/register/verify`.
-6. Backend creates account and returns `accessToken` + `refreshToken` (+ user payload).
+1. Submit `name`, `email`, `phone`, `password` (and optional `address`) to `POST /api/auth/register`.
+2. Backend creates or updates a pending registration and sends an OTP.
+3. If `OTP_DEV_MODE=true`, the response may include `data.otp`.
+4. Show the OTP verification screen.
+5. Submit `email` and `otp` to `POST /api/auth/register/verify`.
+6. Store `data.accessToken` and `data.refreshToken`.
 
-Optional step:
-- If OTP expires or is not received, call `POST /auth/register/resend-otp`.
+Optional resend flow:
 
-### 3.2 Login Flow
+- Call `POST /api/auth/register/resend-otp` with the same `email`.
 
-1. User submits: `email`, `password`.
-2. Frontend calls `POST /auth/login`.
-3. Backend validates credentials and returns `accessToken` + `refreshToken` (+ user payload).
+### Login
 
-### 3.3 Forgot Password Flow
+1. Submit `email` and `password` to `POST /api/auth/login`.
+2. On `201`, store `data.accessToken` and `data.refreshToken`.
+3. Use the access token for all protected API calls.
 
-1. User submits email.
-2. Frontend calls `POST /auth/password/request-otp`.
-3. Backend sends reset OTP to email (or returns generic success message when email is unknown).
-4. User submits OTP + new password + confirm password.
-5. Frontend calls `POST /auth/password/reset`.
-6. Backend resets password and returns new tokens.
+### Forgot Password
 
-### 3.4 Token Lifecycle Flow
+1. Submit `email` to `POST /api/auth/password/request-otp`.
+2. Always show a neutral “check your email” confirmation, even if the email is unknown.
+3. Submit `email`, `otp`, `newPassword`, and `confirmPassword` to `POST /api/auth/password/reset`.
+4. On success, replace the current token pair with the returned token pair.
 
-- Use `POST /auth/refresh` with refresh token to rotate session tokens.
-- Use `POST /auth/logout` to revoke refresh token and end session.
-- On access token expiry during API calls:
-  1. attempt refresh
-  2. retry original request on refresh success
-  3. force re-login if refresh fails
+### Refresh and Logout
 
-## 4. Endpoint Map (High Level)
+- Refresh: `POST /api/auth/refresh` with JSON body `{ "refreshToken": "..." }`
+- Logout: `POST /api/auth/logout` with:
+  - bearer access token
+  - JSON body `{ "refreshToken": "..." }`
 
-- `POST /auth/register`: start registration and send email OTP
-- `POST /auth/register/resend-otp`: resend registration OTP
-- `POST /auth/register/verify`: verify OTP and create account
-- `POST /auth/login`: login with email/password
-- `POST /auth/password/request-otp`: request reset OTP
-- `POST /auth/password/reset`: reset password with OTP
-- `POST /auth/refresh`: refresh token pair
-- `POST /auth/logout`: revoke refresh token
+## Endpoint Contract
 
-## 5. Frontend and Mobile Integration Model
+### `POST /api/auth/register`
 
-### 5.1 Suggested Screens
+Purpose: start registration and send OTP.
 
-- Login
-- Register
-- Verify Registration OTP
-- Forgot Password (request OTP)
-- Reset Password (OTP + new password)
+Request body:
 
-### 5.2 Client-Side Validation (Before API Call)
+```json
+{
+  "name": "Ahmed Ali",
+  "email": "user@example.com",
+  "phone": "+201001234567",
+  "password": "Secret123",
+  "address": "123 Main St, Cairo"
+}
+```
 
-- Email format validation
-- Password length/pattern checks (letters + numbers)
-- Confirm password match in reset flow
-- Required field presence checks
+`address` is optional.
 
-### 5.3 Session Storage Strategy
+Validation:
 
-- Store access token in memory where possible.
-- Store refresh token in secure storage:
-  - Web: secure cookie or hardened storage strategy
-  - Mobile: platform secure storage (Keychain/Keystore)
-- Never log raw tokens in client logs.
+- `name`: string, 2-150 chars
+- `email`: valid email
+- `phone`: string, 7-32 chars
+- `password`: string, 8-64 chars, must contain letters and numbers
+- `address`: optional string, 1-500 chars
 
-### 5.4 Error Handling Branches
+Success:
 
-- `400`: show inline validation/OTP error messages.
-- `401`: show auth failure message or force re-login.
-- `409`: show duplicate registration conflict (email/phone/SSN).
-- `429`: show retry-later message and cooldown UX.
+- `201`
+- response data contains `message`
+- response may also contain `otp` only when `OTP_DEV_MODE=true`
 
-## 6. Minimal QA Integration Checklist
+Possible errors:
 
-- Register new user and verify OTP successfully.
-- Login with registered user.
-- Request password reset OTP and reset password.
-- Login using new password after reset.
-- Refresh token flow works after access token expiry.
-- Logout revokes session; refresh fails after logout.
-- Duplicate registration returns conflict handling UX.
-- Throttling branch (`429`) shows clear retry guidance.
+- `409`: email or phone already exists
+- `400`: invalid payload or unknown fields
+
+Example success:
+
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "data": {
+    "message": "OTP sent",
+    "otp": "000000"
+  }
+}
+```
+
+### `POST /api/auth/register/resend-otp`
+
+Request body:
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+Success:
+
+- `201`
+- same OTP response shape as register
+
+Possible errors:
+
+- `400`: no pending registration found or payload invalid
+
+### `POST /api/auth/register/verify`
+
+Request body:
+
+```json
+{
+  "email": "user@example.com",
+  "otp": "000000"
+}
+```
+
+Validation:
+
+- `email`: valid email
+- `otp`: string, 4-8 chars
+
+Success:
+
+- `201`
+- token response in `data.accessToken` and `data.refreshToken`
+- `data.user` currently contains basic auth user info only
+
+Example success:
+
+```json
+{
+  "success": true,
+  "statusCode": 201,
+  "data": {
+    "user": {
+      "id": 1,
+      "email": "user@example.com"
+    },
+    "accessToken": "jwt-access-token",
+    "refreshToken": "jwt-refresh-token"
+  }
+}
+```
+
+Possible errors:
+
+- `400`: invalid OTP, expired OTP, or expired registration session
+- `409`: uniqueness conflict discovered during user creation
+
+### `POST /api/auth/login`
+
+Request body:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "Secret123"
+}
+```
+
+Validation:
+
+- `email`: valid email
+- `password`: string, 8-64 chars
+
+Success:
+
+- `201`
+- returns `data.user`, `data.accessToken`, `data.refreshToken`
+
+Possible errors:
+
+- `401`: invalid credentials
+- inactive, paused, banned, or deleted users should be treated as generic invalid credentials
+
+### `POST /api/auth/password/request-otp`
+
+Request body:
+
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+Success:
+
+- `201`
+- always return success-style confirmation
+- frontend must not assume the email exists
+- may include `otp` in dev mode
+
+### `POST /api/auth/password/reset`
+
+Request body:
+
+```json
+{
+  "email": "user@example.com",
+  "otp": "000000",
+  "newPassword": "NewSecret123",
+  "confirmPassword": "NewSecret123"
+}
+```
+
+Validation:
+
+- `otp`: string, 4-8 chars
+- `newPassword`: string, 8-64 chars, letters and numbers required
+- `confirmPassword`: string, 8-64 chars, must match `newPassword`
+
+Success:
+
+- `201`
+- returns a fresh token pair in the same token-response shape used by login
+
+Possible errors:
+
+- `400`: invalid OTP, expired OTP, password mismatch, invalid payload, user not found
+- `401`: inactive/non-active user path can currently fail as invalid credentials
+
+### `POST /api/auth/refresh`
+
+Request body:
+
+```json
+{
+  "refreshToken": "jwt-refresh-token"
+}
+```
+
+Success:
+
+- `201`
+- returns new `data.accessToken` and `data.refreshToken`
+
+Possible errors:
+
+- `401`: invalid refresh token
+
+### `POST /api/auth/logout`
+
+Auth: bearer token required
+
+Request body:
+
+```json
+{
+  "refreshToken": "jwt-refresh-token"
+}
+```
+
+Success:
+
+- `201`
+- `data` is an empty object
+
+Possible errors:
+
+- `401`: missing or invalid access token
+
+## Frontend Notes
+
+- Registration and password-reset OTPs are email-based.
+- OTP value should only be shown in development or automated QA when the backend returns `data.otp`.
+- Treat all auth tokens as secrets; never log them.
+- The repo test harnesses use email-based login only. Frontend should also integrate login with `email`.
+
+## Error Handling
+
+- `400`: inline field error, invalid OTP, password mismatch, bad request body
+- `401`: invalid login, invalid refresh token, or missing bearer token on logout
+- `409`: duplicate registration identity
+
+## QA Checklist
+
+- Register a new user and verify using returned dev OTP when available.
+- Resend registration OTP and verify with the resent code.
+- Login with a valid user.
+- Request password reset OTP and complete reset with matching passwords.
+- Confirm old password no longer works after reset.
+- Refresh the token pair and retry a protected request.
+- Logout and confirm later refresh fails.
+- Validate duplicate registration returns `409`.

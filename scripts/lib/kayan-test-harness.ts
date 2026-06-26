@@ -38,7 +38,6 @@ type AuthIdentity = {
   name: string;
   email: string;
   phone: string;
-  ssn: string;
   password: string;
 };
 
@@ -112,12 +111,10 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 
 function makeIdentity(label: 'A' | 'B'): AuthIdentity {
   const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const ssn = `K${suffix.slice(-8)}`;
   return {
     name: `Kayan Sim User ${label}`,
     email: `kayan.sim.${label.toLowerCase()}.${suffix}@example.com`,
     phone: `+2015${suffix.slice(-8)}`,
-    ssn,
     password: label === 'A' ? 'KayanSimPass123' : 'KayanSimPass456',
   };
 }
@@ -452,6 +449,24 @@ export async function runKayanHappyPath(
     requestJson(config, 'GET', '/api/products?query=Product'),
   );
 
+  // Ratings and Reviews fetch
+  await runAndRecord(config, steps, 'public get item reviews', 200, () =>
+    requestJson(config, 'GET', `/api/ratings/items/${state.productId}?itemType=order`),
+  );
+  
+  // To test the legacy summary and public profile, we need userA's ID. Let's fetch it from /api/me
+  const meRes = await runAndRecord(config, steps, 'user A get profile', 200, () =>
+    requestJson(config, 'GET', '/api/me', undefined, { Authorization: `Bearer ${userAToken}` }),
+  );
+  const userAId = pickId(meRes.body, 'user');
+
+  await runAndRecord(config, steps, 'public get user rating summary', 200, () =>
+    requestJson(config, 'GET', `/api/ratings/summary/${userAId}`),
+  );
+  await runAndRecord(config, steps, 'public get user profile', 200, () =>
+    requestJson(config, 'GET', `/api/users/${userAId}`),
+  );
+
   assertHappyState(state);
   return { steps, state };
 }
@@ -488,6 +503,9 @@ export async function runKayanNegativeCases(
       productId: 99999999,
       ratingValue: 5,
     }, { Authorization: `Bearer ${userAToken}` }),
+  );
+  await runAndRecord(config, steps, 'negative get reviews missing itemType', 400, () =>
+    requestJson(config, 'GET', `/api/ratings/items/${state.productId}`),
   );
   await runAndRecord(config, steps, 'negative admin invalid status', [400, 422], () =>
     requestJson(config, 'PATCH', `/api/admin/orders/${state.orderId}/status`, { status: 'bad_status' }, { Authorization: `Bearer ${adminToken}` }),

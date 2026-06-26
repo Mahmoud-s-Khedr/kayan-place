@@ -1,47 +1,134 @@
 # Module 3 Integration Guide: Products, Cart, and Orders
 
-## 1. Purpose and Audience
+## Purpose
 
-This guide is for frontend web and mobile teams integrating Module 3 (Products, Cart, and Orders) with the backend.
+This guide covers:
 
-It covers:
-- product catalog browsing and filtering
-- admin product management
-- cart and checkout flows
-- order tracking and order-status management
-- product rating after delivery
+- public product browsing
+- admin product CRUD
+- cart management
+- order creation and lifecycle
+- delivered-product rating
 
-## 2. Prerequisites
+Shared contract:
 
-- Backend base URL is reachable (example: `http://localhost:800` in local Docker setup).
-- User and admin authentication flows are already integrated (Module 1).
-- Authenticated requests include a valid bearer token where required.
-- Profile/session flows are working (Module 2).
+- [frontend-integration-shared-contract.md](./frontend-integration-shared-contract.md)
 
-## 3. End-to-End Flows
+## Flow-by-Flow Implementation
 
-### 3.1 Product Catalog (Public/User)
+### Public Product Catalog
 
-1. Client loads products using `GET /api/products`.
-2. Client optionally passes query/filter/sort params:
-   - `query`
-   - `minPrice`, `maxPrice`
-   - `fromDate`, `toDate`
-   - `availability` (`active`, `inactive`, `all`)
-   - `sortBy` (`createdAt`, `price`)
-   - `sortDirection` (`asc`, `desc`)
-3. User opens a product details page using `GET /api/products/:id`.
-4. Product payloads returned by list/details include assets split into:
-   - `images`
-   - `files`
+1. Load products with `GET /api/products`.
+2. Apply optional filters and sort controls.
+3. Load details with `GET /api/products/:id`.
+4. Render product assets from separate `images` and `files` arrays.
 
-### 3.2 Admin Product Management
+### Admin Product Management
 
-1. Admin creates product with `POST /api/admin/products`.
-2. Admin updates product fields with `PATCH /api/admin/products/:id`.
-3. Admin soft-deletes product with `DELETE /api/admin/products/:id`.
+1. Upload product assets first when needed.
+2. Create product with `POST /api/admin/products`.
+3. Update product with `PATCH /api/admin/products/:id`.
+4. Soft-delete product with `DELETE /api/admin/products/:id`.
 
-Typical create payload:
+### Cart and Checkout
+
+1. Add item: `POST /api/cart/items`
+2. Update quantity: `PATCH /api/cart/items/:id`
+3. Read cart: `GET /api/cart`
+4. Remove item: `DELETE /api/cart/items/:id`
+5. Checkout: `POST /api/cart/checkout`
+
+### Direct Order Creation
+
+The backend still supports direct order creation in addition to cart checkout:
+
+- `POST /api/orders`
+
+Use this only if the frontend needs a no-cart path. Otherwise prefer cart checkout.
+
+### Order Tracking
+
+User routes:
+
+- `GET /api/orders/me`
+- `GET /api/orders/:id`
+- `PATCH /api/orders/:id/address`
+- `POST /api/orders/:id/cancel`
+
+Admin routes:
+
+- `GET /api/admin/orders`
+- `PATCH /api/admin/orders/:id/status`
+
+### Product Rating After Delivery
+
+Once an order is delivered, the user can rate a purchased product one time:
+
+- `POST /api/ratings`
+
+## Endpoint Contract
+
+### `GET /api/products`
+
+Public route.
+
+Supported query params:
+
+- `query`
+- `minPrice`
+- `maxPrice`
+- `fromDate`
+- `toDate`
+- `availability`: `active`, `inactive`, `all`
+- `sortBy`: `createdAt`, `price`
+- `sortDirection`: `asc`, `desc`
+
+Defaults:
+
+- availability defaults to active products
+- `sortBy` defaults to `createdAt`
+- `sortDirection` defaults to `desc`
+
+Optional rating filters:
+
+- `minRate`: integer, 1-5
+- `maxRate`: integer, 1-5
+
+Success shape:
+
+- `200`
+- `data.items[]`
+
+Important product fields:
+
+- `id`
+- `title`
+- `description`
+- `amount`
+- `price`
+- `details`
+- `is_active`
+- `images[]`
+- `files[]`
+
+### `GET /api/products/:id`
+
+Public route.
+
+Success:
+
+- `200`
+- `data.product`
+
+Errors:
+
+- `404`: product not found
+
+### `POST /api/admin/products`
+
+Auth: admin bearer token required
+
+Request example:
 
 ```json
 {
@@ -53,20 +140,131 @@ Typical create payload:
     "brand": "Kayan",
     "warrantyMonths": 12
   },
-  "imageFileIds": [],
-  "fileIds": []
+  "imageFileIds": [101, 102],
+  "fileIds": [201]
 }
 ```
 
-### 3.3 Cart and Checkout (User)
+Validation:
 
-1. Add product to cart: `POST /api/cart/items`.
-2. Update quantity: `PATCH /api/cart/items/:id`.
-3. Remove item: `DELETE /api/cart/items/:id`.
-4. List current cart: `GET /api/cart`.
-5. Checkout cart: `POST /api/cart/checkout` with `deliveryAddress`.
+- `title`: required non-empty string
+- `description`: required non-empty string
+- `amount`: integer, min `0`
+- `price`: number, min `0`
+- `details`: optional object
+- `imageFileIds`: optional integer array
+- `fileIds`: optional integer array
 
-Checkout payload:
+Success:
+
+- `201`
+- `data.product` with asset arrays attached
+
+### `PATCH /api/admin/products/:id`
+
+Auth: admin bearer token required
+
+Editable fields:
+
+- `title`
+- `description`
+- `amount`
+- `price`
+- `details`
+- `isActive`
+- `imageFileIds`
+- `fileIds`
+
+Success:
+
+- `200`
+- `data.product`
+
+Errors:
+
+- `404`: product not found
+
+### `DELETE /api/admin/products/:id`
+
+Auth: admin bearer token required
+
+Success:
+
+- `200`
+- message envelope
+
+### `GET /api/cart`
+
+Auth: bearer token required
+
+Success:
+
+- `200`
+- `data.items[]`
+
+Important cart item fields:
+
+- `id`
+- `product_id`
+- `quantity`
+- `created_at`
+- `updated_at`
+- `product`
+
+### `POST /api/cart/items`
+
+Request:
+
+```json
+{
+  "productId": 12,
+  "quantity": 1
+}
+```
+
+Validation:
+
+- `productId`: integer, min `1`
+- `quantity`: integer, min `1`
+
+Behavior:
+
+- if the product is already in the cart, quantity is increased
+- success returns the full current cart in `data.items`
+
+### `PATCH /api/cart/items/:id`
+
+Request:
+
+```json
+{
+  "quantity": 2
+}
+```
+
+Success:
+
+- `200`
+- returns the full current cart in `data.items`
+
+Errors:
+
+- `404`: cart item not found
+
+### `DELETE /api/cart/items/:id`
+
+Success:
+
+- `200`
+- message envelope
+
+Errors:
+
+- `404`: cart item not found
+
+### `POST /api/cart/checkout`
+
+Request:
 
 ```json
 {
@@ -74,33 +272,155 @@ Checkout payload:
 }
 ```
 
-### 3.4 Orders and Follow-up
+Success:
 
-User:
-- `GET /api/orders/me` for order list (supports `status`, `fromDate`, `toDate`, `sortBy=createdAt`, `sortDirection`)
-- `GET /api/orders/:id` for details
-- `PATCH /api/orders/:id/address` (allowed before processing starts)
-- `POST /api/orders/:id/cancel` (allowed before processing starts)
+- `201`
+- returns `data.order`
+- cart is cleared by the backend after successful checkout
 
-Admin:
-- `GET /api/admin/orders` to review all orders
-- `PATCH /api/admin/orders/:id/status` to progress order
+### `POST /api/orders`
 
-Order statuses:
+Request:
+
+```json
+{
+  "deliveryAddress": "Cairo, New Cairo, Fifth Settlement",
+  "items": [
+    {
+      "productId": 12,
+      "quantity": 1
+    }
+  ]
+}
+```
+
+Validation:
+
+- `deliveryAddress`: required non-empty string
+- `items[]`: required non-empty array
+- each item requires `productId` and `quantity` as positive integers
+
+### `GET /api/orders/me`
+
+Auth: bearer token required
+
+Supported query params:
+
+- `status`
+- `fromDate`
+- `toDate`
+- `sortBy`: `createdAt`
+- `sortDirection`: `asc`, `desc`
+
+Success:
+
+- `200`
+- `data.items[]`
+
+### `GET /api/orders/:id`
+
+Auth: bearer token required
+
+Success:
+
+- `200`
+- `data.order`
+
+Important order fields:
+
+- `id`
+- `user_id`
+- `delivery_address`
+- `status`
+- `created_at`
+- `updated_at`
+- `item_count`
+- `items[]`
+
+Important order item fields:
+
+- `id`
+- `product_id`
+- `quantity`
+- `unit_price`
+- `product.id`
+- `product.title`
+- `product.is_active`
+
+### `PATCH /api/orders/:id/address`
+
+Allowed only while order status is `received`.
+
+Request:
+
+```json
+{
+  "deliveryAddress": "Cairo, New Cairo, Fifth Settlement"
+}
+```
+
+Success:
+
+- `200`
+- returns updated `data.order`
+
+### `POST /api/orders/:id/cancel`
+
+Allowed only while order status is `received`.
+
+Success:
+
+- `200`
+- returns updated `data.order`
+
+### `GET /api/admin/orders`
+
+Auth: admin bearer token required
+
+Supported query params:
+
+- `status`: `received`, `ready_to_ship`, `on_the_way`, `cancelled`, `delivered`
+- `fromDate`
+- `toDate`
+- `sortBy`: `createdAt`
+- `sortDirection`: `asc`, `desc`
+- `page`: integer, min `1`
+- `limit`: integer, min `1`, max `100`
+
+Success:
+
+- `200`
+- `data.items[]`
+- each order includes nested `user`
+
+### `PATCH /api/admin/orders/:id/status`
+
+Auth: admin bearer token required
+
+Request:
+
+```json
+{
+  "status": "ready_to_ship"
+}
+```
+
+Allowed enum values:
+
 - `received`
 - `ready_to_ship`
 - `on_the_way`
 - `cancelled`
 - `delivered`
 
-### 3.5 Product Rating
+Important note:
 
-Users can rate a delivered ordered product once.
+- The frontend should follow the canonical progression `received -> ready_to_ship -> on_the_way -> delivered`.
+- Current backend code validates the enum value, but does not strictly enforce the admin progression sequence.
 
-Endpoint:
-- `POST /api/ratings`
+### `POST /api/ratings`
 
-Payload for product rating:
+Delivered product rating request:
 
 ```json
 {
@@ -111,63 +431,38 @@ Payload for product rating:
 }
 ```
 
-Contract nuance:
-- Direct order creation (`POST /api/orders`) remains supported for compatibility alongside cart checkout (`POST /api/cart/checkout`).
+Validation:
 
-## 4. Endpoint Map (High Level)
+- `itemType` must be `order`
+- `orderId`: integer, min `1`
+- `productId`: integer, min `1`
+- `ratingValue`: integer, `1-5`
 
-Public/User:
-- `GET /api/products`
-- `GET /api/products/:id`
-- `GET /api/cart`
-- `POST /api/cart/items`
-- `PATCH /api/cart/items/:id`
-- `DELETE /api/cart/items/:id`
-- `POST /api/cart/checkout`
-- `POST /api/orders`
-- `GET /api/orders/me`
-- `GET /api/orders/:id`
-- `PATCH /api/orders/:id/address`
-- `POST /api/orders/:id/cancel`
-- `POST /api/ratings`
+Rules:
 
-Admin:
-- `POST /api/admin/products`
-- `PATCH /api/admin/products/:id`
-- `DELETE /api/admin/products/:id`
-- `GET /api/admin/orders`
-- `PATCH /api/admin/orders/:id/status`
+- order must belong to the authenticated user
+- order status must be `delivered`
+- the product must exist in that order
+- duplicate rating is rejected
 
-## 5. Client Validation and Error Handling
+## Error Handling
 
-### 5.1 Client-Side Validation
+- `400`: invalid payload, invalid product, insufficient stock, empty cart, invalid order state, rating blocked, duplicate rating
+- `401`: missing or invalid bearer token
+- `403`: access to another user’s order or protected resource
+- `404`: product, order, or cart item not found
 
-- `amount` and `quantity` must be positive integers.
-- `price` must be non-negative.
-- `deliveryAddress` must be non-empty.
-- Rating:
-  - `ratingValue` between `1` and `5`
-  - For product rating: include `itemType=order`, `orderId`, `productId`.
+## QA Checklist
 
-### 5.2 Error Branches
-
-- `400`:
-  - invalid payload
-  - invalid product
-  - insufficient stock
-  - action blocked by order status (address update/cancel/rating constraints)
-- `401`: missing/invalid bearer token
-- `403`: access to another user’s order/cart resource, or policy/permission rejection in guarded flows
-- `404`: product/order/cart item not found
-
-## 6. Minimal QA Integration Checklist
-
-- Product list loads with default and custom query/filter/sort params.
-- Product details screen loads a valid `productId`.
-- Admin can create/update/delete product successfully.
-- User can add/update/remove cart items.
-- Checkout creates order and clears cart.
-- User can view own orders and order details.
-- Address update works in `received` status and fails after processing starts.
-- Admin can move order through `ready_to_ship -> on_the_way -> delivered`.
-- Product rating works only after delivery and is blocked on duplicate submission.
+- Product list works with default params and explicit filter/sort params.
+- Product details load correctly.
+- Admin can create, update, and delete products.
+- User can add, update, list, and remove cart items.
+- Cart checkout returns an order and clears the cart.
+- Direct order creation works with explicit items.
+- User can list and read own orders.
+- Order address update succeeds only while `received`.
+- Order cancel succeeds only while `received`.
+- Admin order list returns all orders with nested user info.
+- Admin can set canonical statuses in sequence.
+- Product rating works only after delivery and fails on duplicate submission.

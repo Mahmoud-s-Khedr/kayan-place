@@ -31,7 +31,6 @@ export type ProfileTestConfig = {
 export type ProfileIdentity = {
   email: string;
   phone: string;
-  ssn: string;
   name: string;
   password: string;
 };
@@ -71,7 +70,6 @@ function makeIdentity(password: string): ProfileIdentity {
   return {
     email: `profile.test.${stamp}@example.com`,
     phone: `+2015${String(Date.now()).slice(-8)}`,
-    ssn: `P${digits}`,
     name: 'Profile Test User',
     password,
   };
@@ -197,7 +195,6 @@ async function bootstrapUser(
 ): Promise<{ accessToken: string; refreshToken: string }> {
   const register = await requestJson(config, 'POST', '/api/auth/register', {
     name: identity.name,
-    ssn: identity.ssn,
     email: identity.email,
     phone: identity.phone,
     password: identity.password,

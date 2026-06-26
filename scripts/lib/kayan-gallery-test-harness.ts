@@ -41,7 +41,6 @@ type AuthIdentity = {
   name: string;
   email: string;
   phone: string;
-  ssn: string;
   password: string;
 };
 
@@ -124,7 +123,6 @@ function makeIdentity(): AuthIdentity {
     name: 'Kayan Gallery Sim User',
     email: `kayan.gallery.sim.${suffix}@example.com`,
     phone: `+2015${suffix.slice(-8)}`,
-    ssn,
     password: 'KayanGalleryPass123',
   };
 }

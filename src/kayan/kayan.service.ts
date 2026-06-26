@@ -18,7 +18,11 @@ import {
   CreateServiceOrderDto,
   FaultStatus,
   FaultSortBy,
+  GetItemReviewsQueryDto,
   ItemType,
+  ListAdminFaultsQueryDto,
+  ListFollowupStepsQueryDto,
+  ListGalleryQueryDto,
   ListMyFaultsQueryDto,
   ListOrdersQueryDto,
   ListProductsQueryDto,
@@ -113,11 +117,28 @@ export class KayanService {
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
     const orderColumn = sortBy === ProductSortBy.PRICE ? 'price' : 'created_at';
 
+    // Rate filter is applied via HAVING on the aggregated rating
+    const havingClauses: string[] = [];
+    if (query.minRate !== undefined) {
+      params.push(query.minRate);
+      havingClauses.push(`COALESCE(ROUND(AVG(pr.rating_value)::numeric, 2), 0) >= $${params.length}`);
+    }
+    if (query.maxRate !== undefined) {
+      params.push(query.maxRate);
+      havingClauses.push(`COALESCE(ROUND(AVG(pr.rating_value)::numeric, 2), 0) <= $${params.length}`);
+    }
+    const havingClause = havingClauses.length ? `HAVING ${havingClauses.join(' AND ')}` : '';
+
     const q = await this.db.query(
-      `SELECT id, title, description, amount, price, details, is_active, created_at::text AS created_at, updated_at::text AS updated_at
-       FROM catalog_products
+      `SELECT cp.id, cp.title, cp.description, cp.amount, cp.price, cp.details, cp.is_active,
+              cp.created_at::text AS created_at, cp.updated_at::text AS updated_at,
+              COALESCE(ROUND(AVG(pr.rating_value)::numeric, 2), 0)::text AS rate
+       FROM catalog_products cp
+       LEFT JOIN product_ratings pr ON pr.product_id = cp.id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY ${orderColumn} ${sortDirection}, id DESC`,
+       GROUP BY cp.id
+       ${havingClause}
+       ORDER BY ${orderColumn} ${sortDirection}, cp.id DESC`,
       params,
     );
 
@@ -336,15 +357,52 @@ export class KayanService {
     return this.getOrderForUser(user.sub, orderId, true);
   }
 
-  async adminListOrders(): Promise<Record<string, unknown>> {
+  async adminListOrders(query: ListOrdersQueryDto = {}): Promise<Record<string, unknown>> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (query.status) {
+      params.push(query.status);
+      conditions.push(`po.status = $${params.length}`);
+    }
+    if (query.fromDate) {
+      params.push(query.fromDate);
+      conditions.push(`po.created_at >= $${params.length}`);
+    }
+    if (query.toDate) {
+      params.push(query.toDate);
+      conditions.push(`po.created_at <= $${params.length}`);
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
+
+    const limit = Math.min(query.limit ?? 20, 100);
+    const page = Math.max((query.page ?? 1) - 1, 0);
+    const offset = page * limit;
+
+    params.push(limit);
+    const limitParam = params.length;
+    params.push(offset);
+    const offsetParam = params.length;
+
+    const totalQ = await this.db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM product_orders po ${whereClause}`,
+      params.slice(0, params.length - 2),
+    );
+    const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
+
     const q = await this.db.query(
       `SELECT po.id, po.user_id, po.delivery_address, po.status, po.created_at::text AS created_at, po.updated_at::text AS updated_at,
               u.name AS user_name, u.email AS user_email, u.phone AS user_phone
        FROM product_orders po
        LEFT JOIN users u ON u.id = po.user_id
-       ORDER BY po.created_at DESC, po.id DESC`,
+       ${whereClause}
+       ORDER BY po.created_at ${sortDirection}, po.id DESC
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      params,
     );
-    return { items: await this.attachOrderItems(this.db, q.rows as Array<Record<string, unknown>>, true) };
+    return { items: await this.attachOrderItems(this.db, q.rows as Array<Record<string, unknown>>, true), total };
   }
 
   async adminUpdateOrderStatus(admin: AuthUser, orderId: number, dto: AdminUpdateOrderStatusDto): Promise<Record<string, unknown>> {
@@ -413,7 +471,11 @@ export class KayanService {
 
     const q = await this.db.query(
       `SELECT fr.id, fr.user_id, fr.title, fr.description, fr.severity, fr.address, fr.status, fr.cancelled_at::text AS cancelled_at,
-              fr.created_at::text AS created_at, fr.updated_at::text AS updated_at
+              fr.created_at::text AS created_at, fr.updated_at::text AS updated_at,
+              EXISTS(
+                SELECT 1 FROM item_ratings ir
+                WHERE ir.item_type = 'fault' AND ir.item_id = fr.id AND ir.user_id = $1
+              )::boolean AS has_rated
        FROM fault_reports fr
        WHERE ${conditions.join(' AND ')}
        ${orderClause}`,
@@ -443,9 +505,13 @@ export class KayanService {
   ): Promise<Record<string, unknown>> {
     const q = await executor.query(
       `SELECT id, user_id, title, description, severity, address, status, cancelled_at::text AS cancelled_at,
-              created_at::text AS created_at, updated_at::text AS updated_at
+              created_at::text AS created_at, updated_at::text AS updated_at,
+              EXISTS(
+                SELECT 1 FROM item_ratings ir
+                WHERE ir.item_type = 'fault' AND ir.item_id = $1 AND ir.user_id = $2
+              )::boolean AS has_rated
        FROM fault_reports WHERE id = $1 LIMIT 1`,
-      [faultId],
+      [faultId, userId],
     );
     if (!q.rowCount) throw new NotFoundException('Fault not found');
     const fault = q.rows[0] as { user_id: number } & Record<string, unknown>;
@@ -454,14 +520,56 @@ export class KayanService {
     return { fault: withAssets };
   }
 
-  async adminListFaults(): Promise<Record<string, unknown>> {
+  async adminListFaults(query: ListAdminFaultsQueryDto = {}): Promise<Record<string, unknown>> {
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+
+    if (query.status) {
+      params.push(query.status);
+      conditions.push(`fr.status = $${params.length}`);
+    }
+    if (query.severity) {
+      params.push(query.severity);
+      conditions.push(`fr.severity = $${params.length}`);
+    }
+    if (query.fromDate) {
+      params.push(query.fromDate);
+      conditions.push(`fr.created_at >= $${params.length}`);
+    }
+    if (query.toDate) {
+      params.push(query.toDate);
+      conditions.push(`fr.created_at <= $${params.length}`);
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
+    const orderClause = this.buildFaultOrderClause(query.sortBy ?? FaultSortBy.CREATED_AT, sortDirection);
+
+    const limit = Math.min(query.limit ?? 20, 100);
+    const page = Math.max((query.page ?? 1) - 1, 0);
+    const offset = page * limit;
+
+    params.push(limit);
+    const limitParam = params.length;
+    params.push(offset);
+    const offsetParam = params.length;
+
+    const totalQ = await this.db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM fault_reports fr ${whereClause}`,
+      params.slice(0, params.length - 2),
+    );
+    const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
+
     const q = await this.db.query(
       `SELECT fr.id, fr.user_id, fr.title, fr.description, fr.severity, fr.address, fr.status, fr.cancelled_at::text AS cancelled_at,
               fr.created_at::text AS created_at, fr.updated_at::text AS updated_at,
               u.name AS user_name, u.email AS user_email, u.phone AS user_phone
        FROM fault_reports fr
        LEFT JOIN users u ON u.id = fr.user_id
-       ORDER BY fr.created_at DESC, fr.id DESC`,
+       ${whereClause}
+       ${orderClause}
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      params,
     );
     const items = await this.attachFaultAssets(this.db, q.rows as Array<Record<string, unknown>>);
     return {
@@ -474,6 +582,7 @@ export class KayanService {
           phone: item.user_phone ?? null,
         },
       })),
+      total,
     };
   }
 
@@ -504,7 +613,10 @@ export class KayanService {
     );
     if (!q.rowCount) throw new NotFoundException('Service order not found');
     if (q.rows[0].status !== ServiceStatus.NOT_STARTED) throw new BadRequestException('Service order can only be updated before processing starts');
-    await this.db.query(`UPDATE service_orders SET description = COALESCE($1, description), updated_at = NOW() WHERE id = $2`, [dto.description ?? null, serviceId]);
+    await this.db.query(
+      `UPDATE service_orders SET description = COALESCE($1, description), address = COALESCE($2, address), updated_at = NOW() WHERE id = $3`,
+      [dto.description ?? null, dto.address ?? null, serviceId],
+    );
     return this.getServiceForUser(user.sub, serviceId, true);
   }
 
@@ -529,14 +641,30 @@ export class KayanService {
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
     const orderColumn = sortBy === ServiceSortBy.CREATED_AT ? 'so.created_at' : 'so.created_at';
 
+    const limit = Math.min(query.limit ?? 20, 100);
+    const page = Math.max((query.page ?? 1) - 1, 0);
+    const offset = page * limit;
+
+    params.push(limit);
+    const limitParam = params.length;
+    params.push(offset);
+    const offsetParam = params.length;
+
+    const totalQ = await this.db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM service_orders so WHERE ${conditions.join(' AND ')}`,
+      params.slice(0, params.length - 2),
+    );
+    const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
+
     const q = await this.db.query(
       `SELECT so.*
        FROM service_orders so
        WHERE ${conditions.join(' AND ')}
-       ORDER BY ${orderColumn} ${sortDirection}, so.id DESC`,
+       ORDER BY ${orderColumn} ${sortDirection}, so.id DESC
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
       params,
     );
-    return { items: q.rows };
+    return { items: q.rows, total };
   }
 
   async cancelService(user: AuthUser, serviceId: number): Promise<Record<string, unknown>> {
@@ -554,6 +682,57 @@ export class KayanService {
     const service = q.rows[0] as { user_id: number } & Record<string, unknown>;
     if (!allowAdmin && Number(service.user_id) !== userId) throw new ForbiddenException('Not allowed');
     return { service };
+  }
+
+  async publicListServices(query: ListServicesQueryDto = {}): Promise<Record<string, unknown>> {
+    const conditions = ['1=1'];
+    const params: unknown[] = [];
+
+    if (query.serviceType) {
+      params.push(query.serviceType);
+      conditions.push(`so.service_type = $${params.length}`);
+    }
+    if (query.fromDate) {
+      params.push(query.fromDate);
+      conditions.push(`so.created_at >= $${params.length}`);
+    }
+    if (query.toDate) {
+      params.push(query.toDate);
+      conditions.push(`so.created_at <= $${params.length}`);
+    }
+
+    const sortBy = query.sortBy ?? ServiceSortBy.CREATED_AT;
+    const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
+    const orderColumn = sortBy === ServiceSortBy.CREATED_AT ? 'so.created_at' : 'so.created_at';
+
+    const limit = Math.min(query.limit ?? 20, 100);
+    const page = Math.max((query.page ?? 1) - 1, 0);
+    const offset = page * limit;
+
+    params.push(limit);
+    const limitParam = params.length;
+    params.push(offset);
+    const offsetParam = params.length;
+
+    const totalQ = await this.db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM service_orders so WHERE ${conditions.join(' AND ')}`,
+      params.slice(0, params.length - 2),
+    );
+    const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
+
+    const q = await this.db.query(
+      `SELECT so.*
+       FROM service_orders so
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY ${orderColumn} ${sortDirection}, so.id DESC
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      params,
+    );
+
+    return {
+      items: q.rows,
+      total,
+    };
   }
 
   async adminListServices(query: ListServicesQueryDto = {}): Promise<Record<string, unknown>> {
@@ -577,13 +756,29 @@ export class KayanService {
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
     const orderColumn = sortBy === ServiceSortBy.CREATED_AT ? 'so.created_at' : 'so.created_at';
 
+    const limit = Math.min(query.limit ?? 20, 100);
+    const page = Math.max((query.page ?? 1) - 1, 0);
+    const offset = page * limit;
+
+    params.push(limit);
+    const limitParam = params.length;
+    params.push(offset);
+    const offsetParam = params.length;
+
+    const totalQ = await this.db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM service_orders so WHERE ${conditions.join(' AND ')}`,
+      params.slice(0, params.length - 2),
+    );
+    const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
+
     const q = await this.db.query(
       `SELECT so.*,
               u.name AS user_name, u.email AS user_email, u.phone AS user_phone
        FROM service_orders so
        LEFT JOIN users u ON u.id = so.user_id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY ${orderColumn} ${sortDirection}, so.id DESC`,
+       ORDER BY ${orderColumn} ${sortDirection}, so.id DESC
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
       params,
     );
     return {
@@ -596,6 +791,7 @@ export class KayanService {
           phone: item.user_phone ?? null,
         },
       })),
+      total,
     };
   }
 
@@ -606,14 +802,23 @@ export class KayanService {
     return this.getServiceForUser(0, serviceId, true);
   }
 
-  async listFollowupSteps(user: AuthUser, itemType: ItemType, itemId: number): Promise<Record<string, unknown>> {
+  async listFollowupSteps(user: AuthUser, itemType: ItemType, itemId: number, query: ListFollowupStepsQueryDto = {}): Promise<Record<string, unknown>> {
     await this.assertUserOwnsItem(user, itemType, itemId);
-    const q = await this.db.query(
-      `SELECT id, item_type, item_id, title, step_image_file_id, sort_order, created_at::text AS created_at
-       FROM followup_steps WHERE item_type = $1 AND item_id = $2 ORDER BY sort_order ASC, id ASC`,
+    const limit = Math.min(query.limit ?? 50, 100);
+    const page = Math.max((query.page ?? 1) - 1, 0);
+    const offset = page * limit;
+    const totalQ = await this.db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM followup_steps WHERE item_type = $1 AND item_id = $2`,
       [itemType, itemId],
     );
-    return { items: q.rows };
+    const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
+    const q = await this.db.query(
+      `SELECT id, item_type, item_id, title, step_image_file_id, sort_order, created_at::text AS created_at
+       FROM followup_steps WHERE item_type = $1 AND item_id = $2 ORDER BY sort_order ASC, id ASC
+       LIMIT $3 OFFSET $4`,
+      [itemType, itemId, limit, offset],
+    );
+    return { items: q.rows, total };
   }
 
   async adminCreateFollowupStep(admin: AuthUser, dto: CreateFollowupStepDto): Promise<Record<string, unknown>> {
@@ -642,12 +847,12 @@ export class KayanService {
     return { message: 'Step deleted' };
   }
 
-  async listGallery(): Promise<Record<string, unknown>> {
-    return this.listGalleryItems(true);
+  async listGallery(query: ListGalleryQueryDto = {}): Promise<Record<string, unknown>> {
+    return this.listGalleryItems(true, query);
   }
 
-  async adminListGallery(): Promise<Record<string, unknown>> {
-    return this.listGalleryItems(false);
+  async adminListGallery(query: ListGalleryQueryDto = {}): Promise<Record<string, unknown>> {
+    return this.listGalleryItems(false, query);
   }
 
   async adminCreateGalleryItem(admin: AuthUser, dto: CreateGalleryItemDto): Promise<Record<string, unknown>> {
@@ -708,19 +913,19 @@ export class KayanService {
       if (dto.itemType === ItemType.ORDER) {
         await this.assertRateableProduct(user.sub, dto.orderId!, dto.productId!);
         const q = await this.db.query(
-          `INSERT INTO product_ratings(user_id, order_id, product_id, rating_value)
-           VALUES($1,$2,$3,$4)
-           RETURNING id, user_id, order_id, product_id, rating_value, created_at::text AS created_at`,
-          [user.sub, dto.orderId, dto.productId, dto.ratingValue],
+          `INSERT INTO product_ratings(user_id, order_id, product_id, rating_value, comment)
+           VALUES($1,$2,$3,$4,$5)
+           RETURNING id, user_id, order_id, product_id, rating_value, comment, created_at::text AS created_at`,
+          [user.sub, dto.orderId, dto.productId, dto.ratingValue, dto.comment ?? null],
         );
         return { rating: q.rows[0] };
       }
 
       await this.assertRateableItem(user.sub, dto.itemType, dto.itemId!);
       const q = await this.db.query(
-        `INSERT INTO item_ratings(user_id, item_type, item_id, rating_value)
-         VALUES($1,$2,$3,$4) RETURNING *`,
-        [user.sub, dto.itemType, dto.itemId, dto.ratingValue],
+        `INSERT INTO item_ratings(user_id, item_type, item_id, rating_value, comment)
+         VALUES($1,$2,$3,$4,$5) RETURNING id, user_id, item_type, item_id, rating_value, comment, created_at::text AS created_at`,
+        [user.sub, dto.itemType, dto.itemId, dto.ratingValue, dto.comment ?? null],
       );
       return { rating: q.rows[0] };
     } catch (error) {
@@ -729,6 +934,29 @@ export class KayanService {
       }
       throw error;
     }
+  }
+
+  async getItemReviews(itemId: number, query: GetItemReviewsQueryDto): Promise<Record<string, unknown>> {
+    const limit = Math.min(query.limit ?? 20, 100);
+    const page = Math.max((query.page ?? 1) - 1, 0);
+    const offset = page * limit;
+
+    const totalQ = await this.db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM item_ratings WHERE item_type = $1 AND item_id = $2`,
+      [query.itemType, itemId],
+    );
+    const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
+
+    const q = await this.db.query(
+      `SELECT id, user_id, item_type, item_id, rating_value, comment, created_at::text AS created_at
+       FROM item_ratings
+       WHERE item_type = $1 AND item_id = $2
+       ORDER BY created_at DESC, id DESC
+       LIMIT $3 OFFSET $4`,
+      [query.itemType, itemId, limit, offset],
+    );
+
+    return { items: q.rows, total };
   }
 
   async createFollowupConversation(user: AuthUser, dto: CreateFollowupConversationDto): Promise<Record<string, unknown>> {
@@ -877,8 +1105,14 @@ export class KayanService {
 
   private async getProductWithAssets(executor: SqlExecutor, productId: number): Promise<Record<string, unknown>> {
     const q = await executor.query(
-      `SELECT id, title, description, amount, price, details, is_active, created_at::text AS created_at, updated_at::text AS updated_at
-       FROM catalog_products WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      `SELECT cp.id, cp.title, cp.description, cp.amount, cp.price, cp.details, cp.is_active,
+              cp.created_at::text AS created_at, cp.updated_at::text AS updated_at,
+              COALESCE(ROUND(AVG(pr.rating_value)::numeric, 2), 0)::text AS rate
+       FROM catalog_products cp
+       LEFT JOIN product_ratings pr ON pr.product_id = cp.id
+       WHERE cp.id = $1 AND cp.deleted_at IS NULL
+       GROUP BY cp.id
+       LIMIT 1`,
       [productId],
     );
     if (!q.rowCount) throw new NotFoundException('Product not found');
@@ -925,18 +1159,44 @@ export class KayanService {
     });
   }
 
-  private async listGalleryItems(activeOnly: boolean): Promise<Record<string, unknown>> {
+  private async listGalleryItems(activeOnly: boolean, query: ListGalleryQueryDto = {}): Promise<Record<string, unknown>> {
     const conditions = ['deleted_at IS NULL'];
+    const params: unknown[] = [];
+
     if (activeOnly) conditions.push('is_active = true');
+
+    if (query.query) {
+      params.push(`%${this.escapeLike(query.query)}%`);
+      conditions.push(`(title ILIKE $${params.length} ESCAPE '\\' OR description ILIKE $${params.length} ESCAPE '\\')`);
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const limit = Math.min(query.limit ?? 20, 100);
+    const page = Math.max((query.page ?? 1) - 1, 0);
+    const offset = page * limit;
+
+    params.push(limit);
+    const limitParam = params.length;
+    params.push(offset);
+    const offsetParam = params.length;
+
+    const totalQ = await this.db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM gallery_items ${whereClause}`,
+      params.slice(0, params.length - 2),
+    );
+    const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
 
     const q = await this.db.query(
       `SELECT id, title, description, is_active, created_at::text AS created_at
        FROM gallery_items
-       WHERE ${conditions.join(' AND ')}
-       ORDER BY created_at DESC, id DESC`,
+       ${whereClause}
+       ORDER BY created_at DESC, id DESC
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      params,
     );
 
-    return { items: await this.attachGalleryAssets(this.db, q.rows as Array<Record<string, unknown>>) };
+    return { items: await this.attachGalleryAssets(this.db, q.rows as Array<Record<string, unknown>>), total };
   }
 
   private async attachGalleryAssets(executor: SqlExecutor, galleryItems: Array<Record<string, unknown>>): Promise<Array<Record<string, unknown>>> {

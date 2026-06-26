@@ -24,4 +24,10 @@ export class UpdateProfileDto {
   @IsString()
   @Length(7, 32)
   phone?: string;
+
+  @ApiPropertyOptional({ description: 'Address (optional)', example: '123 Main St, Cairo', maxLength: 500, nullable: true })
+  @IsOptional()
+  @IsString()
+  @Length(1, 500)
+  address?: string | null;
 }

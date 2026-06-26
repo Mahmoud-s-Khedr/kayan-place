@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import { PoolClient } from 'pg';
 
 export const ADMIN_PHONE_REGEX = /^\+?[1-9]\d{7,15}$/;
@@ -38,11 +37,6 @@ export function parseAdminSeedInput(env: NodeJS.ProcessEnv): AdminSeedInput {
   return { email, phone: phone || null, password };
 }
 
-function buildBootstrapSsn(identity: string): string {
-  const digest = createHash('sha256').update(identity).digest('hex').slice(0, 20);
-  return `ADM${digest}`;
-}
-
 export async function seedAdminUser(
   client: Pick<PoolClient, 'query'>,
   input: Pick<AdminSeedInput, 'email' | 'phone'>,
@@ -77,10 +71,10 @@ export async function seedAdminUser(
   if (!existing.rowCount) {
     created = true;
     const inserted = await client.query<{ id: number }>(
-      `INSERT INTO users (name, ssn, phone, email, password_hash, status, is_admin)
-       VALUES ($1, $2, $3, LOWER($4), $5, 'active', true)
+      `INSERT INTO users (name, phone, email, password_hash, status, is_admin)
+       VALUES ($1, $2, LOWER($3), $4, 'active', true)
        RETURNING id`,
-      ['Primary Admin', buildBootstrapSsn(email), phone, email, passwordHash],
+      ['Primary Admin', phone, email, passwordHash],
     );
     if (!inserted.rowCount) {
       throw new Error('Failed to create admin user');

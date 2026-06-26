@@ -45,7 +45,6 @@ type AuthIdentity = {
   name: string;
   email: string;
   phone: string;
-  ssn: string;
   password: string;
 };
 
@@ -150,7 +149,6 @@ function makeIdentity(label: 'A' | 'B'): AuthIdentity {
     name: `Kayan Faults Sim User ${label}`,
     email: `kayan.faults.sim.${label.toLowerCase()}.${suffix}@example.com`,
     phone: `+2015${suffix.slice(-8)}`,
-    ssn,
     password: label === 'A' ? 'KayanFaultsPass123' : 'KayanFaultsPass456',
   };
 }
@@ -639,6 +637,10 @@ export async function runKayanFaultsHappyPath(
       itemId: state.faultId,
       ratingValue: 5,
     }, { Authorization: `Bearer ${userAToken}` }),
+  );
+
+  await runAndRecord(config, steps, 'public get fault reviews', 200, () =>
+    requestJson(config, 'GET', `/api/ratings/items/${state.faultId}?itemType=fault`),
   );
 
   assertHappyState(state);

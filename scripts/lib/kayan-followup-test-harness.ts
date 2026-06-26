@@ -126,13 +126,11 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 
 function makeIdentity(label: 'A' | 'B'): AuthIdentity {
   const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const ssn = `F${suffix.slice(-8)}`;
   return {
     name: `Followup Sim User ${label}`,
     email: `followup.sim.${label.toLowerCase()}.${suffix}@example.com`,
     phone: `+2015${suffix.slice(-8)}`,
-    ssn,
-    password: label === 'A' ? 'FollowupPass123' : 'FollowupPass456',
+    password: label === 'A' ? 'FollowupSimPass123' : 'FollowupSimPass456',
   };
 }
 

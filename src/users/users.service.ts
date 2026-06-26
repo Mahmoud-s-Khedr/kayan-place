@@ -26,12 +26,12 @@ export class UsersService {
   async getMe(user: AuthUser): Promise<Record<string, unknown>> {
     const query = await this.databaseService.query<{
       id: number;
-      ssn: string | null;
       name: string;
       phone: string;
       email: string;
       status: string;
       rate: string;
+      address: string | null;
       avatar_file_id: number | null;
       avatar_object_key: string | null;
       avatar_mime_type: string | null;
@@ -42,11 +42,11 @@ export class UsersService {
       contact_info: string | null;
     }>(
       `SELECT u.id,
-              u.ssn,
               u.name,
               u.phone,
               u.email,
               u.status,
+              u.address,
               u.avatar_file_id,
               f.object_key AS avatar_object_key,
               f.mime_type AS avatar_mime_type,
@@ -86,7 +86,6 @@ export class UsersService {
   ): Promise<Record<string, unknown>> {
     const user = await this.databaseService.query<{
       id: number;
-      ssn: string | null;
       name: string;
       phone: string;
       status: string;
@@ -103,7 +102,6 @@ export class UsersService {
       contact_info: string | null;
     }>(
       `SELECT u.id,
-              u.ssn,
               u.name,
               u.phone,
               u.status,
@@ -177,7 +175,8 @@ export class UsersService {
     const hasAvatarFileId = dto.avatarFileId !== undefined;
     const hasContactInfo = dto.contactInfo !== undefined;
     const hasPhone = dto.phone !== undefined;
-    if (!hasName && !hasAvatarFileId && !hasContactInfo && !hasPhone) {
+    const hasAddress = dto.address !== undefined;
+    if (!hasName && !hasAvatarFileId && !hasContactInfo && !hasPhone && !hasAddress) {
       throw new BadRequestException('Nothing to update');
     }
 
@@ -216,6 +215,7 @@ export class UsersService {
 
     const avatarFileIdParam = hasAvatarFileId ? dto.avatarFileId ?? null : null;
     const contactInfoParam = hasContactInfo ? dto.contactInfo ?? null : null;
+    const addressParam = hasAddress ? dto.address ?? null : null;
     try {
       await this.databaseService.query(
         `UPDATE users
@@ -223,9 +223,10 @@ export class UsersService {
              avatar_file_id = CASE WHEN $2::boolean THEN $3::bigint ELSE avatar_file_id END,
              contact_info = CASE WHEN $5::boolean THEN $6::text ELSE contact_info END,
              phone = CASE WHEN $7::boolean THEN $8::varchar(32) ELSE phone END,
+             address = CASE WHEN $9::boolean THEN $10::text ELSE address END,
              updated_at = NOW()
          WHERE id = $4 AND deleted_at IS NULL`,
-        [dto.name ?? null, hasAvatarFileId, avatarFileIdParam, user.sub, hasContactInfo, contactInfoParam, hasPhone, dto.phone ?? null],
+        [dto.name ?? null, hasAvatarFileId, avatarFileIdParam, user.sub, hasContactInfo, contactInfoParam, hasPhone, dto.phone ?? null, hasAddress, addressParam],
       );
     } catch (error: unknown) {
       if (typeof error === 'object' && error !== null && 'code' in error && (error as { code?: string }).code === '23505') {
@@ -260,6 +261,17 @@ export class UsersService {
 
     return { message: 'Password changed successfully',
     };
+  }
+
+  async deleteAvatar(user: AuthUser): Promise<Record<string, unknown>> {
+    const q = await this.databaseService.query(
+      `UPDATE users SET avatar_file_id = NULL, updated_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING id`,
+      [user.sub],
+    );
+    if (!q.rowCount) {
+      throw new NotFoundException('User not found');
+    }
+    return this.getMe(user);
   }
 
   async deleteMe(user: AuthUser): Promise<Record<string, unknown>> {

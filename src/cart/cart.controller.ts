@@ -27,6 +27,7 @@ export class CartController {
   }
 
   @Patch('items/:id')
+  @ApiResponse({ status: 200, type: KayanCartResponseDto })
   updateCartItem(@CurrentUser() user: AuthUser, @Param() params: CartItemIdParamDto, @Body() dto: UpdateCartItemDto): Promise<Record<string, unknown>> {
     return this.kayanService.updateCartItem(user, params.id, dto);
   }

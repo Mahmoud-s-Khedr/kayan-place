@@ -25,7 +25,6 @@ describe('UsersService', () => {
         rowCount: 1,
         rows: [{
           id: 1,
-          ssn: 'SSN-1',
           name: 'Alice',
           phone: '+201000000001',
           email: 'alice@example.com',
@@ -61,7 +60,6 @@ describe('UsersService', () => {
       databaseService.query.mockResolvedValue({
         rowCount: 1,
         rows: [{
-          id: 1, ssn: 'SSN-2', name: 'Bob', phone: '+201000000002', email: 'bob@example.com', status: 'active', rate: '0.00',
           avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
           avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: null,
         }],
@@ -123,7 +121,6 @@ describe('UsersService', () => {
         .mockResolvedValueOnce({
           rowCount: 1,
           rows: [{
-            id: 1, ssn: 'SSN-1', name: 'Alice', phone: '+201000000001', email: 'alice@example.com', status: 'active', rate: '4.50',
             avatar_file_id: 99, avatar_object_key: 'users/1/avatar.jpg', avatar_mime_type: 'image/jpeg',
             avatar_purpose: 'avatar', avatar_status: 'uploaded',
             avatar_created_at: '2026-01-01T00:00:00.000Z', avatar_uploaded_at: '2026-01-01T00:00:00.000Z',
@@ -155,7 +152,6 @@ describe('UsersService', () => {
         .mockResolvedValueOnce({
           rowCount: 1,
           rows: [{
-            id: 1, ssn: 'SSN-1', name: 'Alice', phone: '+201000000001', email: 'alice@example.com', status: 'active', rate: '4.50',
             avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
             avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: null,
           }],
@@ -172,7 +168,6 @@ describe('UsersService', () => {
         .mockResolvedValueOnce({
           rowCount: 1,
           rows: [{
-            id: 1, ssn: 'SSN-1', name: 'Alice', phone: '+201000000001', email: 'alice@example.com', status: 'active', rate: '4.50',
             avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
             avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: '+201111111111',
           }],
@@ -194,9 +189,9 @@ describe('UsersService', () => {
         .mockResolvedValueOnce({
           rowCount: 1,
           rows: [{
-            id: 1, ssn: 'SSN-1', name: 'Alice', phone: '+201222222222', email: 'alice@example.com', status: 'active', rate: '4.50',
             avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
             avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: null,
+            id: 1, email: 'alice@example.com', name: 'Alice', phone: '+201222222222', status: 'active'
           }],
         });
 
@@ -225,9 +220,9 @@ describe('UsersService', () => {
         .mockResolvedValueOnce({
           rowCount: 1,
           rows: [{
-            id: 1, ssn: 'SSN-1', name: 'Alice Updated', phone: '+201444444444', email: 'alice@example.com', status: 'active', rate: '4.75',
             avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
             avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: '+201555555555',
+            id: 1, email: 'alice@example.com', name: 'Alice Updated', phone: '+201444444444', status: 'active'
           }],
         });
 

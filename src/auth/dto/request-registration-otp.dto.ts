@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, Length, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, Length, Matches } from 'class-validator';
 
 export class RequestRegistrationOtpDto {
   @ApiProperty({ description: 'Full name (2–150 chars)', example: 'Ahmed Ali', minLength: 2, maxLength: 150 })
@@ -7,12 +7,6 @@ export class RequestRegistrationOtpDto {
   @IsNotEmpty()
   @Length(2, 150)
   name!: string;
-
-  @ApiProperty({ description: 'National ID / SSN (8–32 chars)', example: '12345678', minLength: 8, maxLength: 32 })
-  @IsString()
-  @IsNotEmpty()
-  @Length(8, 32)
-  ssn!: string;
 
   @ApiProperty({ description: 'Email address', example: 'user@example.com' })
   @IsEmail()
@@ -31,4 +25,10 @@ export class RequestRegistrationOtpDto {
     message: 'Password must contain letters and numbers',
   })
   password!: string;
+
+  @ApiPropertyOptional({ description: 'Address (optional)', example: '123 Main St, Cairo', maxLength: 500 })
+  @IsOptional()
+  @IsString()
+  @Length(1, 500)
+  address?: string;
 }

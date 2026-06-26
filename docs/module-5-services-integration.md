@@ -1,30 +1,67 @@
 # Module 5 Integration Guide: Services
 
-## 1. Purpose and Audience
+## Purpose
 
-This guide is for frontend web and mobile teams integrating Module 5 (Services) with the backend.
+This guide covers:
 
-It covers:
-- service order creation and update
-- user service listing with filtering/sorting
-- admin service listing and status management
-- service cancellation and service rating rules
+- service order creation
+- user update/cancel flows
+- user and admin service listing
+- admin status changes
+- service rating after completion
 
-## 2. Prerequisites
+Shared contract:
 
-- Backend base URL is reachable (example: `http://localhost:800` in local Docker setup).
-- User and admin authentication flows are already integrated (Module 1).
-- Authenticated requests include a valid bearer token where required.
-- Profile/session flows are working (Module 2).
+- [frontend-integration-shared-contract.md](./frontend-integration-shared-contract.md)
 
-## 3. End-to-End Flows
+## Flow-by-Flow Implementation
 
-### 3.1 Create Service Order (User)
+### Create Service Order
 
-1. User creates service order using `POST /api/services`.
-2. Backend creates service with initial status `not_started`.
+1. User submits `serviceType`, `description`, and `address` to `POST /api/services`.
+2. Backend creates the service with initial status `not_started`.
 
-Typical create payload:
+### Update Service Order
+
+1. User sends `PATCH /api/services/:id`.
+2. `description` and `address` are editable by the user.
+3. Update is allowed only while status is `not_started`.
+
+### List My Services
+
+Use `GET /api/services/me` with optional:
+
+- `serviceType`
+- `fromDate`
+- `toDate`
+- `sortBy=createdAt`
+- `sortDirection=asc|desc`
+
+### Admin List and Status Update
+
+Admin routes:
+
+- `GET /api/admin/services`
+- `PATCH /api/admin/services/:id/status`
+
+### Cancel Service
+
+- user route: `POST /api/services/:id/cancel`
+- allowed only while status is `not_started`
+
+### Rate Finished Service
+
+After status becomes `finished`, the owner can call:
+
+- `POST /api/ratings`
+
+## Endpoint Contract
+
+### `POST /api/services`
+
+Auth: bearer token required
+
+Request:
 
 ```json
 {
@@ -34,60 +71,104 @@ Typical create payload:
 }
 ```
 
-### 3.2 Update Service Order (User)
+Validation:
 
-1. User updates own service using `PATCH /api/services/:id`.
-2. Only description is updatable by user.
-3. Update is allowed only while service status is `not_started`.
+- `serviceType`: `designing`, `maintenance`, `renewal`
+- `description`: required non-empty string
+- `address`: required non-empty string
 
-Typical update payload:
+Success:
+
+- `201`
+- `data.service`
+
+Important returned fields:
+
+- `id`
+- `user_id`
+- `service_type`
+- `description`
+- `address`
+- `status`
+- `cancelled_at`
+- `created_at`
+- `updated_at`
+
+### `PATCH /api/services/:id`
+
+Allowed only while status is `not_started`.
+
+Request:
 
 ```json
 {
-  "description": "Updated: AC noise issue plus weak cooling in living room."
+  "description": "Updated: AC noise issue plus weak cooling in living room.",
+  "address": "Cairo, New Cairo"
 }
 ```
 
-### 3.3 My Service Orders (User)
+Validation:
 
-Endpoint:
-- `GET /api/services/me`
+- `description`: optional non-empty string
+- `address`: optional non-empty string
 
-Query options:
-- `serviceType` (`designing`, `maintenance`, `renewal`)
-- `fromDate`, `toDate`
-- `sortBy` (`createdAt`)
-- `sortDirection` (`asc`, `desc`)
+Success:
 
-Examples:
-- `GET /api/services/me?serviceType=maintenance&sortBy=createdAt&sortDirection=desc`
-- `GET /api/services/me?fromDate=2026-01-01&toDate=2026-12-31&sortBy=createdAt&sortDirection=asc`
+- `200`
+- updated `data.service`
 
-### 3.4 List All Service Orders (Admin)
+### `GET /api/services/me`
 
-Endpoint:
-- `GET /api/admin/services`
+Supported query params:
 
-Query options:
-- `serviceType` (`designing`, `maintenance`, `renewal`)
-- `fromDate`, `toDate`
-- `sortBy` (`createdAt`)
-- `sortDirection` (`asc`, `desc`)
+- `serviceType`
+- `fromDate`
+- `toDate`
+- `sortBy`: `createdAt`
+- `sortDirection`: `asc`, `desc`
 
-Admin response list includes related user context per service order.
+Defaults:
 
-### 3.5 Update Service Order Status (Admin)
+- `sortBy` defaults to `createdAt`
+- `sortDirection` defaults to `desc`
 
-Endpoint:
-- `PATCH /api/admin/services/:id/status`
+Success:
 
-Supported statuses:
-- `not_started`
-- `in_progress`
-- `cancelled`
-- `finished`
+- `200`
+- `data.items[]`
 
-Typical admin status payload:
+### `POST /api/services/:id/cancel`
+
+Allowed only while status is `not_started`.
+
+Success:
+
+- `200`
+- updated `data.service`
+
+### `GET /api/admin/services`
+
+Auth: admin bearer token required
+
+Supported query params:
+
+- `serviceType`
+- `fromDate`
+- `toDate`
+- `sortBy`: `createdAt`
+- `sortDirection`: `asc`, `desc`
+
+Success:
+
+- `200`
+- `data.items[]`
+- each item includes nested `user`
+
+### `PATCH /api/admin/services/:id/status`
+
+Auth: admin bearer token required
+
+Request:
 
 ```json
 {
@@ -95,25 +176,24 @@ Typical admin status payload:
 }
 ```
 
-### 3.6 Cancel Service
+Allowed enum values:
 
-User endpoint:
-- `POST /api/services/:id/cancel`
+- `not_started`
+- `in_progress`
+- `cancelled`
+- `finished`
 
-Rule:
-- Cancellation by user is allowed only while status is `not_started`.
+Important backend note:
 
-Admin cancellation:
-- Admin can set service status to `cancelled` using `PATCH /api/admin/services/:id/status`.
+- The backend validates the enum only.
+- It does not enforce a strict transition matrix for admin service status updates.
+- Frontend/admin UX should still follow the safe progression:
+  - `not_started -> in_progress -> finished`
+  - or cancel before completion when business rules allow it
 
-### 3.7 Service Rating
+### `POST /api/ratings`
 
-Users can rate a service one time only after status is `finished`.
-
-Endpoint:
-- `POST /api/ratings`
-
-Service rating payload:
+Service rating request:
 
 ```json
 {
@@ -123,60 +203,27 @@ Service rating payload:
 }
 ```
 
-Duplicate rating on the same service by the same user is rejected.
+Rules:
 
-## 4. Endpoint Map (High Level)
+- user must own the service
+- service status must be `finished`
+- duplicate rating is rejected
 
-User:
-- `POST /api/services`
-- `PATCH /api/services/:id`
-- `GET /api/services/me`
-- `POST /api/services/:id/cancel`
-- `POST /api/ratings` (service rating shape)
+## Error Handling
 
-Admin:
-- `GET /api/admin/services`
-- `PATCH /api/admin/services/:id/status`
+- `400`: invalid payload, invalid enum, update/cancel blocked by current status, rating before completion, duplicate rating
+- `401`: missing or invalid bearer token
+- `403`: non-admin using admin routes, or other authenticated access-control failures on endpoints that perform explicit participant checks
+- `404`: service order not found
 
-## 5. Client Validation and Error Handling
+## QA Checklist
 
-### 5.1 Client-Side Validation
-
-- `serviceType`: required; one of `designing`, `maintenance`, `renewal`.
-- `description`: required, non-empty on create.
-- `address`: required, non-empty on create.
-- List query validation:
-  - `sortBy` must be `createdAt`.
-  - `sortDirection` must be `asc` or `desc`.
-- Service rating:
-  - `itemType` must be `service`
-  - `itemId` must be numeric
-  - `ratingValue` must be between `1` and `5`
-
-### 5.2 Error Branches
-
-- `400`:
-  - invalid payload
-  - invalid status enum
-  - update/cancel not allowed for current status
-  - rating before service is `finished`
-  - duplicate service rating
-- `401`:
-  - missing or invalid bearer token
-- `403`:
-  - trying to access/update/cancel/rate another user service
-  - non-admin access to admin services endpoints
-- `404`:
-  - service order not found
-
-## 6. Minimal QA Integration Checklist
-
-- User can create service with valid type/description/address.
-- User can update own service while status is `not_started`.
-- User cannot update/cancel own service after processing starts.
-- `GET /api/services/me` supports expected filter/sort query combinations.
-- Admin can list services with user context and apply filter/sort query params.
-- Admin can update service statuses using valid enum values.
-- User can rate only after service reaches `finished`.
-- Duplicate service rating is rejected.
-- Unauthorized and cross-user access branches return expected errors.
+- User can create service with valid payload.
+- User can update service while `not_started`.
+- User cannot update or cancel after processing starts.
+- `GET /api/services/me` works with type, date, and sort filters.
+- Admin list returns user context and honors supported query params.
+- Admin status updates accept valid enum values.
+- Frontend follows the canonical status progression even though backend does not strictly enforce it.
+- User can rate only after `finished`.
+- Duplicate service rating fails.

@@ -21,6 +21,7 @@ export class FaultsController {
   }
 
   @Patch(':id')
+  @ApiResponse({ status: 200, type: KayanFaultResponseDto })
   updateFault(@CurrentUser() user: AuthUser, @Param() params: FaultIdParamDto, @Body() dto: UpdateFaultDto): Promise<Record<string, unknown>> {
     return this.kayanService.updateFault(user, params.id, dto);
   }
@@ -29,6 +30,12 @@ export class FaultsController {
   @ApiResponse({ status: 200, type: KayanFaultsResponseDto })
   listMyFaults(@CurrentUser() user: AuthUser, @Query() query: ListMyFaultsQueryDto): Promise<Record<string, unknown>> {
     return this.kayanService.listMyFaults(user, query);
+  }
+
+  @Get(':id')
+  @ApiResponse({ status: 200, type: KayanFaultResponseDto })
+  getFault(@CurrentUser() user: AuthUser, @Param() params: FaultIdParamDto): Promise<Record<string, unknown>> {
+    return this.kayanService.getFaultForUser(user.sub, params.id);
   }
 
   @Post(':id/cancel')

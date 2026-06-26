@@ -19,6 +19,7 @@ class KayanProductDto {
   @ApiProperty() price!: number;
   @ApiPropertyOptional({ nullable: true, type: Object }) details!: Record<string, unknown> | null;
   @ApiProperty() is_active!: boolean;
+  @ApiPropertyOptional({ nullable: true }) rate!: string | null;
   @ApiProperty() created_at!: string;
   @ApiProperty() updated_at!: string;
   @ApiProperty({ type: [KayanAssetDto] }) images!: KayanAssetDto[];
@@ -85,6 +86,7 @@ class KayanFaultDto {
   @ApiPropertyOptional({ nullable: true }) cancelled_at!: string | null;
   @ApiProperty() created_at!: string;
   @ApiProperty() updated_at!: string;
+  @ApiPropertyOptional({ nullable: true }) has_rated!: boolean | null;
   @ApiProperty({ type: [KayanAssetDto] }) images!: KayanAssetDto[];
   @ApiPropertyOptional({ type: KayanFaultUserDto }) user?: KayanFaultUserDto;
 }
@@ -152,6 +154,7 @@ class ItemRatingDto {
   @ApiPropertyOptional({ nullable: true }) order_id?: number;
   @ApiPropertyOptional({ nullable: true }) product_id?: number;
   @ApiProperty() rating_value!: number;
+  @ApiPropertyOptional({ nullable: true }) comment?: string | null;
   @ApiPropertyOptional({ nullable: true }) created_at?: string;
 }
 
@@ -209,6 +212,9 @@ export class FollowupMessageResponseDto extends SuccessEnvelopeDto { @ApiPropert
 
 class KayanRatingDataDto { @ApiProperty({ type: ItemRatingDto }) rating!: ItemRatingDto; }
 export class KayanRatingResponseDto extends SuccessEnvelopeDto { @ApiProperty({ type: KayanRatingDataDto }) data!: KayanRatingDataDto; }
+
+class KayanRatingsDataDto { @ApiProperty({ type: [ItemRatingDto] }) items!: ItemRatingDto[]; @ApiProperty() total!: number; }
+export class KayanRatingsResponseDto extends SuccessEnvelopeDto { @ApiProperty({ type: KayanRatingsDataDto }) data!: KayanRatingsDataDto; }
 
 class MessageOnlyDataDto { @ApiProperty({ type: MessageOnlyDto }) message!: string; }
 export class KayanMessageResponseDto extends SuccessEnvelopeDto { @ApiProperty({ type: MessageOnlyDataDto }) data!: MessageOnlyDataDto; }

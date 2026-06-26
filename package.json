@@ -5,7 +5,7 @@
   "description": "Online Market backend (NestJS + PostgreSQL)",
   "scripts": {
     "start": "node dist/main.js",
-    "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "start:dev": "ts-node-dev --compiler ts-patch/compiler --respawn --transpile-only src/main.ts",
     "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.scripts.json",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
@@ -29,10 +29,12 @@
     "simulate:kayan:faults": "npx ts-node --transpile-only scripts/simulate-kayan-faults-flows.ts",
     "simulate:kayan:services": "npx ts-node --transpile-only scripts/simulate-kayan-services-flows.ts",
     "simulate:kayan:gallery": "npx ts-node --transpile-only scripts/simulate-kayan-gallery-flows.ts",
+    "simulate:kayan:admin": "npx ts-node --transpile-only scripts/simulate-kayan-admin-flows.ts",
     "test:kayan:cli": "npx ts-node --transpile-only scripts/simulate-kayan-flows.ts",
     "test:kayan:faults:cli": "npx ts-node --transpile-only scripts/simulate-kayan-faults-flows.ts",
     "test:kayan:services:cli": "npx ts-node --transpile-only scripts/simulate-kayan-services-flows.ts",
     "test:kayan:gallery:cli": "npx ts-node --transpile-only scripts/simulate-kayan-gallery-flows.ts",
+    "test:kayan:admin:cli": "npx ts-node --transpile-only scripts/simulate-kayan-admin-flows.ts",
     "test:auth:cli": "npx ts-node --transpile-only scripts/test-auth.ts",
     "test:auth:e2e": "jest --config test/jest-e2e.json --runInBand test/auth.e2e-spec.ts",
     "simulate:chat": "npx ts-node --transpile-only scripts/chat-socket-test.ts",
@@ -41,7 +43,8 @@
     "test:followup-chat": "jest --runInBand src/kayan/kayan.service.spec.ts src/chat/chat.service.spec.ts src/chat/chat.controller.spec.ts src/chat/chat.gateway.spec.ts",
     "ci:followup-chat": "npm run test:followup-chat",
     "simulate:kayan:followup": "npx ts-node --transpile-only scripts/simulate-kayan-followup-flows.ts",
-    "test:kayan:followup:cli": "npx ts-node --transpile-only scripts/simulate-kayan-followup-flows.ts"
+    "test:kayan:followup:cli": "npx ts-node --transpile-only scripts/simulate-kayan-followup-flows.ts",
+    "prepare": "ts-patch install -s"
   },
   "engines": {
     "node": ">=20"
@@ -88,6 +91,7 @@
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
+    "ts-patch": "^3.1.2",
     "typescript": "^5.9.3"
   }
 }

@@ -30,10 +30,7 @@ export class RelatedUserDto {
   @ApiProperty({ example: 12 })
   id!: number;
 
-  @ApiPropertyOptional({ example: '29876543210987', nullable: true })
-  ssn!: string | null;
-
-  @ApiProperty({ example: 'Jana Ahmed' })
+  @ApiProperty({ example: 'John Doe' })
   name!: string;
 
   @ApiProperty({ example: '+201000000012' })

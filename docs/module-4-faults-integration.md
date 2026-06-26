@@ -1,53 +1,31 @@
 # Module 4 Integration Guide: Faults
 
-## 1. Purpose and Audience
+## Purpose
 
-This guide is for frontend web and mobile teams integrating Module 4 (Faults) with the backend.
+This guide covers:
 
-It covers:
-- fault report creation and update
-- file upload handoff for fault images
-- user "My Reports" filtering/sorting
-- admin faults review and status management
-- fault cancellation and fault rating rules
+- fault creation
+- fault image upload handoff
+- fault update and cancellation
+- user and admin listing
+- enforced admin status transitions
+- post-completion rating
 
-## 2. Prerequisites
+Shared contract:
 
-- Backend base URL is reachable (example: `http://localhost:800` in local Docker setup).
-- User and admin authentication flows are already integrated (Module 1).
-- Authenticated requests include a valid bearer token where required.
-- File upload flow endpoints are integrated for image attachment:
-  - `POST /files/upload-intent`
-  - `PATCH /files/:id/mark-uploaded`
+- [frontend-integration-shared-contract.md](./frontend-integration-shared-contract.md)
 
-## 3. End-to-End Flows
+## Flow-by-Flow Implementation
 
-### 3.1 Create Fault Report (User)
+### Create Fault
 
-1. User uploads fault image(s) through files flow (optional).
-2. User creates report with `POST /api/faults`.
-3. Backend creates fault with initial status `received`.
+1. Upload optional image files first.
+2. Send `POST /api/faults`.
+3. Backend creates the fault with initial status `received`.
 
-Typical create payload:
+### Upload Fault Images
 
-```json
-{
-  "title": "Water leak",
-  "description": "Leak from kitchen ceiling.",
-  "severity": "high",
-  "address": "Cairo, Nasr City",
-  "imageFileIds": [101, 102]
-}
-```
-
-### 3.2 File Upload Handoff for Fault Images
-
-1. Request upload intent: `POST /files/upload-intent`.
-2. Upload binary to returned storage URL.
-3. Confirm upload: `PATCH /files/:id/mark-uploaded`.
-4. Pass returned uploaded `file.id` values in `imageFileIds` when creating/updating fault.
-
-Example upload-intent payload:
+Recommended current upload-intent payload, aligned with the repo harness:
 
 ```json
 {
@@ -59,13 +37,86 @@ Example upload-intent payload:
 }
 ```
 
-### 3.3 Update Fault Report (User)
+Current backend rule for successful fault association:
 
-1. User updates own report with `PATCH /api/faults/:id`.
-2. Allowed only while report status is `received`.
-3. User can update title/description/severity/address/images.
+- file must exist
+- file must be uploaded
+- file purpose must be `product_image`
+- file MIME type must start with `image/`
 
-Typical update payload:
+### Update Fault
+
+1. Send `PATCH /api/faults/:id`.
+2. This is only allowed while status is `received`.
+3. The user may update `title`, `description`, `severity`, `address`, and `imageFileIds`.
+
+### List My Faults
+
+Use `GET /api/faults/me` with optional filters:
+
+- `status`
+- `severity`
+- `fromDate`
+- `toDate`
+- `sortBy`: `createdAt`, `severity`
+- `sortDirection`: `asc`, `desc`
+
+### Admin Review and Status Update
+
+Admin routes:
+
+- `GET /api/admin/faults`
+- `PATCH /api/admin/faults/:id/status`
+
+Unlike orders and services, fault transitions are currently enforced by backend logic.
+
+### Cancel Fault
+
+- User route: `POST /api/faults/:id/cancel`
+- Only allowed while status is `received`
+
+### Rate Finished Fault
+
+Once status is `finished`, the owner can submit:
+
+- `POST /api/ratings`
+
+## Endpoint Contract
+
+### `POST /api/faults`
+
+Auth: bearer token required
+
+Request:
+
+```json
+{
+  "title": "Water leak",
+  "description": "Leak from kitchen ceiling.",
+  "severity": "high",
+  "address": "Cairo, Nasr City",
+  "imageFileIds": [101, 102]
+}
+```
+
+Validation:
+
+- `title`: required non-empty string
+- `description`: required non-empty string
+- `severity`: `normal`, `high`, `urgent`, `emergent`
+- `address`: required non-empty string
+- `imageFileIds`: optional integer array
+
+Success:
+
+- `201`
+- `data.fault`
+
+### `PATCH /api/faults/:id`
+
+Allowed only while current status is `received`.
+
+Request example:
 
 ```json
 {
@@ -76,41 +127,89 @@ Typical update payload:
 }
 ```
 
-### 3.4 My Reports (User)
+Success:
 
-Endpoint:
-- `GET /api/faults/me`
+- `200`
+- updated `data.fault`
 
-Query options:
+### `GET /api/faults/me`
+
+Supported query params:
+
 - `status`
 - `severity`
-- `fromDate`, `toDate`
-- `sortBy` (`createdAt`, `severity`)
-- `sortDirection` (`asc`, `desc`)
+- `fromDate`
+- `toDate`
+- `sortBy`: `createdAt`, `severity`
+- `sortDirection`: `asc`, `desc`
 
-Examples:
-- `GET /api/faults/me?status=received&sortBy=createdAt&sortDirection=desc`
-- `GET /api/faults/me?severity=urgent&sortBy=severity&sortDirection=asc`
+Defaults:
 
-### 3.5 Admin List and Update Fault Status
+- `sortBy` defaults to `createdAt`
+- `sortDirection` defaults to `desc`
 
-Admin endpoints:
-- `GET /api/admin/faults`
-- `PATCH /api/admin/faults/:id/status`
+Severity sorting behavior:
 
-Supported statuses:
-- `received`
-- `assigned`
-- `on_the_way`
-- `in_progress`
-- `finished`
-- `cancelled`
+- backend sorts by severity priority:
+  - `normal`
+  - `high`
+  - `urgent`
+  - `emergent`
 
-Constrained workflow:
-- `received -> assigned -> on_the_way -> in_progress -> finished`
-- Cancellation is allowed before `finished`.
+Success:
 
-Typical admin status payload:
+- `200`
+- `data.items[]`
+
+Important fault fields:
+
+- `id`
+- `user_id`
+- `title`
+- `description`
+- `severity`
+- `address`
+- `status`
+- `cancelled_at`
+- `created_at`
+- `updated_at`
+- `images[]`
+
+### `POST /api/faults/:id/cancel`
+
+Allowed only while current status is `received`.
+
+Success:
+
+- `200`
+- updated `data.fault`
+
+### `GET /api/admin/faults`
+
+Auth: admin bearer token required
+
+Supported query params:
+
+- `status`: `received`, `assigned`, `on_the_way`, `in_progress`, `finished`, `cancelled`
+- `severity`: `normal`, `high`, `urgent`, `emergent`
+- `fromDate`
+- `toDate`
+- `sortBy`: `createdAt`, `severity`
+- `sortDirection`: `asc`, `desc`
+- `page`: integer, min `1`
+- `limit`: integer, min `1`, max `100`
+
+Success:
+
+- `200`
+- `data.items[]`
+- each fault includes nested `user`
+
+### `PATCH /api/admin/faults/:id/status`
+
+Auth: admin bearer token required
+
+Request:
 
 ```json
 {
@@ -118,23 +217,27 @@ Typical admin status payload:
 }
 ```
 
-### 3.6 Cancel Fault Report
+Allowed statuses:
 
-User:
-- `POST /api/faults/:id/cancel`
-- Allowed only while status is `received`.
+- `received`
+- `assigned`
+- `on_the_way`
+- `in_progress`
+- `finished`
+- `cancelled`
 
-Admin:
-- Cancels through status endpoint by setting `status=cancelled` (within allowed transitions).
+Current enforced transition matrix:
 
-### 3.7 Fault Rating
+- `received -> assigned` or `cancelled`
+- `assigned -> on_the_way` or `cancelled`
+- `on_the_way -> in_progress` or `cancelled`
+- `in_progress -> finished` or `cancelled`
+- `finished ->` no further transitions
+- `cancelled ->` no further transitions
 
-Users can rate a fault one time only after status is `finished`.
+### `POST /api/ratings`
 
-Endpoint:
-- `POST /api/ratings`
-
-Fault rating payload:
+Fault rating request:
 
 ```json
 {
@@ -144,64 +247,35 @@ Fault rating payload:
 }
 ```
 
-Duplicate rating on the same fault by the same user is rejected.
+Rules:
 
-## 4. Endpoint Map (High Level)
+- authenticated user must own the fault
+- fault status must be `finished`
+- duplicate rating is rejected
 
-User:
-- `POST /api/faults`
-- `PATCH /api/faults/:id`
-- `GET /api/faults/me`
-- `POST /api/faults/:id/cancel`
-- `POST /api/ratings` (fault rating shape)
+## Error Handling
 
-Admin:
-- `GET /api/admin/faults`
-- `PATCH /api/admin/faults/:id/status`
+- `400`: invalid payload, invalid transition, invalid file purpose, pending file, non-image file, update/cancel blocked by current status, duplicate rating, rating before completion
+- `401`: missing or invalid bearer token
+- `403`: authenticated user tries to access another user’s fault or non-admin hits admin route
+- `404`: fault not found
 
-File flow dependency:
-- `POST /files/upload-intent`
-- `PATCH /files/:id/mark-uploaded`
+Ownership/state distinction:
 
-## 5. Client Validation and Error Handling
+- same-user missing resource: `404`
+- different-user authenticated access may be `403` or `404` depending on the endpoint
+- invalid current status for same owner: `400`
 
-### 5.1 Client-Side Validation
+## QA Checklist
 
-- `title`, `description`, `address`: required and non-empty.
-- `severity`: one of `normal`, `high`, `urgent`, `emergent`.
-- `imageFileIds`: optional array of numeric IDs.
-- Fault rating:
-  - `itemType` must be `fault`
-  - `itemId` must be numeric
-  - `ratingValue` must be between `1` and `5`
-
-### 5.2 Error Branches
-
-- `400`:
-  - invalid payload
-  - invalid status transition
-  - update/cancel not allowed for current status
-  - rating before fault is `finished`
-  - duplicate rating
-  - invalid image file reference (missing/non-uploaded/wrong purpose/non-image)
-- `401`:
-  - missing or invalid bearer token
-- `403`:
-  - trying to access/update/cancel/rate another user fault
-  - non-admin access to admin faults endpoints
-- `404`:
-  - fault not found
-  - file not found (during image references)
-
-## 6. Minimal QA Integration Checklist
-
-- User can create fault with valid payload and optional image IDs.
-- User can update own fault while status is `received`.
-- User cannot update/cancel own fault after processing starts.
-- `GET /api/faults/me` supports expected filter/sort query combinations.
-- Admin can list all faults and update status through valid transitions.
-- Invalid admin transitions are rejected.
-- User can cancel while `received` and cancellation is blocked later.
+- User can create fault with optional uploaded image IDs.
+- Fault creation rejects missing, pending, non-image, or wrong-purpose files.
+- User can update fault while status is `received`.
+- User cannot update or cancel after processing begins.
+- `GET /api/faults/me` works with status, severity, date, and sort combinations.
+- Admin list includes nested user info.
+- Admin valid transitions succeed.
+- Admin invalid transitions fail with `400`.
+- User can cancel only while `received`.
 - User can rate only after `finished`.
-- Duplicate fault rating is rejected.
-- Unauthorized and cross-user access branches return expected errors.
+- Duplicate fault rating fails.

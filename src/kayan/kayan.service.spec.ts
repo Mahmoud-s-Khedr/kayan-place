@@ -56,7 +56,7 @@ describe('KayanService', () => {
       sortDirection: 'asc' as any,
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [
         expect.objectContaining({
           id: 1,
@@ -77,7 +77,7 @@ describe('KayanService', () => {
     expect(queryText).toContain('price <= $3');
     expect(queryText).toContain('created_at >= $4');
     expect(queryText).toContain('created_at <= $5');
-    expect(queryText).toContain('ORDER BY price ASC, id DESC');
+    expect(queryText).toContain('ORDER BY price ASC, cp.id DESC');
     expect(params).toEqual(['%chair%', 100, 300, '2026-01-01', '2026-01-31']);
   });
 
@@ -121,7 +121,7 @@ describe('KayanService', () => {
       { productId: 3, quantity: 2 },
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [
         expect.objectContaining({
           id: 10,
@@ -227,7 +227,7 @@ describe('KayanService', () => {
       { status: OrderStatus.RECEIVED, fromDate: '2026-02-01', sortDirection: 'asc' as any },
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [
         expect.objectContaining({
           id: 15,
@@ -246,6 +246,7 @@ describe('KayanService', () => {
 
   it('lists admin orders with user information', async () => {
     databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -267,7 +268,7 @@ describe('KayanService', () => {
 
     const result = await service.adminListOrders();
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [
         expect.objectContaining({
           user: expect.objectContaining({
@@ -280,7 +281,8 @@ describe('KayanService', () => {
   });
 
   it('lists my services with filters and sorting', async () => {
-    databaseService.query.mockResolvedValueOnce({
+    databaseService.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
+      .mockResolvedValueOnce({
       rows: [
         {
           id: 51,
@@ -306,7 +308,7 @@ describe('KayanService', () => {
       },
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [
         expect.objectContaining({
           id: 51,
@@ -315,17 +317,18 @@ describe('KayanService', () => {
       ],
     });
 
-    const [queryText, params] = databaseService.query.mock.calls[0];
+    const [queryText, params] = databaseService.query.mock.calls[1];
     expect(queryText).toContain('so.user_id = $1');
     expect(queryText).toContain('so.service_type = $2');
     expect(queryText).toContain('so.created_at >= $3');
     expect(queryText).toContain('so.created_at <= $4');
     expect(queryText).toContain('ORDER BY so.created_at ASC, so.id DESC');
-    expect(params).toEqual([6, ServiceType.MAINTENANCE, '2026-03-01', '2026-03-31']);
+    expect(params).toEqual([6, ServiceType.MAINTENANCE, '2026-03-01', '2026-03-31', 20, 0]);
   });
 
   it('lists admin services with filters and user information', async () => {
-    databaseService.query.mockResolvedValueOnce({
+    databaseService.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
+      .mockResolvedValueOnce({
       rows: [
         {
           id: 61,
@@ -351,7 +354,7 @@ describe('KayanService', () => {
       sortBy: 'createdAt' as any,
     });
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [
         expect.objectContaining({
           id: 61,
@@ -365,13 +368,13 @@ describe('KayanService', () => {
       ],
     });
 
-    const [queryText, params] = databaseService.query.mock.calls[0];
+    const [queryText, params] = databaseService.query.mock.calls[1];
     expect(queryText).toContain('LEFT JOIN users u ON u.id = so.user_id');
     expect(queryText).toContain('so.service_type = $1');
     expect(queryText).toContain('so.created_at >= $2');
     expect(queryText).toContain('so.created_at <= $3');
     expect(queryText).toContain('ORDER BY so.created_at DESC, so.id DESC');
-    expect(params).toEqual([ServiceType.DESIGNING, '2026-04-01', '2026-04-30']);
+    expect(params).toEqual([ServiceType.DESIGNING, '2026-04-01', '2026-04-30', 20, 0]);
   });
 
   it('creates a product rating only for delivered ordered products', async () => {
@@ -504,7 +507,7 @@ describe('KayanService', () => {
       { status: FaultStatus.ASSIGNED, severity: 'urgent' as any, fromDate: '2026-01-01', sortBy: 'severity' as any, sortDirection: 'asc' as any },
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [
         expect.objectContaining({
           id: 31,
@@ -524,6 +527,7 @@ describe('KayanService', () => {
 
   it('enriches admin fault list with user and images', async () => {
     databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -548,7 +552,7 @@ describe('KayanService', () => {
       });
 
     const result = await service.adminListFaults();
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [
         expect.objectContaining({
           id: 41,
@@ -709,6 +713,7 @@ describe('KayanService', () => {
   it('lists followup steps for item owner ordered by sort_order then id', async () => {
     databaseService.query
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
       .mockResolvedValueOnce({
         rows: [
           { id: 2, item_type: 'order', item_id: 50, title: 'Delivered', sort_order: 1, created_at: '2026-05-01T00:00:00.000Z' },
@@ -722,13 +727,13 @@ describe('KayanService', () => {
       50,
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [
         expect.objectContaining({ id: 2, sort_order: 1 }),
         expect.objectContaining({ id: 3, sort_order: 2 }),
       ],
     });
-    expect(databaseService.query.mock.calls[1][0]).toContain('ORDER BY sort_order ASC, id ASC');
+    expect(databaseService.query.mock.calls[2][0]).toContain('ORDER BY sort_order ASC, id ASC');
   });
 
   it('rejects followup steps listing for non-owner user', async () => {
@@ -836,7 +841,7 @@ describe('KayanService', () => {
       81,
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [expect.objectContaining({ id: 1, message_text: 'Ping' })],
     });
   });
@@ -886,6 +891,7 @@ describe('KayanService', () => {
 
   it('lists public gallery items as active-only with rich images', async () => {
     databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
       .mockResolvedValueOnce({
         rows: [
           { id: 1, title: 'Living Room', description: 'Modern', is_active: true, created_at: '2026-05-01T00:00:00.000Z' },
@@ -907,7 +913,7 @@ describe('KayanService', () => {
 
     const result = await service.listGallery();
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [
         expect.objectContaining({
           id: 1,
@@ -927,6 +933,7 @@ describe('KayanService', () => {
 
   it('lists admin gallery items including inactive entries', async () => {
     databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
       .mockResolvedValueOnce({
         rows: [
           { id: 2, title: 'Kitchen', description: 'Wood', is_active: false, created_at: '2026-05-02T00:00:00.000Z' },
@@ -948,7 +955,7 @@ describe('KayanService', () => {
 
     const result = await service.adminListGallery();
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       items: [
         expect.objectContaining({
           id: 2,
@@ -1075,6 +1082,7 @@ describe('KayanService', () => {
 
   it('soft deletes gallery item and hides it from subsequent list', async () => {
     databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 12 }] })
       .mockResolvedValueOnce({ rows: [] });
 
@@ -1085,7 +1093,8 @@ describe('KayanService', () => {
     const listed = await service.listGallery();
 
     expect(deletion).toEqual({ message: 'Gallery item deleted' });
-    expect(listed).toEqual({ items: [] });
+    expect(listed).toMatchObject({
+      items: [] });
     expect(databaseService.query.mock.calls[0][0]).toContain('SET deleted_at = NOW()');
   });
 });

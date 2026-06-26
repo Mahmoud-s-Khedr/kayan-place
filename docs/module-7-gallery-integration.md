@@ -1,48 +1,101 @@
 # Module 7 Integration Guide: Gallery
 
-## 1. Purpose and Audience
+## Purpose
 
-This guide is for frontend web and mobile teams integrating Module 7 (Gallery) with the backend.
+This guide covers:
 
-It covers:
 - public gallery browsing
-- admin gallery management (create/update/delete)
-- gallery visibility behavior (`active` vs `inactive` vs soft-deleted)
-- file upload handoff for gallery images
+- admin gallery list/create/update/delete
+- image upload handoff
+- public visibility rules
 
-## 2. Prerequisites
+Shared contract:
 
-- Backend base URL is reachable (example: `http://localhost:800` in local Docker setup).
-- Authentication flow is integrated (Module 1) for admin-protected endpoints.
-- Admin requests include a valid bearer token.
-- File upload flow endpoints are integrated for image attachment:
-  - `POST /files/upload-intent`
-  - `PATCH /files/:id/mark-uploaded`
+- [frontend-integration-shared-contract.md](./frontend-integration-shared-contract.md)
 
-## 3. End-to-End Flows
+## Flow-by-Flow Implementation
 
-### 3.1 Public Gallery Browsing
+### Public Gallery Browsing
 
-1. Client calls `GET /api/gallery`.
-2. Backend returns gallery items visible to public/users.
-3. Client renders each item using:
-   - `title`
-   - `description`
-   - `images`
+1. Call `GET /api/gallery`.
+2. Render returned `data.items[]`.
+3. Each item exposes `title`, `description`, `is_active`, `created_at`, and `images[]`.
 
-Behavior:
-- Public list includes active items only.
-- Soft-deleted items are excluded.
+### Admin Upload and Create
 
-### 3.2 Admin Upload + Create Gallery Item
+Recommended upload-intent payload, aligned with the repo harness:
 
-1. Admin requests upload intent: `POST /files/upload-intent`.
-2. Client uploads binary to signed storage URL from the intent response.
-3. Client confirms upload: `PATCH /files/:id/mark-uploaded`.
-4. Admin creates gallery item: `POST /api/admin/gallery` with `title`, `description`, and `imageFileIds`.
-5. Backend returns created item with `images` payload.
+```json
+{
+  "ownerType": "product",
+  "purpose": "product_image",
+  "filename": "gallery-sim.png",
+  "mimeType": "image/png",
+  "fileSizeBytes": 68
+}
+```
 
-Typical create payload:
+Sequence:
+
+1. `POST /api/files/upload-intent`
+2. upload binary to the signed target
+3. `PATCH /api/files/:id/mark-uploaded`
+4. `POST /api/admin/gallery`
+
+### Admin Visibility Toggle
+
+1. `PATCH /api/admin/gallery/:id`
+2. Set `isActive=false` to hide from public list
+3. Set `isActive=true` to restore to public list
+
+### Admin Soft Delete
+
+1. `DELETE /api/admin/gallery/:id`
+2. Record is soft-deleted
+3. It disappears from both public and admin list endpoints
+
+## Visibility Matrix
+
+| State | Public `GET /api/gallery` | Admin `GET /api/admin/gallery` |
+|---|---|---|
+| `is_active=true`, not deleted | visible | visible |
+| `is_active=false`, not deleted | hidden | visible |
+| soft-deleted | hidden | hidden |
+
+## Endpoint Contract
+
+### `GET /api/gallery`
+
+Public route.
+
+Success:
+
+- `200`
+- `data.items[]`
+
+Public behavior:
+
+- only active, non-deleted items are returned
+
+### `GET /api/admin/gallery`
+
+Auth: admin bearer token required
+
+Success:
+
+- `200`
+- `data.items[]`
+
+Admin behavior:
+
+- returns active and inactive items
+- excludes soft-deleted items
+
+### `POST /api/admin/gallery`
+
+Auth: admin bearer token required
+
+Request:
 
 ```json
 {
@@ -52,13 +105,29 @@ Typical create payload:
 }
 ```
 
-### 3.3 Admin Visibility Update Flow
+Validation:
 
-1. Admin updates item: `PATCH /api/admin/gallery/:id`.
-2. Admin can set `isActive=false` to hide from public list.
-3. Admin can later set `isActive=true` to show again.
+- `title`: required non-empty string
+- `description`: required non-empty string
+- `imageFileIds`: optional integer array
 
-Typical update payload:
+Success:
+
+- `201`
+- `data.item`
+
+### `PATCH /api/admin/gallery/:id`
+
+Auth: admin bearer token required
+
+Editable fields:
+
+- `title`
+- `description`
+- `isActive`
+- `imageFileIds`
+
+Request example:
 
 ```json
 {
@@ -69,57 +138,46 @@ Typical update payload:
 }
 ```
 
-### 3.4 Admin Delete Flow (Soft Delete)
+Success:
 
-1. Admin deletes item via `DELETE /api/admin/gallery/:id`.
-2. Backend soft-deletes item (`deleted_at` set).
-3. Item no longer appears in public or admin list endpoints.
+- `200`
+- updated `data.item`
 
-## 4. Endpoint Map (High Level)
+### `DELETE /api/admin/gallery/:id`
 
-Public/User:
-- `GET /api/gallery`
+Auth: admin bearer token required
 
-Admin:
-- `GET /api/admin/gallery`
-- `POST /api/admin/gallery`
-- `PATCH /api/admin/gallery/:id`
-- `DELETE /api/admin/gallery/:id`
+Success:
 
-File flow dependency:
-- `POST /files/upload-intent`
-- `PATCH /files/:id/mark-uploaded`
+- `200`
+- message envelope
 
-## 5. Client Validation and Error Handling
+Errors:
 
-### 5.1 Client-Side Validation
+- `404`: gallery item not found
 
-- `title`: required, non-empty.
-- `description`: required, non-empty.
-- `imageFileIds`: optional array of numeric file IDs.
-- Preserve intended image order by sending `imageFileIds` in display order.
+## Asset Notes
 
-### 5.2 Error Branches
+- Send `imageFileIds` in intended display order.
+- Backend preserves order by storing each image with `sort_order` based on array position.
+- Frontend should only attach uploaded image files even though current gallery backend logic is looser than faults and does not enforce the same file-purpose checks.
 
-- `400`:
-  - invalid payload (for example empty `title`/`description`)
-  - invalid field types
-- `401`:
-  - missing/invalid bearer token for protected endpoints
-- `403`:
-  - authenticated non-admin calling admin gallery endpoints
-- `404`:
-  - gallery item not found on update/delete
+## Error Handling
 
-## 6. Minimal QA Integration Checklist
+- `400`: invalid payload or field types
+- `401`: missing or invalid bearer token
+- `403`: authenticated non-admin hitting admin routes
+- `404`: gallery item not found
 
-- Public `GET /api/gallery` loads items and renders `images` correctly.
-- Admin `GET /api/admin/gallery` returns both active and inactive items.
-- Admin can create gallery item after upload intent + upload + mark-uploaded flow.
-- Admin can update title/description/images successfully.
-- Setting `isActive=false` hides item from public list and keeps it in admin list.
-- Setting `isActive=true` makes item visible in public list again.
-- Admin delete removes item from both public/admin list responses (soft delete behavior).
-- Unauthorized admin endpoint calls return `401`.
-- Non-admin admin-endpoint calls return `403`.
-- Invalid payload and invalid ID branches return expected `400`/`404`.
+## QA Checklist
+
+- Public gallery list renders returned images.
+- Admin gallery list returns active and inactive items.
+- Admin can create a gallery item after upload intent, upload, and mark-uploaded.
+- Admin can update title, description, and image list.
+- `isActive=false` hides item from public list but keeps it in admin list.
+- `isActive=true` restores visibility in public list.
+- Delete removes item from both public and admin list responses.
+- Unauthorized admin calls fail with `401`.
+- Non-admin admin calls fail with `403`.
+- Invalid payload and invalid IDs fail with expected errors.

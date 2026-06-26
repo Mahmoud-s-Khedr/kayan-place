@@ -20,7 +20,14 @@ export class ServicesController {
     return this.kayanService.createService(user, dto);
   }
 
+  @Get()
+  @ApiResponse({ status: 200, type: KayanServicesResponseDto })
+  listServices(@Query() query: ListServicesQueryDto): Promise<Record<string, unknown>> {
+    return this.kayanService.publicListServices(query);
+  }
+
   @Patch(':id')
+  @ApiResponse({ status: 200, type: KayanServiceResponseDto })
   updateService(@CurrentUser() user: AuthUser, @Param() params: ServiceIdParamDto, @Body() dto: UpdateServiceOrderDto): Promise<Record<string, unknown>> {
     return this.kayanService.updateService(user, params.id, dto);
   }
@@ -29,6 +36,12 @@ export class ServicesController {
   @ApiResponse({ status: 200, type: KayanServicesResponseDto })
   listMyServices(@CurrentUser() user: AuthUser, @Query() query: ListServicesQueryDto): Promise<Record<string, unknown>> {
     return this.kayanService.listMyServices(user, query);
+  }
+
+  @Get(':id')
+  @ApiResponse({ status: 200, type: KayanServiceResponseDto })
+  getService(@CurrentUser() user: AuthUser, @Param() params: ServiceIdParamDto): Promise<Record<string, unknown>> {
+    return this.kayanService.getServiceForUser(user.sub, params.id);
   }
 
   @Post(':id/cancel')

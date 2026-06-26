@@ -15,7 +15,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache bash postgresql-client
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 COPY --from=builder /app/dist ./dist
 COPY db ./db
 COPY scripts ./scripts
