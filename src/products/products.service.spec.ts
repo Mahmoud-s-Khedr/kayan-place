@@ -252,6 +252,16 @@ describe('ProductsService', () => {
     expect(queryText).toContain('ORDER BY plv.seller_rate DESC, plv.id DESC');
   });
 
+  it('derives offset from page in search queries when offset is absent', async () => {
+    databaseService.query.mockResolvedValueOnce({ rows: [] });
+
+    await service.searchProducts({ page: 3, limit: 5 });
+
+    const [, queryParams] = databaseService.query.mock.calls[0];
+    expect(queryParams.at(-2)).toBe(5);
+    expect(queryParams.at(-1)).toBe(10);
+  });
+
   it('rejects invalid category/subcategory pair on create', async () => {
     databaseService.withTransaction.mockImplementation((callback: any) => callback({ query: jest.fn() }));
 

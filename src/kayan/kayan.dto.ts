@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { createOffsetPaginationQueryDto } from '../common/dto/offset-pagination-query.dto';
 
 export enum OrderStatus {
   RECEIVED = 'received',
@@ -73,6 +74,16 @@ export enum ServiceSortBy {
   CREATED_AT = 'createdAt',
 }
 
+const KayanListPaginationQueryDto = createOffsetPaginationQueryDto({
+  defaultLimit: 20,
+  maxLimit: 100,
+});
+
+const KayanFollowupPaginationQueryDto = createOffsetPaginationQueryDto({
+  defaultLimit: 50,
+  maxLimit: 100,
+});
+
 export class ProductItemDto {
   @IsInt() @Min(1) productId!: number;
   @IsInt() @Min(1) quantity!: number;
@@ -99,7 +110,7 @@ export class AdminUpdateProductDto {
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
 
-export class ListProductsQueryDto {
+export class ListProductsQueryDto extends KayanListPaginationQueryDto {
   @IsOptional() @IsString() @IsNotEmpty() query?: string;
   @IsOptional() @Type(() => Number) @Min(0) minPrice?: number;
   @IsOptional() @Type(() => Number) @Min(0) maxPrice?: number;
@@ -125,14 +136,12 @@ export class AdminUpdateOrderStatusDto {
   @IsEnum(OrderStatus) status!: OrderStatus;
 }
 
-export class ListOrdersQueryDto {
+export class ListOrdersQueryDto extends KayanListPaginationQueryDto {
   @IsOptional() @IsEnum(OrderStatus) status?: OrderStatus;
   @IsOptional() @IsDateString() fromDate?: string;
   @IsOptional() @IsDateString() toDate?: string;
   @IsOptional() @IsEnum(OrderSortBy) sortBy?: OrderSortBy;
   @IsOptional() @IsEnum(SortDirection) sortDirection?: SortDirection;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }
 
 export class CreateCartItemDto {
@@ -168,7 +177,7 @@ export class AdminUpdateFaultStatusDto {
   @IsEnum(FaultStatus) status!: FaultStatus;
 }
 
-export class ListMyFaultsQueryDto {
+export class ListMyFaultsQueryDto extends KayanListPaginationQueryDto {
   @IsOptional() @IsEnum(FaultStatus) status?: FaultStatus;
   @IsOptional() @IsEnum(FaultSeverity) severity?: FaultSeverity;
   @IsOptional() @IsDateString() fromDate?: string;
@@ -192,14 +201,12 @@ export class AdminUpdateServiceStatusDto {
   @IsEnum(ServiceStatus) status!: ServiceStatus;
 }
 
-export class ListServicesQueryDto {
+export class ListServicesQueryDto extends KayanListPaginationQueryDto {
   @IsOptional() @IsEnum(ServiceType) serviceType?: ServiceType;
   @IsOptional() @IsDateString() fromDate?: string;
   @IsOptional() @IsDateString() toDate?: string;
   @IsOptional() @IsEnum(ServiceSortBy) sortBy?: ServiceSortBy;
   @IsOptional() @IsEnum(SortDirection) sortDirection?: SortDirection;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }
 
 export class CreateFollowupStepDto {
@@ -298,34 +305,25 @@ export class FollowupStepParamDto extends FollowupScopeParamDto {
   @Type(() => Number) @IsInt() @Min(1) id!: number;
 }
 
-export class ListGalleryQueryDto {
+export class ListGalleryQueryDto extends KayanListPaginationQueryDto {
   @IsOptional() @IsString() @IsNotEmpty() query?: string;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }
 
-export class ListFollowupStepsQueryDto {
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
-}
+export class ListFollowupStepsQueryDto extends KayanFollowupPaginationQueryDto {}
 
-export class GetItemReviewsQueryDto {
+export class GetItemReviewsQueryDto extends KayanListPaginationQueryDto {
   @IsEnum(ItemType) itemType!: ItemType;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }
 
 export class ItemIdParamDto {
   @Type(() => Number) @IsInt() @Min(1) itemId!: number;
 }
 
-export class ListAdminFaultsQueryDto {
+export class ListAdminFaultsQueryDto extends KayanListPaginationQueryDto {
   @IsOptional() @IsEnum(FaultStatus) status?: FaultStatus;
   @IsOptional() @IsEnum(FaultSeverity) severity?: FaultSeverity;
   @IsOptional() @IsDateString() fromDate?: string;
   @IsOptional() @IsDateString() toDate?: string;
   @IsOptional() @IsEnum(FaultSortBy) sortBy?: FaultSortBy;
   @IsOptional() @IsEnum(SortDirection) sortDirection?: SortDirection;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }

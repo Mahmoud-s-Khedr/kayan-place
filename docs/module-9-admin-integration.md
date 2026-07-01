@@ -23,7 +23,7 @@ Shared contract:
 
 ### List and Search Users
 
-1. Call `GET /api/admin/users` with optional `q`, `status`, `limit`, and `offset` params.
+1. Call `GET /api/admin/users` with optional `q`, `status`, `page`, `limit`, and `offset` params.
 2. Render the returned `data.items[]`.
 
 ### View User Details
@@ -88,11 +88,12 @@ Supported query params:
 
 - `q`: string, 1-100 chars — search by name or phone
 - `status`: `active`, `paused`, `banned`
+- `page`: integer, min `1`, default `1`
 - `limit`: integer, 1-100 (default `20`)
 - `offset`: integer, 0-10000 (default `0`)
 
 > [!NOTE]
-> Admin users list uses `offset`-based pagination (not `page`-based). This differs from other list endpoints in the API.
+> Admin users list accepts both `page` and `offset`. If both are sent, `offset` takes precedence.
 
 Success:
 
@@ -143,6 +144,7 @@ Path param:
 Supported query params:
 
 - `status`: `available`, `sold`
+- `page`: integer, min `1`, default `1`
 - `limit`: integer, 1-100 (default `20`)
 - `offset`: integer, 0-10000 (default `0`)
 
@@ -297,6 +299,7 @@ Path param:
 
 Supported query params:
 
+- `page`: integer, min `1`, default `1`
 - `limit`: integer, 1-50 (default `20`)
 - `offset`: integer, min `0` (default `0`)
 
@@ -317,12 +320,13 @@ Possible errors:
 
 ## Pagination Style Note
 
-Admin user management endpoints (`/admin/users`, `/admin/users/:id/listings`, `/admin/admins`) use **offset-based pagination**:
+Admin user management endpoints (`/admin/users`, `/admin/users/:id/listings`, `/admin/admins`) accept both `page` and `offset`:
 
+- `page`: optional page number, default `1`
 - `limit`: page size
-- `offset`: number of records to skip
+- `offset`: optional number of records to skip
 
-This differs from other Kayan module endpoints that use **page-based pagination** (`page`, `limit`). Do not mix the two styles.
+If `offset` is present, it overrides the derived `(page - 1) * limit` value.
 
 ---
 

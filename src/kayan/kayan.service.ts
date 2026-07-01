@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { resolveOffsetPagination } from '../common/helpers/pagination.helpers';
 import { DatabaseService } from '../database/database.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import {
@@ -128,6 +129,12 @@ export class KayanService {
       havingClauses.push(`COALESCE(ROUND(AVG(pr.rating_value)::numeric, 2), 0) <= $${params.length}`);
     }
     const havingClause = havingClauses.length ? `HAVING ${havingClauses.join(' AND ')}` : '';
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
+
+    params.push(limit);
+    const limitParam = params.length;
+    params.push(offset);
+    const offsetParam = params.length;
 
     const q = await this.db.query(
       `SELECT cp.id, cp.title, cp.description, cp.amount, cp.price, cp.details, cp.is_active,
@@ -138,7 +145,8 @@ export class KayanService {
        WHERE ${conditions.join(' AND ')}
        GROUP BY cp.id
        ${havingClause}
-       ORDER BY ${orderColumn} ${sortDirection}, cp.id DESC`,
+       ORDER BY ${orderColumn} ${sortDirection}, cp.id DESC
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
       params,
     );
 
@@ -305,12 +313,19 @@ export class KayanService {
     const sortBy = query.sortBy ?? OrderSortBy.CREATED_AT;
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
     const orderColumn = sortBy === OrderSortBy.CREATED_AT ? 'po.created_at' : 'po.created_at';
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
+
+    params.push(limit);
+    const limitParam = params.length;
+    params.push(offset);
+    const offsetParam = params.length;
 
     const q = await this.db.query(
       `SELECT po.id, po.user_id, po.delivery_address, po.status, po.created_at::text AS created_at, po.updated_at::text AS updated_at
        FROM product_orders po
        WHERE ${conditions.join(' AND ')}
-       ORDER BY ${orderColumn} ${sortDirection}, po.id DESC`,
+       ORDER BY ${orderColumn} ${sortDirection}, po.id DESC
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
       params,
     );
     return { items: await this.attachOrderItems(this.db, q.rows as Array<Record<string, unknown>>, false) };
@@ -377,9 +392,7 @@ export class KayanService {
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
 
-    const limit = Math.min(query.limit ?? 20, 100);
-    const page = Math.max((query.page ?? 1) - 1, 0);
-    const offset = page * limit;
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
 
     params.push(limit);
     const limitParam = params.length;
@@ -468,6 +481,7 @@ export class KayanService {
 
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
     const orderClause = this.buildFaultOrderClause(query.sortBy ?? FaultSortBy.CREATED_AT, sortDirection);
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
 
     const q = await this.db.query(
       `SELECT fr.id, fr.user_id, fr.title, fr.description, fr.severity, fr.address, fr.status, fr.cancelled_at::text AS cancelled_at,
@@ -478,8 +492,9 @@ export class KayanService {
               )::boolean AS has_rated
        FROM fault_reports fr
        WHERE ${conditions.join(' AND ')}
-       ${orderClause}`,
-      params,
+       ${orderClause}
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
     );
     return { items: await this.attachFaultAssets(this.db, q.rows as Array<Record<string, unknown>>) };
   }
@@ -545,9 +560,7 @@ export class KayanService {
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
     const orderClause = this.buildFaultOrderClause(query.sortBy ?? FaultSortBy.CREATED_AT, sortDirection);
 
-    const limit = Math.min(query.limit ?? 20, 100);
-    const page = Math.max((query.page ?? 1) - 1, 0);
-    const offset = page * limit;
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
 
     params.push(limit);
     const limitParam = params.length;
@@ -641,9 +654,7 @@ export class KayanService {
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
     const orderColumn = sortBy === ServiceSortBy.CREATED_AT ? 'so.created_at' : 'so.created_at';
 
-    const limit = Math.min(query.limit ?? 20, 100);
-    const page = Math.max((query.page ?? 1) - 1, 0);
-    const offset = page * limit;
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
 
     params.push(limit);
     const limitParam = params.length;
@@ -705,9 +716,7 @@ export class KayanService {
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
     const orderColumn = sortBy === ServiceSortBy.CREATED_AT ? 'so.created_at' : 'so.created_at';
 
-    const limit = Math.min(query.limit ?? 20, 100);
-    const page = Math.max((query.page ?? 1) - 1, 0);
-    const offset = page * limit;
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
 
     params.push(limit);
     const limitParam = params.length;
@@ -756,9 +765,7 @@ export class KayanService {
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
     const orderColumn = sortBy === ServiceSortBy.CREATED_AT ? 'so.created_at' : 'so.created_at';
 
-    const limit = Math.min(query.limit ?? 20, 100);
-    const page = Math.max((query.page ?? 1) - 1, 0);
-    const offset = page * limit;
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
 
     params.push(limit);
     const limitParam = params.length;
@@ -804,9 +811,7 @@ export class KayanService {
 
   async listFollowupSteps(user: AuthUser, itemType: ItemType, itemId: number, query: ListFollowupStepsQueryDto = {}): Promise<Record<string, unknown>> {
     await this.assertUserOwnsItem(user, itemType, itemId);
-    const limit = Math.min(query.limit ?? 50, 100);
-    const page = Math.max((query.page ?? 1) - 1, 0);
-    const offset = page * limit;
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 50, maxLimit: 100 });
     const totalQ = await this.db.query<{ count: string }>(
       `SELECT COUNT(*)::text AS count FROM followup_steps WHERE item_type = $1 AND item_id = $2`,
       [itemType, itemId],
@@ -937,9 +942,7 @@ export class KayanService {
   }
 
   async getItemReviews(itemId: number, query: GetItemReviewsQueryDto): Promise<Record<string, unknown>> {
-    const limit = Math.min(query.limit ?? 20, 100);
-    const page = Math.max((query.page ?? 1) - 1, 0);
-    const offset = page * limit;
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
 
     const totalQ = await this.db.query<{ count: string }>(
       `SELECT COUNT(*)::text AS count FROM item_ratings WHERE item_type = $1 AND item_id = $2`,
@@ -1172,9 +1175,7 @@ export class KayanService {
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const limit = Math.min(query.limit ?? 20, 100);
-    const page = Math.max((query.page ?? 1) - 1, 0);
-    const offset = page * limit;
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
 
     params.push(limit);
     const limitParam = params.length;

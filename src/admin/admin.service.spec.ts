@@ -91,6 +91,16 @@ describe('AdminService', () => {
     });
   });
 
+  it('derives listUsers offset from page when offset is absent', async () => {
+    databaseService.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await service.listUsers({ page: 3, limit: 10 });
+
+    const [, queryParams] = databaseService.query.mock.calls[0];
+    expect(queryParams.at(-2)).toBe(10);
+    expect(queryParams.at(-1)).toBe(20);
+  });
+
   it('lists admins only', async () => {
     databaseService.query.mockResolvedValueOnce({
       rowCount: 1,

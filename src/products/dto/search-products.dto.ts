@@ -11,8 +11,14 @@ import {
   ValidationArguments,
   ValidationOptions,
 } from 'class-validator';
+import { createOffsetPaginationQueryDto } from '../../common/dto/offset-pagination-query.dto';
 import { PRODUCT_CATEGORIES, PRODUCT_SUBCATEGORIES } from '../product-taxonomy';
 import { IsValidProductCategory, IsValidSubcategoryForCategory } from './product-taxonomy.validators';
+
+const SearchProductsDtoBase = createOffsetPaginationQueryDto({
+  defaultLimit: 20,
+  maxLimit: 100,
+});
 
 function IsNotAfter(siblingProperty: string, validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
@@ -38,7 +44,7 @@ function IsNotAfter(siblingProperty: string, validationOptions?: ValidationOptio
   };
 }
 
-export class SearchProductsDto {
+export class SearchProductsDto extends SearchProductsDtoBase {
   @ApiPropertyOptional({ description: 'Filter by category enum key', enum: PRODUCT_CATEGORIES, example: 'electronics' })
   @IsOptional()
   @IsString()
@@ -107,16 +113,4 @@ export class SearchProductsDto {
   @IsEnum(['asc', 'desc'])
   sortDir?: 'asc' | 'desc';
 
-  @ApiPropertyOptional({ description: 'Page size (1–100, default 20)', example: 20, minimum: 1, maximum: 100 })
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  limit?: number;
-
-  @ApiPropertyOptional({ description: 'Pagination offset (default 0)', example: 0, minimum: 0 })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  offset?: number;
 }

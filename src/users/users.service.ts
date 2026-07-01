@@ -11,6 +11,7 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { FileReadUrlService } from '../files/file-read-url.service';
 import { DEFAULT_PAGE_SIZE } from '../common/constants';
 import { toPositiveInt } from '../common/helpers/id.helpers';
+import { resolveOffsetPagination } from '../common/helpers/pagination.helpers';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { GetPublicUserQueryDto } from './dto/get-public-user-query.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -132,8 +133,7 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    const limit = dto.limit ?? DEFAULT_PAGE_SIZE;
-    const offset = dto.offset ?? 0;
+    const { limit, offset } = resolveOffsetPagination(dto, { defaultLimit: DEFAULT_PAGE_SIZE, maxLimit: 50 });
     const products = await this.databaseService.query(
       `SELECT plv.id, plv.owner_id, plv.category, plv.subcategory, plv.name, plv.description, plv.price, plv.city, plv.address_text,
               plv.details, plv.status, plv.is_negotiable, plv.preferred_contact_method,

@@ -126,6 +126,12 @@ Supported query params:
 - `toDate`
 - `sortBy`: `createdAt`
 - `sortDirection`: `asc`, `desc`
+- `page`: integer, min `1`, default `1`
+- `limit`: integer, min `1`, max `100`
+- `offset`: integer, min `0`
+- `page`: integer, min `1`, default `1`
+- `limit`: integer, min `1`, max `100`
+- `offset`: integer, min `0`
 
 Defaults:
 

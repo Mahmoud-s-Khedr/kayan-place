@@ -9,6 +9,7 @@ import { AuthUser } from '../common/types/auth-user.type';
 import { DatabaseService } from '../database/database.service';
 import { escapeLike } from '../common/helpers/db.helpers';
 import { toPositiveInt } from '../common/helpers/id.helpers';
+import { resolveOffsetPagination } from '../common/helpers/pagination.helpers';
 import { DEFAULT_PAGE_SIZE } from '../common/constants';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ListMyProductsDto } from './dto/list-my-products.dto';
@@ -182,7 +183,8 @@ export class ProductsService {
 
     const leadingParams: unknown[] = [user.sub];
     const { whereClause, params } = this.buildSearchFilters(dto, leadingParams, 'plv.');
-    const allParams = [...leadingParams, ...params, dto.limit ?? DEFAULT_PAGE_SIZE, dto.offset ?? 0];
+    const { limit, offset } = resolveOffsetPagination(dto, { defaultLimit: DEFAULT_PAGE_SIZE, maxLimit: 100 });
+    const allParams = [...leadingParams, ...params, limit, offset];
     const limitIdx = leadingParams.length + params.length + 1;
     const offsetIdx = leadingParams.length + params.length + 2;
     const { sortColumn, sortDir } = this.resolveSort(dto, {
@@ -221,7 +223,8 @@ export class ProductsService {
 
     const leadingParams: unknown[] = [];
     const { whereClause, params } = this.buildSearchFilters(dto, leadingParams, '');
-    const allParams = [...params, dto.limit ?? DEFAULT_PAGE_SIZE, dto.offset ?? 0];
+    const { limit, offset } = resolveOffsetPagination(dto, { defaultLimit: DEFAULT_PAGE_SIZE, maxLimit: 100 });
+    const allParams = [...params, limit, offset];
     const limitIdx = params.length + 1;
     const offsetIdx = params.length + 2;
 

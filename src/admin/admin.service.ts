@@ -5,6 +5,7 @@ import { assertUserExists, escapeLike, isForeignKeyViolation } from '../common/h
 import { RedisService } from '../redis/redis.service';
 import { DEFAULT_PAGE_SIZE } from '../common/constants';
 import { CreateWarningDto } from './dto/create-warning.dto';
+import { resolveOffsetPagination } from '../common/helpers/pagination.helpers';
 import { ListAdminPaginationQueryDto } from './dto/list-admin-pagination-query.dto';
 import { ListUserListingsQueryDto } from './dto/list-user-listings-query.dto';
 import { ListUsersQueryDto } from './dto/list-users-query.dto';
@@ -23,8 +24,7 @@ export class AdminService {
   async listUsers(queryDto: ListUsersQueryDto): Promise<Record<string, unknown>> {
     const status = queryDto.status;
     const q = queryDto.q;
-    const limit = queryDto.limit ?? 50;
-    const offset = queryDto.offset ?? 0;
+    const { limit, offset } = resolveOffsetPagination(queryDto, { defaultLimit: 50, maxLimit: 100 });
 
     const params: unknown[] = [];
     const clauses: string[] = [];
@@ -119,8 +119,7 @@ export class AdminService {
   async listUserListings(userId: number, queryDto: ListUserListingsQueryDto): Promise<Record<string, unknown>> {
     await assertUserExists(this.databaseService, userId);
 
-    const limit = queryDto.limit ?? DEFAULT_PAGE_SIZE;
-    const offset = queryDto.offset ?? 0;
+    const { limit, offset } = resolveOffsetPagination(queryDto, { defaultLimit: DEFAULT_PAGE_SIZE, maxLimit: 100 });
     const status = queryDto.status ?? null;
 
     const query = await this.databaseService.query(
@@ -148,8 +147,7 @@ export class AdminService {
   }
 
   async listAdmins(queryDto: ListAdminPaginationQueryDto): Promise<Record<string, unknown>> {
-    const limit = queryDto.limit ?? DEFAULT_PAGE_SIZE;
-    const offset = queryDto.offset ?? 0;
+    const { limit, offset } = resolveOffsetPagination(queryDto, { defaultLimit: DEFAULT_PAGE_SIZE, maxLimit: 100 });
     const query = await this.databaseService.query(
       `SELECT id, name, phone, status, is_admin, created_at::text AS created_at, updated_at::text AS updated_at
        FROM users

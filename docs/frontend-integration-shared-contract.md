@@ -160,6 +160,20 @@ Response conventions:
 
 Frontend should not auto-convert backend field names unless the application has a consistent mapping layer.
 
+## Pagination Contract
+
+Offset-style collection endpoints accept:
+
+- `page`: optional, minimum `1`, default `1`
+- `limit`: optional, endpoint-specific max, default usually `20`
+- `offset`: optional, minimum `0`, default `0`
+
+Behavior:
+
+- If `offset` is present, it takes precedence.
+- If `offset` is omitted, the backend computes it as `(page - 1) * limit`.
+- `GET /api/chat/conversations/:id/messages` is the exception and remains cursor-paginated with `limit` + `before`.
+
 ## File Upload Lifecycle
 
 Used by profile avatar, faults, gallery, and any future asset-linked flows.

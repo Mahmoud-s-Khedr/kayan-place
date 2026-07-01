@@ -1,7 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsEnum, IsOptional } from 'class-validator';
+import { createOffsetPaginationQueryDto } from '../../common/dto/offset-pagination-query.dto';
 
-export class ListConversationsDto {
+const ListConversationsDtoBase = createOffsetPaginationQueryDto({
+  defaultLimit: 20,
+  maxLimit: 100,
+});
+
+export class ListConversationsDto extends ListConversationsDtoBase {
   @ApiPropertyOptional({
     description: 'Filter conversations by context',
     enum: ['all', 'buy', 'sell'],
@@ -11,16 +17,4 @@ export class ListConversationsDto {
   @IsEnum(['all', 'buy', 'sell'])
   scope?: 'all' | 'buy' | 'sell';
 
-  @ApiPropertyOptional({ description: 'Page size (1–100, default 20)', example: 20, minimum: 1, maximum: 100 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
-
-  @ApiPropertyOptional({ description: 'Pagination offset (default 0)', example: 0, minimum: 0 })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  offset?: number;
 }

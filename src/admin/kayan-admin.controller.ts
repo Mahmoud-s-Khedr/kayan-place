@@ -16,6 +16,7 @@ import {
   FollowupScopeParamDto,
   FollowupStepParamDto,
   GalleryIdParamDto,
+  ListGalleryQueryDto,
   ListAdminFaultsQueryDto,
   ListOrdersQueryDto,
   ListServicesQueryDto,
@@ -117,7 +118,7 @@ export class KayanAdminController {
 
   @Get('gallery')
   @ApiResponse({ status: 200, type: GalleryItemsResponseDto })
-  listGallery(): Promise<Record<string, unknown>> { return this.kayanService.adminListGallery(); }
+  listGallery(@Query() query: ListGalleryQueryDto): Promise<Record<string, unknown>> { return this.kayanService.adminListGallery(query); }
 
   @Post('gallery')
   @ApiResponse({ status: 201, type: GalleryItemResponseDto })

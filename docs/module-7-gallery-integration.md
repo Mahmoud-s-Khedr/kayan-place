@@ -17,7 +17,7 @@ Shared contract:
 
 ### Public Gallery Browsing
 
-1. Call `GET /api/gallery`.
+1. Call `GET /api/gallery` with optional `page`, `limit`, `offset`, and `query`.
 2. Render returned `data.items[]`.
 3. Each item exposes `title`, `description`, `is_active`, `created_at`, and `images[]`.
 
@@ -68,6 +68,13 @@ Sequence:
 
 Public route.
 
+Supported query params:
+
+- `query`
+- `page`: integer, min `1`, default `1`
+- `limit`: integer, min `1`, max `100`
+- `offset`: integer, min `0`
+
 Success:
 
 - `200`
@@ -80,6 +87,13 @@ Public behavior:
 ### `GET /api/admin/gallery`
 
 Auth: admin bearer token required
+
+Supported query params:
+
+- `query`
+- `page`: integer, min `1`, default `1`
+- `limit`: integer, min `1`, max `100`
+- `offset`: integer, min `0`
 
 Success:
 

@@ -82,6 +82,9 @@ Supported query params:
 - `availability`: `active`, `inactive`, `all`
 - `sortBy`: `createdAt`, `price`
 - `sortDirection`: `asc`, `desc`
+- `page`: integer, min `1`, default `1`
+- `limit`: integer, min `1`, max `100`
+- `offset`: integer, min `0`
 
 Defaults:
 
@@ -311,6 +314,9 @@ Supported query params:
 - `toDate`
 - `sortBy`: `createdAt`
 - `sortDirection`: `asc`, `desc`
+- `page`: integer, min `1`, default `1`
+- `limit`: integer, min `1`, max `100`
+- `offset`: integer, min `0`
 
 Success:
 
@@ -386,6 +392,7 @@ Supported query params:
 - `sortDirection`: `asc`, `desc`
 - `page`: integer, min `1`
 - `limit`: integer, min `1`, max `100`
+- `offset`: integer, min `0`
 
 Success:
 

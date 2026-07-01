@@ -138,6 +138,7 @@ Optional query params:
 
 - `page`: integer, min `1`
 - `limit`: integer, min `1`, max `100`
+- `offset`: integer, min `0`
 
 Success:
 

@@ -78,7 +78,8 @@ describe('KayanService', () => {
     expect(queryText).toContain('created_at >= $4');
     expect(queryText).toContain('created_at <= $5');
     expect(queryText).toContain('ORDER BY price ASC, cp.id DESC');
-    expect(params).toEqual(['%chair%', 100, 300, '2026-01-01', '2026-01-31']);
+    expect(queryText).toContain('LIMIT $6 OFFSET $7');
+    expect(params).toEqual(['%chair%', 100, 300, '2026-01-01', '2026-01-31', 20, 0]);
   });
 
   it('adds cart items and returns expanded cart data', async () => {
@@ -224,7 +225,7 @@ describe('KayanService', () => {
 
     const result = await service.listMyOrders(
       { sub: 3, phone: '+201000000003', isAdmin: false },
-      { status: OrderStatus.RECEIVED, fromDate: '2026-02-01', sortDirection: 'asc' as any },
+      { status: OrderStatus.RECEIVED, fromDate: '2026-02-01', sortDirection: 'asc' as any, page: 2, limit: 5 },
     );
 
     expect(result).toMatchObject({
@@ -241,7 +242,39 @@ describe('KayanService', () => {
     expect(queryText).toContain('po.status = $2');
     expect(queryText).toContain('po.created_at >= $3');
     expect(queryText).toContain('ORDER BY po.created_at ASC, po.id DESC');
-    expect(params).toEqual([3, OrderStatus.RECEIVED, '2026-02-01']);
+    expect(queryText).toContain('LIMIT $4 OFFSET $5');
+    expect(params).toEqual([3, OrderStatus.RECEIVED, '2026-02-01', 5, 5]);
+  });
+
+  it('prefers explicit offset over page in my faults list', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 1,
+            user_id: 9,
+            title: 'Leak',
+            description: 'Pipe leak',
+            severity: 'normal',
+            address: 'Cairo',
+            status: 'received',
+            cancelled_at: null,
+            created_at: '2026-02-01T00:00:00.000Z',
+            updated_at: '2026-02-01T00:00:00.000Z',
+            has_rated: false,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await service.listMyFaults(
+      { sub: 9, phone: '+201000000009', isAdmin: false },
+      { page: 3, limit: 10, offset: 4 },
+    );
+
+    const [queryText, params] = databaseService.query.mock.calls[0];
+    expect(queryText).toContain('LIMIT $2 OFFSET $3');
+    expect(params).toEqual([9, 10, 4]);
   });
 
   it('lists admin orders with user information', async () => {
@@ -522,7 +555,8 @@ describe('KayanService', () => {
     expect(queryText).toContain('fr.created_at >= $4');
     expect(queryText).toContain("WHEN 'normal' THEN 1");
     expect(queryText).toContain('END ASC');
-    expect(params).toEqual([5, FaultStatus.ASSIGNED, 'urgent', '2026-01-01']);
+    expect(queryText).toContain('LIMIT $5 OFFSET $6');
+    expect(params).toEqual([5, FaultStatus.ASSIGNED, 'urgent', '2026-01-01', 20, 0]);
   });
 
   it('enriches admin fault list with user and images', async () => {

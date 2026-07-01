@@ -4,13 +4,19 @@ import { ListAdminPaginationQueryDto } from './list-admin-pagination-query.dto';
 
 describe('ListAdminPaginationQueryDto', () => {
   it('rejects invalid pagination values', async () => {
-    const dto = plainToInstance(ListAdminPaginationQueryDto, { limit: 0, offset: 10001 });
+    const dto = plainToInstance(ListAdminPaginationQueryDto, { page: 0, limit: 0, offset: 10001 });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
   });
 
   it('accepts valid pagination values', async () => {
-    const dto = plainToInstance(ListAdminPaginationQueryDto, { limit: 20, offset: 0 });
+    const dto = plainToInstance(ListAdminPaginationQueryDto, { page: 2, limit: 20, offset: 0 });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+  });
+
+  it('accepts page-only pagination values', async () => {
+    const dto = plainToInstance(ListAdminPaginationQueryDto, { page: 3, limit: 20 });
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
   });

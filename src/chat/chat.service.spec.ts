@@ -61,6 +61,15 @@ describe('ChatService', () => {
     expect(row.last_message_sent_at).toBe('2026-01-01T00:01:00.000Z');
   });
 
+  it('derives conversations offset from page when offset is absent', async () => {
+    databaseService.query.mockResolvedValueOnce({ rows: [] });
+
+    await service.listConversations(1, 'all', { page: 4, limit: 10 });
+
+    const [, queryParams] = databaseService.query.mock.calls[0];
+    expect(queryParams).toEqual([1, 'all', 10, 30]);
+  });
+
   it('throws forbidden with NOT_PARTICIPANT reason when sender is outside conversation', async () => {
     databaseService.query.mockResolvedValueOnce({
       rowCount: 1,

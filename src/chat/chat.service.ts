@@ -5,6 +5,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { OffsetPaginationQuery } from '../common/dto/offset-pagination-query.dto';
+import { resolveOffsetPagination } from '../common/helpers/pagination.helpers';
 import { DatabaseService } from '../database/database.service';
 import { assertUserExists, isForeignKeyViolation } from '../common/helpers/db.helpers';
 
@@ -90,9 +92,9 @@ export class ChatService {
   async listConversations(
     userId: number,
     scope: 'all' | 'buy' | 'sell' = 'all',
-    limit = 20,
-    offset = 0,
+    pagination: OffsetPaginationQuery = {},
   ): Promise<Record<string, unknown>> {
+    const { limit, offset } = resolveOffsetPagination(pagination, { defaultLimit: 20, maxLimit: 100 });
     const query = await this.databaseService.query(
       `SELECT c.id,
               c.product_id,
