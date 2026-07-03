@@ -39,6 +39,14 @@ describe('configuration', () => {
     expect(config.logWsPayload).toBe(false);
   });
 
+  it('parses multiple CORS origins from a comma-separated env var', () => {
+    process.env.CORS_ORIGINS = 'https://a.com, https://b.com';
+
+    const config = configuration();
+
+    expect(config.corsOrigins).toEqual(['https://a.com', 'https://b.com']);
+  });
+
   it('requires resend credentials when otp provider is resend', () => {
     process.env.OTP_PROVIDER = 'resend';
     delete process.env.RESEND_API_KEY;

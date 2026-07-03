@@ -1,0 +1,38 @@
+import { IoAdapter } from '@nestjs/platform-socket.io';
+import { RedisIoAdapter } from './redis-io.adapter';
+
+describe('RedisIoAdapter', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('passes multiple explicit origins with credentials enabled', () => {
+    const server = { adapter: jest.fn() };
+    const createIOServerSpy = jest.spyOn(IoAdapter.prototype as any, 'createIOServer').mockReturnValue(server);
+    const adapter = new RedisIoAdapter({} as any, ['https://a.com', 'https://b.com']);
+
+    adapter.createIOServer(3000);
+
+    expect(createIOServerSpy).toHaveBeenCalledWith(3000, expect.objectContaining({
+      cors: {
+        origin: ['https://a.com', 'https://b.com'],
+        credentials: true,
+      },
+    }));
+  });
+
+  it('uses wildcard-compatible CORS for websocket server', () => {
+    const server = { adapter: jest.fn() };
+    const createIOServerSpy = jest.spyOn(IoAdapter.prototype as any, 'createIOServer').mockReturnValue(server);
+    const adapter = new RedisIoAdapter({} as any, ['*']);
+
+    adapter.createIOServer(3000);
+
+    expect(createIOServerSpy).toHaveBeenCalledWith(3000, expect.objectContaining({
+      cors: {
+        origin: true,
+        credentials: false,
+      },
+    }));
+  });
+});

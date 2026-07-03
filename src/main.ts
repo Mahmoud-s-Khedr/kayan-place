@@ -13,6 +13,7 @@ import { HttpResponseEnvelopeInterceptor } from './common/interceptors/http-resp
 import { AppConfig } from './config/configuration';
 import { RedisIoAdapter } from './chat/redis-io.adapter';
 import { ErrorDetailDto, ErrorResponseDto } from './common/dto/error-response.dto';
+import { buildSharedCorsOptions } from './common/helpers/cors.helpers';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -44,12 +45,10 @@ async function bootstrap(): Promise<void> {
 
   app.setGlobalPrefix('api');
 
-  if (appConfig.corsOrigins.length > 0) {
-    const hasWildcardOrigin = appConfig.corsOrigins.includes('*');
+  const corsOptions = buildSharedCorsOptions(appConfig.corsOrigins);
+  if (corsOptions) {
     app.enableCors({
-      // Browsers reject wildcard CORS with credentials=true.
-      origin: hasWildcardOrigin ? true : appConfig.corsOrigins,
-      credentials: hasWildcardOrigin ? false : true,
+      ...corsOptions,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     });

@@ -16,6 +16,9 @@ export class UserDto {
   @ApiProperty({ example: '+201012345678' })
   phone!: string;
 
+  @ApiPropertyOptional({ example: '123 Main St, Cairo', nullable: true })
+  address!: string | null;
+
   @ApiProperty({ example: 'active', enum: ['active', 'paused', 'banned'] })
   status!: string;
 

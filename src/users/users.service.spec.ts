@@ -20,7 +20,7 @@ describe('UsersService', () => {
   });
 
   describe('getMe', () => {
-    it('returns user profile with resolved avatar object and contactInfo', async () => {
+    it('returns user profile with resolved avatar object, contactInfo, and address', async () => {
       databaseService.query.mockResolvedValue({
         rowCount: 1,
         rows: [{
@@ -38,6 +38,7 @@ describe('UsersService', () => {
           avatar_created_at: '2026-01-01T00:00:00.000Z',
           avatar_uploaded_at: '2026-01-01T00:00:00.000Z',
           contact_info: '+201000000001',
+          address: '123 Main St, Cairo',
         }],
       });
 
@@ -47,6 +48,7 @@ describe('UsersService', () => {
         user: expect.objectContaining({
           email: 'alice@example.com',
           contactInfo: '+201000000001',
+          address: '123 Main St, Cairo',
           avatar: expect.objectContaining({
             id: 7,
             url: 'https://res.cloudinary.com/demo/image/upload/users/1/avatar.jpg',
@@ -62,6 +64,7 @@ describe('UsersService', () => {
         rows: [{
           avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
           avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: null,
+          address: null,
         }],
       });
 
@@ -124,7 +127,7 @@ describe('UsersService', () => {
             avatar_file_id: 99, avatar_object_key: 'users/1/avatar.jpg', avatar_mime_type: 'image/jpeg',
             avatar_purpose: 'avatar', avatar_status: 'uploaded',
             avatar_created_at: '2026-01-01T00:00:00.000Z', avatar_uploaded_at: '2026-01-01T00:00:00.000Z',
-            contact_info: null,
+            contact_info: null, address: null,
           }],
         });
 
@@ -154,6 +157,7 @@ describe('UsersService', () => {
           rows: [{
             avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
             avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: null,
+            address: null,
           }],
         });
 
@@ -169,7 +173,7 @@ describe('UsersService', () => {
           rowCount: 1,
           rows: [{
             avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
-            avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: '+201111111111',
+            avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: '+201111111111', address: null,
           }],
         });
 
@@ -191,7 +195,7 @@ describe('UsersService', () => {
           rows: [{
             avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
             avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: null,
-            id: 1, email: 'alice@example.com', name: 'Alice', phone: '+201222222222', status: 'active'
+            id: 1, email: 'alice@example.com', name: 'Alice', phone: '+201222222222', status: 'active', address: null,
           }],
         });
 
@@ -222,7 +226,7 @@ describe('UsersService', () => {
           rows: [{
             avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
             avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null, contact_info: '+201555555555',
-            id: 1, email: 'alice@example.com', name: 'Alice Updated', phone: '+201444444444', status: 'active'
+            id: 1, email: 'alice@example.com', name: 'Alice Updated', phone: '+201444444444', status: 'active', address: null,
           }],
         });
 
@@ -237,6 +241,28 @@ describe('UsersService', () => {
           name: 'Alice Updated',
           phone: '+201444444444',
           contactInfo: '+201555555555',
+        }),
+      });
+    });
+
+    it('returns updated address after profile patch', async () => {
+      databaseService.query
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+        .mockResolvedValueOnce({
+          rowCount: 1,
+          rows: [{
+            avatar_file_id: null, avatar_object_key: null, avatar_mime_type: null,
+            avatar_purpose: null, avatar_status: null, avatar_created_at: null, avatar_uploaded_at: null,
+            contact_info: null, id: 1, email: 'alice@example.com', name: 'Alice', phone: '+201000000001',
+            status: 'active', address: 'Cairo, Nasr City',
+          }],
+        });
+
+      const result = await service.updateMe(user, { address: 'Cairo, Nasr City' });
+
+      expect(result).toMatchObject({
+        user: expect.objectContaining({
+          address: 'Cairo, Nasr City',
         }),
       });
     });
