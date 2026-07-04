@@ -32,6 +32,8 @@ Shared contract:
 Use `GET /api/services/me` with optional:
 
 - `serviceType`
+- `status`
+- `search`
 - `fromDate`
 - `toDate`
 - `sortBy=createdAt`
@@ -122,6 +124,8 @@ Success:
 Supported query params:
 
 - `serviceType`
+- `status`
+- `search`
 - `fromDate`
 - `toDate`
 - `sortBy`: `createdAt`
@@ -159,6 +163,8 @@ Auth: admin bearer token required
 Supported query params:
 
 - `serviceType`
+- `status`
+- `search`
 - `fromDate`
 - `toDate`
 - `sortBy`: `createdAt`

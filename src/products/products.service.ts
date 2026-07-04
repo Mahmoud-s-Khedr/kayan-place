@@ -286,11 +286,11 @@ export class ProductsService {
     }
     if (dto.fromDate) {
       params.push(dto.fromDate);
-      clauses.push(`AND ${prefix}created_at >= $${base + params.length}`);
+      clauses.push(`AND ${prefix}created_at >= $${base + params.length}::date`);
     }
     if (dto.toDate) {
       params.push(dto.toDate);
-      clauses.push(`AND ${prefix}created_at <= $${base + params.length}`);
+      clauses.push(`AND ${prefix}created_at < ($${base + params.length}::date + INTERVAL '1 day')`);
     }
     if (dto.city) {
       params.push(`%${escapeLike(dto.city)}%`);

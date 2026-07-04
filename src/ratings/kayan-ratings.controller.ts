@@ -23,7 +23,7 @@ export class KayanRatingsController {
 
   @Get('items/:itemId')
   @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({ summary: 'Get reviews for a specific item (fault, service, or order)' })
+  @ApiOperation({ summary: 'Get reviews for a specific item (product, fault, or service)' })
   @ApiResponse({ status: 200, type: KayanRatingsResponseDto })
   getItemReviews(@Param() params: ItemIdParamDto, @Query() query: GetItemReviewsQueryDto): Promise<Record<string, unknown>> {
     return this.kayanService.getItemReviews(params.itemId, query);

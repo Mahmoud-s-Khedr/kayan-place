@@ -35,6 +35,7 @@ const FK_RULES: Record<string, FkRule> = {
   reporter_id: { entity: 'user' },
   reviewed_by: { entity: 'user', outputKey: 'reviewed_by' },
   sender_id: { entity: 'user' },
+  step_image_file_id: { entity: 'file', outputKey: 'step_image' },
   target_user_id: { entity: 'user' },
   uploader_user_id: { entity: 'user' },
   user_a_id: { entity: 'user' },

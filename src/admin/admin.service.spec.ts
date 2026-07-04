@@ -46,6 +46,7 @@ describe('AdminService', () => {
 
     expect(result).toEqual({
       users: [{
+        address: null,
         id: 12,
         name: 'Counted User',
         phone: '+201000000012',
@@ -78,6 +79,7 @@ describe('AdminService', () => {
 
     expect(result).toEqual({
       users: [{
+        address: null,
         id: 13,
         name: 'Zero Counts User',
         phone: '+201000000013',
@@ -118,7 +120,7 @@ describe('AdminService', () => {
     const result = await service.listAdmins({});
 
     expect(result).toEqual({
-      admins: [{ id: 2, name: 'Admin', phone: '+201000000002', email: '', profileState: 'active', is_admin: true, created_at: '2026-01-05T00:00:00.000Z', updated_at: '2026-01-06T00:00:00.000Z' }],
+      admins: [{ id: 2, name: 'Admin', phone: '+201000000002', email: '', address: null, profileState: 'active', is_admin: true, created_at: '2026-01-05T00:00:00.000Z', updated_at: '2026-01-06T00:00:00.000Z' }],
     });
   });
 
@@ -151,6 +153,7 @@ describe('AdminService', () => {
         name: 'User',
         phone: '+201000000007',
         email: '',
+        address: null,
         profileState: 'active',
         is_admin: true,
         token_version: 1,
@@ -203,6 +206,7 @@ describe('AdminService', () => {
         name: 'Other Admin',
         phone: '+201000000008',
         email: '',
+        address: null,
         profileState: 'active',
         is_admin: false,
         token_version: 4,
@@ -235,6 +239,7 @@ describe('AdminService', () => {
         name: 'Target User',
         phone: '+201000000005',
         email: '',
+        address: null,
         profileState: 'active',
         status: 'active',
         avatar_file_id: 10,
@@ -244,6 +249,29 @@ describe('AdminService', () => {
         updated_at: '2026-01-02T00:00:00.000Z',
       },
     });
+  });
+
+  it('lists archived products for admin user listings', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 12 }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 91,
+          name: 'Archived Product',
+          price: '600.00',
+          status: 'archived',
+          city: 'Cairo',
+          created_at: '2026-03-28T12:00:00.000Z',
+          product_image_file_id: null,
+        }],
+      });
+
+    const result = await service.listUserListings(12, { status: 'archived', limit: 20, offset: 0 });
+
+    expect(result).toEqual({
+      items: [expect.objectContaining({ id: 91, status: 'archived' })],
+    });
+    expect(databaseService.query.mock.calls[1][0]).not.toContain("p.status IN ('available', 'sold')");
   });
 
 });

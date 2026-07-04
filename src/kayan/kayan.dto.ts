@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Length, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { createOffsetPaginationQueryDto } from '../common/dto/offset-pagination-query.dto';
 
 export enum OrderStatus {
@@ -41,6 +41,12 @@ export enum ServiceType {
 
 export enum ItemType {
   ORDER = 'order',
+  FAULT = 'fault',
+  SERVICE = 'service',
+}
+
+export enum RatingItemType {
+  PRODUCT = 'product',
   FAULT = 'fault',
   SERVICE = 'service',
 }
@@ -180,6 +186,7 @@ export class AdminUpdateFaultStatusDto {
 export class ListMyFaultsQueryDto extends KayanListPaginationQueryDto {
   @IsOptional() @IsEnum(FaultStatus) status?: FaultStatus;
   @IsOptional() @IsEnum(FaultSeverity) severity?: FaultSeverity;
+  @IsOptional() @IsString() @IsNotEmpty() search?: string;
   @IsOptional() @IsDateString() fromDate?: string;
   @IsOptional() @IsDateString() toDate?: string;
   @IsOptional() @IsEnum(FaultSortBy) sortBy?: FaultSortBy;
@@ -203,6 +210,8 @@ export class AdminUpdateServiceStatusDto {
 
 export class ListServicesQueryDto extends KayanListPaginationQueryDto {
   @IsOptional() @IsEnum(ServiceType) serviceType?: ServiceType;
+  @IsOptional() @IsEnum(ServiceStatus) status?: ServiceStatus;
+  @IsOptional() @IsString() @IsNotEmpty() search?: string;
   @IsOptional() @IsDateString() fromDate?: string;
   @IsOptional() @IsDateString() toDate?: string;
   @IsOptional() @IsEnum(ServiceSortBy) sortBy?: ServiceSortBy;
@@ -243,15 +252,15 @@ export class UpdateGalleryItemDto {
 }
 
 export class CreateItemRatingDto {
-  @IsEnum(ItemType) itemType!: ItemType;
-  @ValidateIf((dto: CreateItemRatingDto) => dto.itemType !== ItemType.ORDER)
+  @IsEnum(RatingItemType) itemType!: RatingItemType;
+  @ValidateIf((dto: CreateItemRatingDto) => dto.itemType !== RatingItemType.PRODUCT)
   @IsInt() @Min(1) itemId?: number;
-  @ValidateIf((dto: CreateItemRatingDto) => dto.itemType === ItemType.ORDER)
+  @ValidateIf((dto: CreateItemRatingDto) => dto.itemType === RatingItemType.PRODUCT)
   @IsInt() @Min(1) orderId?: number;
-  @ValidateIf((dto: CreateItemRatingDto) => dto.itemType === ItemType.ORDER)
+  @ValidateIf((dto: CreateItemRatingDto) => dto.itemType === RatingItemType.PRODUCT && dto.itemId === undefined)
   @IsInt() @Min(1) productId?: number;
   @IsInt() @Min(1) @Max(5) ratingValue!: number;
-  @IsOptional() @IsString() @Min(1) @Max(2000) comment?: string;
+  @IsOptional() @IsString() @Length(1, 2000) comment?: string;
 }
 
 export class CreateFollowupConversationDto {
@@ -312,7 +321,7 @@ export class ListGalleryQueryDto extends KayanListPaginationQueryDto {
 export class ListFollowupStepsQueryDto extends KayanFollowupPaginationQueryDto {}
 
 export class GetItemReviewsQueryDto extends KayanListPaginationQueryDto {
-  @IsEnum(ItemType) itemType!: ItemType;
+  @IsEnum(RatingItemType) itemType!: RatingItemType;
 }
 
 export class ItemIdParamDto {
@@ -322,6 +331,7 @@ export class ItemIdParamDto {
 export class ListAdminFaultsQueryDto extends KayanListPaginationQueryDto {
   @IsOptional() @IsEnum(FaultStatus) status?: FaultStatus;
   @IsOptional() @IsEnum(FaultSeverity) severity?: FaultSeverity;
+  @IsOptional() @IsString() @IsNotEmpty() search?: string;
   @IsOptional() @IsDateString() fromDate?: string;
   @IsOptional() @IsDateString() toDate?: string;
   @IsOptional() @IsEnum(FaultSortBy) sortBy?: FaultSortBy;

@@ -136,7 +136,6 @@ export class AdminService {
        FROM products p
        WHERE p.owner_id = $1
          AND p.deleted_at IS NULL
-         AND p.status IN ('available', 'sold')
          AND ($2::product_status IS NULL OR p.status = $2::product_status)
        ORDER BY p.created_at DESC
        LIMIT $3 OFFSET $4`,

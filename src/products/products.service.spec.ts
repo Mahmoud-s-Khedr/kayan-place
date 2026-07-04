@@ -216,7 +216,7 @@ describe('ProductsService', () => {
     expect(queryText).toContain('plv.price >= $3');
     expect(queryText).toContain('plv.price <= $4');
     expect(queryText).toContain('plv.created_at >= $5');
-    expect(queryText).toContain('plv.created_at <= $6');
+    expect(queryText).toContain("plv.created_at < ($6::date + INTERVAL '1 day')");
     expect(queryText).toContain("plv.city ILIKE $7 ESCAPE '\\'");
     expect(queryText).toContain("plv.address_text ILIKE $8 ESCAPE '\\'");
     expect(queryText).toContain("plainto_tsquery('simple', $9)");

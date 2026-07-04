@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { KayanService } from './kayan.service';
-import { FaultStatus, ItemType, OrderStatus, ServiceStatus, ServiceType } from './kayan.dto';
+import { FaultStatus, ItemType, OrderStatus, RatingItemType, ServiceStatus, ServiceType } from './kayan.dto';
 
 describe('KayanService', () => {
   const databaseService = {
@@ -76,7 +76,7 @@ describe('KayanService', () => {
     expect(queryText).toContain('price >= $2');
     expect(queryText).toContain('price <= $3');
     expect(queryText).toContain('created_at >= $4');
-    expect(queryText).toContain('created_at <= $5');
+    expect(queryText).toContain("created_at < ($5::date + INTERVAL '1 day')");
     expect(queryText).toContain('ORDER BY price ASC, cp.id DESC');
     expect(queryText).toContain('LIMIT $6 OFFSET $7');
     expect(params).toEqual(['%chair%', 100, 300, '2026-01-01', '2026-01-31', 20, 0]);
@@ -261,7 +261,7 @@ describe('KayanService', () => {
             cancelled_at: null,
             created_at: '2026-02-01T00:00:00.000Z',
             updated_at: '2026-02-01T00:00:00.000Z',
-            has_rated: false,
+            rate: null,
           },
         ],
       })
@@ -354,7 +354,7 @@ describe('KayanService', () => {
     expect(queryText).toContain('so.user_id = $1');
     expect(queryText).toContain('so.service_type = $2');
     expect(queryText).toContain('so.created_at >= $3');
-    expect(queryText).toContain('so.created_at <= $4');
+    expect(queryText).toContain("so.created_at < ($4::date + INTERVAL '1 day')");
     expect(queryText).toContain('ORDER BY so.created_at ASC, so.id DESC');
     expect(params).toEqual([6, ServiceType.MAINTENANCE, '2026-03-01', '2026-03-31', 20, 0]);
   });
@@ -405,9 +405,31 @@ describe('KayanService', () => {
     expect(queryText).toContain('LEFT JOIN users u ON u.id = so.user_id');
     expect(queryText).toContain('so.service_type = $1');
     expect(queryText).toContain('so.created_at >= $2');
-    expect(queryText).toContain('so.created_at <= $3');
+    expect(queryText).toContain("so.created_at < ($3::date + INTERVAL '1 day')");
     expect(queryText).toContain('ORDER BY so.created_at DESC, so.id DESC');
     expect(params).toEqual([ServiceType.DESIGNING, '2026-04-01', '2026-04-30', 20, 0]);
+  });
+
+  it('applies search and status filters in services list', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '0' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await service.listMyServices(
+      { sub: 6, phone: '+201000000006', isAdmin: false },
+      {
+        serviceType: ServiceType.MAINTENANCE,
+        status: ServiceStatus.NOT_STARTED,
+        search: 'AC',
+        limit: 10,
+        offset: 5,
+      },
+    );
+
+    const [queryText, params] = databaseService.query.mock.calls[1];
+    expect(queryText).toContain('so.status = $3');
+    expect(queryText).toContain("so.description ILIKE $4 ESCAPE '\\'");
+    expect(params).toEqual([6, ServiceType.MAINTENANCE, ServiceStatus.NOT_STARTED, '%AC%', 10, 5]);
   });
 
   it('creates a product rating only for delivered ordered products', async () => {
@@ -421,11 +443,13 @@ describe('KayanService', () => {
 
     const result = await service.createItemRating(
       { sub: 4, phone: '+201000000004', isAdmin: false },
-      { itemType: ItemType.ORDER, orderId: 6, productId: 2, ratingValue: 5 },
+      { itemType: RatingItemType.PRODUCT, itemId: 2, orderId: 6, ratingValue: 5 },
     );
 
     expect(result).toEqual({
       rating: expect.objectContaining({
+        item_type: RatingItemType.PRODUCT,
+        item_id: 2,
         order_id: 6,
         product_id: 2,
         rating_value: 5,
@@ -442,9 +466,43 @@ describe('KayanService', () => {
     await expect(
       service.createItemRating(
         { sub: 4, phone: '+201000000004', isAdmin: false },
-        { itemType: ItemType.ORDER, orderId: 6, productId: 2, ratingValue: 5 },
+        { itemType: RatingItemType.PRODUCT, itemId: 2, orderId: 6, ratingValue: 5 },
       ),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('returns product reviews from product_ratings when itemType=product', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 11,
+          user_id: 4,
+          item_type: RatingItemType.PRODUCT,
+          item_id: 2,
+          order_id: 6,
+          product_id: 2,
+          rating_value: 5,
+          comment: 'Excellent',
+          created_at: '2026-04-01T00:00:00.000Z',
+        }],
+      });
+
+    const result = await service.getItemReviews(2, { itemType: RatingItemType.PRODUCT });
+
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({
+          item_type: RatingItemType.PRODUCT,
+          item_id: 2,
+          order_id: 6,
+          product_id: 2,
+        }),
+      ],
+      total: 1,
+    });
+    expect(databaseService.query.mock.calls[0][0]).toContain('FROM product_ratings');
+    expect(databaseService.query.mock.calls[1][0]).toContain('FROM product_ratings');
   });
 
   it('rejects service rating before service is finished', async () => {
@@ -455,7 +513,7 @@ describe('KayanService', () => {
     await expect(
       service.createItemRating(
         { sub: 7, phone: '+201000000007', isAdmin: false },
-        { itemType: ItemType.SERVICE, itemId: 77, ratingValue: 5 },
+        { itemType: RatingItemType.SERVICE, itemId: 77, ratingValue: 5 },
       ),
     ).rejects.toThrow(BadRequestException);
   });
@@ -469,7 +527,7 @@ describe('KayanService', () => {
     await expect(
       service.createItemRating(
         { sub: 7, phone: '+201000000007', isAdmin: false },
-        { itemType: ItemType.SERVICE, itemId: 77, ratingValue: 5 },
+        { itemType: RatingItemType.SERVICE, itemId: 77, ratingValue: 5 },
       ),
     ).rejects.toThrow(BadRequestException);
   });

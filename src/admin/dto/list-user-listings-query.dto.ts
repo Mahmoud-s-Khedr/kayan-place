@@ -11,11 +11,11 @@ const ListUserListingsQueryDtoBase = createOffsetPaginationQueryDto({
 export class ListUserListingsQueryDto extends ListUserListingsQueryDtoBase {
   @ApiPropertyOptional({
     description: 'Filter user listings by status for admin view',
-    enum: ['available', 'sold'],
+    enum: ['available', 'sold', 'archived'],
     example: 'available',
   })
   @IsOptional()
-  @IsEnum(['available', 'sold'])
-  status?: 'available' | 'sold';
+  @IsEnum(['available', 'sold', 'archived'])
+  status?: 'available' | 'sold' | 'archived';
 
 }

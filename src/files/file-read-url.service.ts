@@ -15,21 +15,38 @@ export class FileReadUrlService {
         ? 'video'
         : 'raw';
     const format = this.resolveFormat(mimeType);
-    const publicIdWithOptionalFormat = format ? `${objectKey}.${format}` : objectKey;
+    const publicIdWithOptionalFormat = resourceType === 'raw'
+      ? this.appendFormatIfMissing(objectKey, format)
+      : (format ? `${objectKey}.${format}` : objectKey);
 
     const cloudName = this.configService.get('app', { infer: true }).cloudinaryCloudName;
     return `https://res.cloudinary.com/${cloudName}/${resourceType}/upload/${publicIdWithOptionalFormat}`;
   }
 
   private resolveFormat(mimeType: string): string | null {
-    if (!mimeType || (!mimeType.startsWith('image/') && !mimeType.startsWith('video/'))) {
+    if (!mimeType) {
       return null;
     }
 
     const subtype = mimeType.split('/')[1]?.split('+')[0]?.toLowerCase();
     if (!subtype) return null;
     if (subtype === 'jpeg') return 'jpg';
+    if (subtype === 'plain') return 'txt';
+    if (subtype === 'msword') return 'doc';
+    if (subtype === 'vnd.openxmlformats-officedocument.wordprocessingml.document') return 'docx';
+    if (subtype === 'vnd.openxmlformats-officedocument.spreadsheetml.sheet') return 'xlsx';
+    if (subtype === 'vnd.ms-excel') return 'xls';
+    if (subtype === 'vnd.openxmlformats-officedocument.presentationml.presentation') return 'pptx';
+    if (subtype === 'vnd.ms-powerpoint') return 'ppt';
 
     return subtype;
+  }
+
+  private appendFormatIfMissing(objectKey: string, format: string | null): string {
+    if (!format) {
+      return objectKey;
+    }
+
+    return objectKey.toLowerCase().endsWith(`.${format}`) ? objectKey : `${objectKey}.${format}`;
   }
 }

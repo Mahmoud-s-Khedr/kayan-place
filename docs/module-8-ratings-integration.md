@@ -18,7 +18,7 @@ Ratings apply to three types of items:
 
 | `itemType` | Description |
 |---|---|
-| `order` | A product purchased via a delivered order |
+| `product` | A product purchased via a delivered order |
 | `fault` | A fault report that has reached `finished` status |
 | `service` | A service order that has reached `finished` status |
 
@@ -31,9 +31,9 @@ The request body shape differs depending on `itemType` — see the endpoint cont
 Once an order status is `delivered`, the buyer can rate each product in that order:
 
 1. Call `POST /api/ratings` with:
-   - `itemType: "order"`
+   - `itemType: "product"`
+   - `itemId`: the product ID
    - `orderId`: the order ID
-   - `productId`: the product ID within that order
    - `ratingValue`: integer 1–5
    - `comment`: optional string
 
@@ -79,13 +79,13 @@ Authentication is optional — the endpoint uses `OptionalJwtAuthGuard`.
 
 Auth: bearer token required
 
-**For order/product ratings:**
+**For product ratings:**
 
 ```json
 {
-  "itemType": "order",
+  "itemType": "product",
+  "itemId": 12,
   "orderId": 101,
-  "productId": 12,
   "ratingValue": 5,
   "comment": "Excellent quality!"
 }
@@ -104,15 +104,15 @@ Auth: bearer token required
 
 Validation:
 
-- `itemType`: required, must be `order`, `fault`, or `service`
-- `itemId`: required integer, min `1` — **only when `itemType` is `fault` or `service`**
-- `orderId`: required integer, min `1` — **only when `itemType` is `order`**
-- `productId`: required integer, min `1` — **only when `itemType` is `order`**
+- `itemType`: required, must be `product`, `fault`, or `service`
+- `itemId`: required integer, min `1` — **used as the product ID when `itemType` is `product`, or the target item ID for `fault`/`service`**
+- `orderId`: required integer, min `1` — **only when `itemType` is `product`**
+- `productId`: optional legacy alias for the product ID when `itemType` is `product`
 - `ratingValue`: required integer, `1-5`
 - `comment`: optional string, 1-2000 chars
 
 > [!IMPORTANT]
-> The required fields differ by `itemType`. Sending `itemId` when `itemType` is `order` will fail validation, and vice versa.
+> Product reviews are product-oriented now: send `itemType="product"` and the product ID as `itemId`, plus the delivered `orderId` used for ownership validation.
 
 Success:
 
@@ -132,7 +132,7 @@ Auth: optional (public access allowed)
 
 Required query param:
 
-- `itemType`: `order`, `fault`, or `service`
+- `itemType`: `product`, `fault`, or `service`
 
 Optional query params:
 

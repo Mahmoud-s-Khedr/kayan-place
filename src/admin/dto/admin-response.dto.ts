@@ -186,7 +186,7 @@ export class AdminUserListingDto {
   @ApiProperty({ example: '600.00' })
   price!: string;
 
-  @ApiProperty({ example: 'available', enum: ['available', 'sold'] })
+  @ApiProperty({ example: 'available', enum: ['available', 'sold', 'archived'] })
   status!: string;
 
   @ApiProperty({ example: 'Cairo' })

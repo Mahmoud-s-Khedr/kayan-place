@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SuccessEnvelopeDto } from '../common/dto/api-response-envelope.dto';
-import { FaultSeverity, FaultStatus, ItemType, OrderStatus, ServiceStatus, ServiceType } from './kayan.dto';
+import { RelatedFileDto } from '../common/dto/related-entities.dto';
+import { FaultSeverity, FaultStatus, ItemType, OrderStatus, RatingItemType, ServiceStatus, ServiceType } from './kayan.dto';
 
 class KayanAssetDto {
   @ApiProperty() file_id!: number;
@@ -38,7 +39,13 @@ class KayanCartItemDto {
 class KayanOrderItemProductDto {
   @ApiProperty() id!: number;
   @ApiPropertyOptional({ nullable: true }) title!: string | null;
+  @ApiPropertyOptional({ nullable: true }) description!: string | null;
+  @ApiPropertyOptional({ nullable: true }) amount!: number | null;
+  @ApiPropertyOptional({ nullable: true }) price!: string | null;
+  @ApiPropertyOptional({ nullable: true, type: Object }) details!: Record<string, unknown> | null;
   @ApiPropertyOptional({ nullable: true }) is_active!: boolean | null;
+  @ApiProperty({ type: [KayanAssetDto] }) images!: KayanAssetDto[];
+  @ApiProperty({ type: [KayanAssetDto] }) files!: KayanAssetDto[];
 }
 
 class KayanOrderItemDto {
@@ -86,7 +93,7 @@ class KayanFaultDto {
   @ApiPropertyOptional({ nullable: true }) cancelled_at!: string | null;
   @ApiProperty() created_at!: string;
   @ApiProperty() updated_at!: string;
-  @ApiPropertyOptional({ nullable: true }) has_rated!: boolean | null;
+  @ApiPropertyOptional({ type: () => ItemRatingDto, nullable: true }) rate!: ItemRatingDto | null;
   @ApiProperty({ type: [KayanAssetDto] }) images!: KayanAssetDto[];
   @ApiPropertyOptional({ type: KayanFaultUserDto }) user?: KayanFaultUserDto;
 }
@@ -108,6 +115,7 @@ class KayanServiceDto {
   @ApiPropertyOptional({ nullable: true }) cancelled_at!: string | null;
   @ApiProperty() created_at!: string;
   @ApiProperty() updated_at!: string;
+  @ApiPropertyOptional({ type: () => ItemRatingDto, nullable: true }) rate!: ItemRatingDto | null;
   @ApiPropertyOptional({ type: KayanServiceUserDto }) user?: KayanServiceUserDto;
 }
 
@@ -116,7 +124,7 @@ class FollowupStepDto {
   @ApiProperty({ enum: ItemType }) item_type!: ItemType;
   @ApiProperty() item_id!: number;
   @ApiProperty() title!: string;
-  @ApiPropertyOptional({ nullable: true }) step_image_file_id!: number | null;
+  @ApiPropertyOptional({ type: RelatedFileDto, nullable: true }) step_image!: RelatedFileDto | null;
   @ApiProperty() sort_order!: number;
   @ApiProperty() created_at!: string;
 }
@@ -149,7 +157,7 @@ class FollowupMessageDto {
 class ItemRatingDto {
   @ApiProperty() id!: number;
   @ApiProperty() user_id!: number;
-  @ApiPropertyOptional({ nullable: true }) item_type?: ItemType;
+  @ApiPropertyOptional({ nullable: true, enum: RatingItemType }) item_type?: RatingItemType;
   @ApiPropertyOptional({ nullable: true }) item_id?: number;
   @ApiPropertyOptional({ nullable: true }) order_id?: number;
   @ApiPropertyOptional({ nullable: true }) product_id?: number;

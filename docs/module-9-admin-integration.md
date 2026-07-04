@@ -143,7 +143,7 @@ Path param:
 
 Supported query params:
 
-- `status`: `available`, `sold`
+- `status`: `available`, `sold`, `archived`
 - `page`: integer, min `1`, default `1`
 - `limit`: integer, 1-100 (default `20`)
 - `offset`: integer, 0-10000 (default `0`)

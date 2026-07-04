@@ -56,6 +56,7 @@ Use `GET /api/faults/me` with optional filters:
 
 - `status`
 - `severity`
+- `search`
 - `fromDate`
 - `toDate`
 - `sortBy`: `createdAt`, `severity`
@@ -138,6 +139,7 @@ Supported query params:
 
 - `status`
 - `severity`
+- `search`
 - `fromDate`
 - `toDate`
 - `sortBy`: `createdAt`, `severity`
@@ -176,6 +178,7 @@ Important fault fields:
 - `cancelled_at`
 - `created_at`
 - `updated_at`
+- `rate`
 - `images[]`
 
 ### `POST /api/faults/:id/cancel`
@@ -195,6 +198,7 @@ Supported query params:
 
 - `status`: `received`, `assigned`, `on_the_way`, `in_progress`, `finished`, `cancelled`
 - `severity`: `normal`, `high`, `urgent`, `emergent`
+- `search`
 - `fromDate`
 - `toDate`
 - `sortBy`: `createdAt`, `severity`

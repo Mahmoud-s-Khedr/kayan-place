@@ -351,6 +351,8 @@ Important order item fields:
 - `unit_price`
 - `product.id`
 - `product.title`
+- `product.description`
+- `product.price`
 - `product.is_active`
 
 ### `PATCH /api/orders/:id/address`

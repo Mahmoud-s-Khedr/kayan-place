@@ -100,7 +100,7 @@ Step fields:
 - `item_type`
 - `item_id`
 - `title`
-- `step_image_file_id`
+- `step_image`
 - `sort_order`
 - `created_at`
 

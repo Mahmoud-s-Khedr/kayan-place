@@ -32,6 +32,7 @@ import {
   OrderStatus,
   ProductAvailabilityFilter,
   ProductSortBy,
+  RatingItemType,
   SendFollowupMessageDto,
   ServiceSortBy,
   ServiceStatus,
@@ -107,11 +108,11 @@ export class KayanService {
     }
     if (query.fromDate) {
       params.push(query.fromDate);
-      conditions.push(`created_at >= $${params.length}`);
+      conditions.push(`created_at >= $${params.length}::date`);
     }
     if (query.toDate) {
       params.push(query.toDate);
-      conditions.push(`created_at <= $${params.length}`);
+      conditions.push(`created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
 
     const sortBy = query.sortBy ?? ProductSortBy.CREATED_AT;
@@ -303,11 +304,11 @@ export class KayanService {
     }
     if (query.fromDate) {
       params.push(query.fromDate);
-      conditions.push(`po.created_at >= $${params.length}`);
+      conditions.push(`po.created_at >= $${params.length}::date`);
     }
     if (query.toDate) {
       params.push(query.toDate);
-      conditions.push(`po.created_at <= $${params.length}`);
+      conditions.push(`po.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
 
     const sortBy = query.sortBy ?? OrderSortBy.CREATED_AT;
@@ -382,11 +383,11 @@ export class KayanService {
     }
     if (query.fromDate) {
       params.push(query.fromDate);
-      conditions.push(`po.created_at >= $${params.length}`);
+      conditions.push(`po.created_at >= $${params.length}::date`);
     }
     if (query.toDate) {
       params.push(query.toDate);
-      conditions.push(`po.created_at <= $${params.length}`);
+      conditions.push(`po.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -470,13 +471,17 @@ export class KayanService {
       params.push(query.severity);
       conditions.push(`fr.severity = $${params.length}`);
     }
+    if (query.search) {
+      params.push(`%${this.escapeLike(query.search)}%`);
+      conditions.push(`(fr.title ILIKE $${params.length} ESCAPE '\\' OR fr.description ILIKE $${params.length} ESCAPE '\\' OR fr.address ILIKE $${params.length} ESCAPE '\\')`);
+    }
     if (query.fromDate) {
       params.push(query.fromDate);
-      conditions.push(`fr.created_at >= $${params.length}`);
+      conditions.push(`fr.created_at >= $${params.length}::date`);
     }
     if (query.toDate) {
       params.push(query.toDate);
-      conditions.push(`fr.created_at <= $${params.length}`);
+      conditions.push(`fr.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
 
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
@@ -486,10 +491,16 @@ export class KayanService {
     const q = await this.db.query(
       `SELECT fr.id, fr.user_id, fr.title, fr.description, fr.severity, fr.address, fr.status, fr.cancelled_at::text AS cancelled_at,
               fr.created_at::text AS created_at, fr.updated_at::text AS updated_at,
-              EXISTS(
-                SELECT 1 FROM item_ratings ir
-                WHERE ir.item_type = 'fault' AND ir.item_id = fr.id AND ir.user_id = $1
-              )::boolean AS has_rated
+              (
+                SELECT row_to_json(ir_row)
+                FROM (
+                  SELECT ir.id, ir.user_id, ir.item_type, ir.item_id, ir.rating_value, ir.comment, ir.created_at::text AS created_at
+                  FROM item_ratings ir
+                  WHERE ir.item_type = 'fault' AND ir.item_id = fr.id AND ir.user_id = $1
+                  ORDER BY ir.created_at DESC, ir.id DESC
+                  LIMIT 1
+                ) ir_row
+              ) AS rate
        FROM fault_reports fr
        WHERE ${conditions.join(' AND ')}
        ${orderClause}
@@ -521,10 +532,16 @@ export class KayanService {
     const q = await executor.query(
       `SELECT id, user_id, title, description, severity, address, status, cancelled_at::text AS cancelled_at,
               created_at::text AS created_at, updated_at::text AS updated_at,
-              EXISTS(
-                SELECT 1 FROM item_ratings ir
-                WHERE ir.item_type = 'fault' AND ir.item_id = $1 AND ir.user_id = $2
-              )::boolean AS has_rated
+              (
+                SELECT row_to_json(ir_row)
+                FROM (
+                  SELECT ir.id, ir.user_id, ir.item_type, ir.item_id, ir.rating_value, ir.comment, ir.created_at::text AS created_at
+                  FROM item_ratings ir
+                  WHERE ir.item_type = 'fault' AND ir.item_id = $1 AND ir.user_id = $2
+                  ORDER BY ir.created_at DESC, ir.id DESC
+                  LIMIT 1
+                ) ir_row
+              ) AS rate
        FROM fault_reports WHERE id = $1 LIMIT 1`,
       [faultId, userId],
     );
@@ -547,13 +564,17 @@ export class KayanService {
       params.push(query.severity);
       conditions.push(`fr.severity = $${params.length}`);
     }
+    if (query.search) {
+      params.push(`%${this.escapeLike(query.search)}%`);
+      conditions.push(`(fr.title ILIKE $${params.length} ESCAPE '\\' OR fr.description ILIKE $${params.length} ESCAPE '\\' OR fr.address ILIKE $${params.length} ESCAPE '\\')`);
+    }
     if (query.fromDate) {
       params.push(query.fromDate);
-      conditions.push(`fr.created_at >= $${params.length}`);
+      conditions.push(`fr.created_at >= $${params.length}::date`);
     }
     if (query.toDate) {
       params.push(query.toDate);
-      conditions.push(`fr.created_at <= $${params.length}`);
+      conditions.push(`fr.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -641,13 +662,21 @@ export class KayanService {
       params.push(query.serviceType);
       conditions.push(`so.service_type = $${params.length}`);
     }
+    if (query.status) {
+      params.push(query.status);
+      conditions.push(`so.status = $${params.length}`);
+    }
+    if (query.search) {
+      params.push(`%${this.escapeLike(query.search)}%`);
+      conditions.push(`(so.description ILIKE $${params.length} ESCAPE '\\' OR so.address ILIKE $${params.length} ESCAPE '\\')`);
+    }
     if (query.fromDate) {
       params.push(query.fromDate);
-      conditions.push(`so.created_at >= $${params.length}`);
+      conditions.push(`so.created_at >= $${params.length}::date`);
     }
     if (query.toDate) {
       params.push(query.toDate);
-      conditions.push(`so.created_at <= $${params.length}`);
+      conditions.push(`so.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
 
     const sortBy = query.sortBy ?? ServiceSortBy.CREATED_AT;
@@ -668,7 +697,17 @@ export class KayanService {
     const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
 
     const q = await this.db.query(
-      `SELECT so.*
+      `SELECT so.*,
+              (
+                SELECT row_to_json(ir_row)
+                FROM (
+                  SELECT ir.id, ir.user_id, ir.item_type, ir.item_id, ir.rating_value, ir.comment, ir.created_at::text AS created_at
+                  FROM item_ratings ir
+                  WHERE ir.item_type = 'service' AND ir.item_id = so.id AND ir.user_id = $1
+                  ORDER BY ir.created_at DESC, ir.id DESC
+                  LIMIT 1
+                ) ir_row
+              ) AS rate
        FROM service_orders so
        WHERE ${conditions.join(' AND ')}
        ORDER BY ${orderColumn} ${sortDirection}, so.id DESC
@@ -688,7 +727,23 @@ export class KayanService {
   }
 
   async getServiceForUser(userId: number, serviceId: number, allowAdmin = false): Promise<Record<string, unknown>> {
-    const q = await this.db.query(`SELECT * FROM service_orders WHERE id = $1 LIMIT 1`, [serviceId]);
+    const q = await this.db.query(
+      `SELECT so.*,
+              (
+                SELECT row_to_json(ir_row)
+                FROM (
+                  SELECT ir.id, ir.user_id, ir.item_type, ir.item_id, ir.rating_value, ir.comment, ir.created_at::text AS created_at
+                  FROM item_ratings ir
+                  WHERE ir.item_type = 'service' AND ir.item_id = so.id AND ir.user_id = $2
+                  ORDER BY ir.created_at DESC, ir.id DESC
+                  LIMIT 1
+                ) ir_row
+              ) AS rate
+       FROM service_orders so
+       WHERE so.id = $1
+       LIMIT 1`,
+      [serviceId, userId],
+    );
     if (!q.rowCount) throw new NotFoundException('Service order not found');
     const service = q.rows[0] as { user_id: number } & Record<string, unknown>;
     if (!allowAdmin && Number(service.user_id) !== userId) throw new ForbiddenException('Not allowed');
@@ -703,13 +758,21 @@ export class KayanService {
       params.push(query.serviceType);
       conditions.push(`so.service_type = $${params.length}`);
     }
+    if (query.status) {
+      params.push(query.status);
+      conditions.push(`so.status = $${params.length}`);
+    }
+    if (query.search) {
+      params.push(`%${this.escapeLike(query.search)}%`);
+      conditions.push(`(so.description ILIKE $${params.length} ESCAPE '\\' OR so.address ILIKE $${params.length} ESCAPE '\\')`);
+    }
     if (query.fromDate) {
       params.push(query.fromDate);
-      conditions.push(`so.created_at >= $${params.length}`);
+      conditions.push(`so.created_at >= $${params.length}::date`);
     }
     if (query.toDate) {
       params.push(query.toDate);
-      conditions.push(`so.created_at <= $${params.length}`);
+      conditions.push(`so.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
 
     const sortBy = query.sortBy ?? ServiceSortBy.CREATED_AT;
@@ -752,13 +815,21 @@ export class KayanService {
       params.push(query.serviceType);
       conditions.push(`so.service_type = $${params.length}`);
     }
+    if (query.status) {
+      params.push(query.status);
+      conditions.push(`so.status = $${params.length}`);
+    }
+    if (query.search) {
+      params.push(`%${this.escapeLike(query.search)}%`);
+      conditions.push(`(so.description ILIKE $${params.length} ESCAPE '\\' OR so.address ILIKE $${params.length} ESCAPE '\\')`);
+    }
     if (query.fromDate) {
       params.push(query.fromDate);
-      conditions.push(`so.created_at >= $${params.length}`);
+      conditions.push(`so.created_at >= $${params.length}::date`);
     }
     if (query.toDate) {
       params.push(query.toDate);
-      conditions.push(`so.created_at <= $${params.length}`);
+      conditions.push(`so.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
 
     const sortBy = query.sortBy ?? ServiceSortBy.CREATED_AT;
@@ -915,15 +986,24 @@ export class KayanService {
 
   async createItemRating(user: AuthUser, dto: CreateItemRatingDto): Promise<Record<string, unknown>> {
     try {
-      if (dto.itemType === ItemType.ORDER) {
-        await this.assertRateableProduct(user.sub, dto.orderId!, dto.productId!);
+      if (dto.itemType === RatingItemType.PRODUCT) {
+        const productId = dto.itemId ?? dto.productId;
+        if (!productId) throw new BadRequestException('itemId is required for product ratings');
+        if (!dto.orderId) throw new BadRequestException('orderId is required for product ratings');
+        await this.assertRateableProduct(user.sub, dto.orderId, productId);
         const q = await this.db.query(
           `INSERT INTO product_ratings(user_id, order_id, product_id, rating_value, comment)
            VALUES($1,$2,$3,$4,$5)
            RETURNING id, user_id, order_id, product_id, rating_value, comment, created_at::text AS created_at`,
-          [user.sub, dto.orderId, dto.productId, dto.ratingValue, dto.comment ?? null],
+          [user.sub, dto.orderId, productId, dto.ratingValue, dto.comment ?? null],
         );
-        return { rating: q.rows[0] };
+        return {
+          rating: {
+            ...q.rows[0],
+            item_type: RatingItemType.PRODUCT,
+            item_id: productId,
+          },
+        };
       }
 
       await this.assertRateableItem(user.sub, dto.itemType, dto.itemId!);
@@ -943,6 +1023,25 @@ export class KayanService {
 
   async getItemReviews(itemId: number, query: GetItemReviewsQueryDto): Promise<Record<string, unknown>> {
     const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
+
+    if (query.itemType === RatingItemType.PRODUCT) {
+      const totalQ = await this.db.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM product_ratings WHERE product_id = $1`,
+        [itemId],
+      );
+      const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
+
+      const q = await this.db.query(
+        `SELECT id, user_id, $1::text AS item_type, product_id AS item_id, order_id, product_id, rating_value, comment, created_at::text AS created_at
+         FROM product_ratings
+         WHERE product_id = $2
+         ORDER BY created_at DESC, id DESC
+         LIMIT $3 OFFSET $4`,
+        [RatingItemType.PRODUCT, itemId, limit, offset],
+      );
+
+      return { items: q.rows, total };
+    }
 
     const totalQ = await this.db.query<{ count: string }>(
       `SELECT COUNT(*)::text AS count FROM item_ratings WHERE item_type = $1 AND item_id = $2`,
@@ -1040,12 +1139,12 @@ export class KayanService {
     return Number(q.rowCount ?? 0) > 0;
   }
 
-  private async resolveOwnership(itemType: ItemType, itemId: number): Promise<number | null> {
+  private async resolveOwnership(itemType: ItemType | RatingItemType, itemId: number): Promise<number | null> {
     if (itemType === ItemType.ORDER) {
       const q = await this.db.query<{ user_id: number }>(`SELECT user_id FROM product_orders WHERE id = $1`, [itemId]);
       return q.rowCount ? Number(q.rows[0].user_id) : null;
     }
-    if (itemType === ItemType.FAULT) {
+    if (itemType === ItemType.FAULT || itemType === RatingItemType.FAULT) {
       const q = await this.db.query<{ user_id: number }>(`SELECT user_id FROM fault_reports WHERE id = $1`, [itemId]);
       return q.rowCount ? Number(q.rows[0].user_id) : null;
     }
@@ -1053,17 +1152,12 @@ export class KayanService {
     return q.rowCount ? Number(q.rows[0].user_id) : null;
   }
 
-  private async assertRateableItem(userId: number, itemType: ItemType, itemId: number): Promise<void> {
+  private async assertRateableItem(userId: number, itemType: RatingItemType, itemId: number): Promise<void> {
     const owner = await this.resolveOwnership(itemType, itemId);
     if (owner === null) throw new NotFoundException('Item not found');
     if (owner !== userId) throw new ForbiddenException('Not allowed');
 
-    if (itemType === ItemType.ORDER) {
-      const q = await this.db.query<{ status: OrderStatus }>(`SELECT status FROM product_orders WHERE id = $1`, [itemId]);
-      if (q.rows[0].status !== OrderStatus.DELIVERED) throw new BadRequestException('Rating allowed only after delivery');
-      return;
-    }
-    if (itemType === ItemType.FAULT) {
+    if (itemType === RatingItemType.FAULT) {
       const q = await this.db.query<{ status: FaultStatus }>(`SELECT status FROM fault_reports WHERE id = $1`, [itemId]);
       if (q.rows[0].status !== FaultStatus.FINISHED) throw new BadRequestException('Rating allowed only after completion');
       return;
@@ -1289,13 +1383,49 @@ export class KayanService {
 
     const orderIds = orders.map((order) => Number(order.id));
     const items = await executor.query(
-      `SELECT oi.order_id, oi.id, oi.product_id, oi.quantity, oi.unit_price::text AS unit_price, cp.title, cp.is_active
+      `SELECT oi.order_id, oi.id, oi.product_id, oi.quantity, oi.unit_price::text AS unit_price,
+              cp.title, cp.description, cp.amount, cp.price::text AS product_price, cp.details, cp.is_active
        FROM order_items oi
        LEFT JOIN catalog_products cp ON cp.id = oi.product_id
        WHERE oi.order_id = ANY($1::bigint[])
        ORDER BY oi.order_id ASC, oi.id ASC`,
       [orderIds],
     );
+
+    const productIds = Array.from(new Set(
+      (items.rows as Array<{ product_id: number | string }>).map((item) => Number(item.product_id)),
+    ));
+    const assets = productIds.length
+      ? await executor.query(
+          `SELECT pa.product_id, pa.file_id, pa.asset_type, pa.sort_order, f.object_key, f.original_filename, f.mime_type, f.status
+           FROM product_assets pa
+           LEFT JOIN files f ON f.id = pa.file_id
+           WHERE pa.product_id = ANY($1::bigint[])
+           ORDER BY pa.product_id ASC, pa.asset_type ASC, pa.sort_order ASC, pa.id ASC`,
+          [productIds],
+        )
+      : { rows: [] };
+    const assetRows = (assets?.rows ?? []) as ProductAssetRow[];
+
+    const assetsByProductId = new Map<number, { images: Record<string, unknown>[]; files: Record<string, unknown>[] }>();
+    for (const asset of assetRows) {
+      const productId = Number(asset.product_id);
+      const bucket = assetsByProductId.get(productId) ?? { images: [], files: [] };
+      const payload = {
+        file_id: Number(asset.file_id),
+        sort_order: asset.sort_order,
+        object_key: asset.object_key,
+        original_filename: asset.original_filename,
+        mime_type: asset.mime_type,
+        status: asset.status,
+      };
+      if (asset.asset_type === 'image') {
+        bucket.images.push(payload);
+      } else {
+        bucket.files.push(payload);
+      }
+      assetsByProductId.set(productId, bucket);
+    }
 
     const itemsByOrderId = new Map<number, Record<string, unknown>[]>();
     for (const item of items.rows as Array<{
@@ -1304,11 +1434,16 @@ export class KayanService {
       product_id: number;
       quantity: number;
       unit_price: string;
-      title: string;
-      is_active: boolean;
+      title: string | null;
+      description: string | null;
+      amount: number | null;
+      product_price: string | null;
+      details: Record<string, unknown> | null;
+      is_active: boolean | null;
     }>) {
       const orderId = Number(item.order_id);
       const bucket = itemsByOrderId.get(orderId) ?? [];
+      const productAssets = assetsByProductId.get(Number(item.product_id)) ?? { images: [], files: [] };
       bucket.push({
         id: Number(item.id),
         product_id: Number(item.product_id),
@@ -1316,8 +1451,14 @@ export class KayanService {
         unit_price: item.unit_price,
         product: {
           id: Number(item.product_id),
-          title: item.title,
-          is_active: item.is_active,
+          title: item.title ?? null,
+          description: item.description ?? null,
+          amount: item.amount === null ? null : Number(item.amount),
+          price: item.product_price,
+          details: item.details ?? null,
+          is_active: item.is_active ?? null,
+          images: productAssets.images,
+          files: productAssets.files,
         },
       });
       itemsByOrderId.set(orderId, bucket);
