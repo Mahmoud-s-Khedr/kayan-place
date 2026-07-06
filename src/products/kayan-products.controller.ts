@@ -1,7 +1,9 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ErrorResponseDto } from '../common/dto/error-response.dto';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
+import { AuthUser } from '../common/types/auth-user.type';
 import { ProductIdParamDto, ListProductsQueryDto } from '../kayan/kayan.dto';
 import { KayanProductResponseDto, KayanProductsResponseDto } from '../kayan/kayan-response.dto';
 import { KayanService } from '../kayan/kayan.service';
@@ -15,8 +17,8 @@ export class KayanProductsController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'List public Kayan products' })
   @ApiResponse({ status: 200, type: KayanProductsResponseDto })
-  listProducts(@Query() query: ListProductsQueryDto): Promise<Record<string, unknown>> {
-    return this.kayanService.listProducts(query);
+  listProducts(@Query() query: ListProductsQueryDto, @CurrentUser() user?: AuthUser | null): Promise<Record<string, unknown>> {
+    return this.kayanService.listProducts(query, user);
   }
 
   @Get(':id')

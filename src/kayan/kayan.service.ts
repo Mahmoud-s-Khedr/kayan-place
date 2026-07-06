@@ -84,11 +84,14 @@ type FaultAssetRow = {
 export class KayanService {
   constructor(private readonly db: DatabaseService) {}
 
-  async listProducts(query: ListProductsQueryDto = {}): Promise<Record<string, unknown>> {
+  async listProducts(query: ListProductsQueryDto = {}, user?: AuthUser | null): Promise<Record<string, unknown>> {
     const conditions = ['deleted_at IS NULL'];
     const params: unknown[] = [];
+    const isAdmin = !!user?.isAdmin;
 
-    if (query.availability === ProductAvailabilityFilter.ACTIVE || !query.availability) {
+    if (!isAdmin) {
+      conditions.push('is_active = true');
+    } else if (query.availability === ProductAvailabilityFilter.ACTIVE) {
       conditions.push('is_active = true');
     } else if (query.availability === ProductAvailabilityFilter.INACTIVE) {
       conditions.push('is_active = false');

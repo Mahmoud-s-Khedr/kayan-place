@@ -82,6 +82,102 @@ describe('KayanService', () => {
     expect(params).toEqual(['%chair%', 100, 300, '2026-01-01', '2026-01-31', 20, 0]);
   });
 
+  it('lists products as active-only for public callers by default', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 1,
+            title: 'Chair',
+            description: 'Wooden chair',
+            amount: 4,
+            price: '200.00',
+            details: null,
+            is_active: true,
+            created_at: '2026-01-01T00:00:00.000Z',
+            updated_at: '2026-01-01T00:00:00.000Z',
+            rate: '0',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await service.listProducts();
+
+    const [queryText] = databaseService.query.mock.calls[0];
+    expect(queryText).toContain('deleted_at IS NULL AND is_active = true');
+  });
+
+  it('ignores inactive/all availability filters for public and non-admin callers', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await service.listProducts({ availability: 'all' as any });
+    await service.listProducts({ availability: 'inactive' as any }, { sub: 9, phone: '+201000000009', isAdmin: false });
+
+    const [publicQueryText] = databaseService.query.mock.calls[0];
+    const [memberQueryText] = databaseService.query.mock.calls[1];
+    expect(publicQueryText).toContain('deleted_at IS NULL AND is_active = true');
+    expect(memberQueryText).toContain('deleted_at IS NULL AND is_active = true');
+    expect(publicQueryText).not.toContain('is_active = false');
+    expect(memberQueryText).not.toContain('is_active = false');
+  });
+
+  it('lists all non-deleted products for admin callers by default', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 2,
+            title: 'Cabinet',
+            description: 'Storage',
+            amount: 2,
+            price: '300.00',
+            details: null,
+            is_active: false,
+            created_at: '2026-01-02T00:00:00.000Z',
+            updated_at: '2026-01-02T00:00:00.000Z',
+            rate: '0',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await service.listProducts({}, { sub: 1, phone: '+201000000001', isAdmin: true });
+
+    const [queryText] = databaseService.query.mock.calls[0];
+    expect(queryText).toContain('WHERE deleted_at IS NULL');
+    expect(queryText).not.toContain('is_active = true');
+    expect(queryText).not.toContain('is_active = false');
+  });
+
+  it('honors availability filters for admin callers', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await service.listProducts({ availability: 'active' as any }, { sub: 1, phone: '+201000000001', isAdmin: true });
+    await service.listProducts({ availability: 'inactive' as any }, { sub: 1, phone: '+201000000001', isAdmin: true });
+    await service.listProducts({ availability: 'all' as any }, { sub: 1, phone: '+201000000001', isAdmin: true });
+
+    const productListQueries = databaseService.query.mock.calls
+      .map(([queryText]) => queryText)
+      .filter((queryText) => typeof queryText === 'string' && queryText.includes('FROM catalog_products cp'));
+    const [activeQueryText, inactiveQueryText, allQueryText] = productListQueries;
+    expect(activeQueryText).toContain('deleted_at IS NULL AND is_active = true');
+    expect(inactiveQueryText).toContain('deleted_at IS NULL AND is_active = false');
+    expect(allQueryText).toContain('WHERE deleted_at IS NULL');
+    expect(allQueryText).not.toContain('is_active = true');
+    expect(allQueryText).not.toContain('is_active = false');
+  });
+
   it('adds cart items and returns expanded cart data', async () => {
     databaseService.query
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ amount: 5, is_active: true }] })

@@ -79,7 +79,7 @@ Supported query params:
 - `maxPrice`
 - `fromDate`
 - `toDate`
-- `availability`: `active`, `inactive`, `all`
+- `availability`: `active`, `inactive`, `all` (`inactive`/`all` are effective for admins only)
 - `sortBy`: `createdAt`, `price`
 - `sortDirection`: `asc`, `desc`
 - `page`: integer, min `1`, default `1`
@@ -88,7 +88,8 @@ Supported query params:
 
 Defaults:
 
-- availability defaults to active products
+- public and regular users always see active products only
+- admins default to all non-deleted products
 - `sortBy` defaults to `createdAt`
 - `sortDirection` defaults to `desc`
 
