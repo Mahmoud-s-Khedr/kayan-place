@@ -889,7 +889,7 @@ export class KayanService {
     );
     const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
     const q = await this.db.query(
-      `SELECT id, item_type, item_id, title, step_image_file_id, sort_order, created_at::text AS created_at
+      `SELECT id, item_type, item_id, title, step_image_file_id, state, sort_order, created_at::text AS created_at
        FROM followup_steps WHERE item_type = $1 AND item_id = $2 ORDER BY sort_order ASC, id ASC
        LIMIT $3 OFFSET $4`,
       [itemType, itemId, limit, offset],
@@ -900,9 +900,9 @@ export class KayanService {
   async adminCreateFollowupStep(admin: AuthUser, dto: CreateFollowupStepDto): Promise<Record<string, unknown>> {
     await this.assertItemExists(dto.itemType, dto.itemId);
     const q = await this.db.query(
-      `INSERT INTO followup_steps(item_type, item_id, title, step_image_file_id, sort_order, created_by)
-       VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [dto.itemType, dto.itemId, dto.title, dto.stepImageFileId ?? null, dto.sortOrder ?? 0, admin.sub],
+      `INSERT INTO followup_steps(item_type, item_id, title, step_image_file_id, state, sort_order, created_by)
+       VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [dto.itemType, dto.itemId, dto.title, dto.stepImageFileId ?? null, dto.state ?? false, dto.sortOrder ?? 0, admin.sub],
     );
     return { step: q.rows[0] };
   }
@@ -910,8 +910,8 @@ export class KayanService {
   async adminUpdateFollowupStep(stepId: number, dto: UpdateFollowupStepDto): Promise<Record<string, unknown>> {
     const q = await this.db.query(
       `UPDATE followup_steps SET title = COALESCE($1,title), step_image_file_id = COALESCE($2,step_image_file_id),
-       sort_order = COALESCE($3,sort_order), updated_at = NOW() WHERE id = $4 RETURNING *`,
-      [dto.title ?? null, dto.stepImageFileId ?? null, dto.sortOrder ?? null, stepId],
+       sort_order = COALESCE($3,sort_order), state = COALESCE($4,state), updated_at = NOW() WHERE id = $5 RETURNING *`,
+      [dto.title ?? null, dto.stepImageFileId ?? null, dto.sortOrder ?? null, dto.state ?? null, stepId],
     );
     if (!q.rowCount) throw new NotFoundException('Step not found');
     return { step: q.rows[0] };

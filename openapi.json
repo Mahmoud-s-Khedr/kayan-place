@@ -7008,7 +7008,23 @@
       },
       "CreateFollowupStepBodyDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "stepImageFileId": {
+            "type": "number"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "state": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "title"
+        ]
       },
       "FollowupStepDto": {
         "type": "object",
@@ -7030,9 +7046,16 @@
           "title": {
             "type": "string"
           },
-          "step_image_file_id": {
-            "type": "object",
-            "nullable": true
+          "step_image": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RelatedFileDto"
+              }
+            ]
+          },
+          "state": {
+            "type": "boolean"
           },
           "sort_order": {
             "type": "number"
@@ -7046,6 +7069,7 @@
           "item_type",
           "item_id",
           "title",
+          "state",
           "sort_order",
           "created_at"
         ]
@@ -7084,7 +7108,20 @@
       },
       "UpdateFollowupStepDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "stepImageFileId": {
+            "type": "number"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "state": {
+            "type": "boolean"
+          }
+        }
       },
       "GalleryItemDto": {
         "type": "object",

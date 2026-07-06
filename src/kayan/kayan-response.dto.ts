@@ -125,6 +125,7 @@ class FollowupStepDto {
   @ApiProperty() item_id!: number;
   @ApiProperty() title!: string;
   @ApiPropertyOptional({ type: RelatedFileDto, nullable: true }) step_image!: RelatedFileDto | null;
+  @ApiProperty() state!: boolean;
   @ApiProperty() sort_order!: number;
   @ApiProperty() created_at!: string;
 }

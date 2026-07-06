@@ -1,3 +1,4 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Length, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { createOffsetPaginationQueryDto } from '../common/dto/offset-pagination-query.dto';
@@ -221,21 +222,24 @@ export class ListServicesQueryDto extends KayanListPaginationQueryDto {
 export class CreateFollowupStepDto {
   @IsEnum(ItemType) itemType!: ItemType;
   @IsInt() @Min(1) itemId!: number;
-  @IsString() @IsNotEmpty() title!: string;
-  @IsOptional() @IsInt() @Min(1) stepImageFileId?: number;
-  @IsOptional() @IsInt() @Min(0) sortOrder?: number;
+  @ApiProperty() @IsString() @IsNotEmpty() title!: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) stepImageFileId?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) sortOrder?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() state?: boolean;
 }
 
 export class CreateFollowupStepBodyDto {
-  @IsString() @IsNotEmpty() title!: string;
-  @IsOptional() @IsInt() @Min(1) stepImageFileId?: number;
-  @IsOptional() @IsInt() @Min(0) sortOrder?: number;
+  @ApiProperty() @IsString() @IsNotEmpty() title!: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) stepImageFileId?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) sortOrder?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() state?: boolean;
 }
 
 export class UpdateFollowupStepDto {
-  @IsOptional() @IsString() @IsNotEmpty() title?: string;
-  @IsOptional() @IsInt() @Min(1) stepImageFileId?: number;
-  @IsOptional() @IsInt() @Min(0) sortOrder?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() @IsNotEmpty() title?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) stepImageFileId?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) sortOrder?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() state?: boolean;
 }
 
 export class CreateGalleryItemDto {

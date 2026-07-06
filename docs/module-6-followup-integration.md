@@ -101,6 +101,7 @@ Step fields:
 - `item_id`
 - `title`
 - `step_image`
+- `state`
 - `sort_order`
 - `created_at`
 
@@ -119,6 +120,7 @@ Request:
 {
   "title": "Technician assigned",
   "stepImageFileId": 55,
+  "state": false,
   "sortOrder": 1
 }
 ```
@@ -127,6 +129,7 @@ Validation:
 
 - `title`: required non-empty string
 - `stepImageFileId`: optional integer, min `1`
+- `state`: optional boolean, defaults to `false`
 - `sortOrder`: optional integer, min `0`
 
 Success:
@@ -146,6 +149,7 @@ Editable fields:
 
 - `title`
 - `stepImageFileId`
+- `state`
 - `sortOrder`
 
 Success:

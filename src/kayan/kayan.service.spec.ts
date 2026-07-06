@@ -808,8 +808,8 @@ describe('KayanService', () => {
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
       .mockResolvedValueOnce({
         rows: [
-          { id: 2, item_type: 'order', item_id: 50, title: 'Delivered', sort_order: 1, created_at: '2026-05-01T00:00:00.000Z' },
-          { id: 3, item_type: 'order', item_id: 50, title: 'Installed', sort_order: 2, created_at: '2026-05-01T01:00:00.000Z' },
+          { id: 2, item_type: 'order', item_id: 50, title: 'Delivered', state: false, sort_order: 1, created_at: '2026-05-01T00:00:00.000Z' },
+          { id: 3, item_type: 'order', item_id: 50, title: 'Installed', state: true, sort_order: 2, created_at: '2026-05-01T01:00:00.000Z' },
         ],
       });
 
@@ -821,8 +821,8 @@ describe('KayanService', () => {
 
     expect(result).toMatchObject({
       items: [
-        expect.objectContaining({ id: 2, sort_order: 1 }),
-        expect.objectContaining({ id: 3, sort_order: 2 }),
+        expect.objectContaining({ id: 2, state: false, sort_order: 1 }),
+        expect.objectContaining({ id: 3, state: true, sort_order: 2 }),
       ],
     });
     expect(databaseService.query.mock.calls[2][0]).toContain('ORDER BY sort_order ASC, id ASC');
@@ -856,7 +856,7 @@ describe('KayanService', () => {
     databaseService.query
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
       .mockResolvedValueOnce({
-        rows: [{ id: 70, item_type: 'order', item_id: 50, title: 'Packed', step_image_file_id: 11, sort_order: 0 }],
+        rows: [{ id: 70, item_type: 'order', item_id: 50, title: 'Packed', step_image_file_id: 11, state: false, sort_order: 0 }],
       });
 
     const result = await service.adminCreateFollowupStep(
@@ -865,8 +865,76 @@ describe('KayanService', () => {
     );
 
     expect(result).toEqual({
-      step: expect.objectContaining({ id: 70, title: 'Packed' }),
+      step: expect.objectContaining({ id: 70, title: 'Packed', state: false }),
     });
+  });
+
+  it('creates followup step with explicit state', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
+      .mockResolvedValueOnce({
+        rows: [{ id: 71, item_type: 'order', item_id: 50, title: 'Packed', step_image_file_id: null, state: true, sort_order: 0 }],
+      });
+
+    const result = await service.adminCreateFollowupStep(
+      { sub: 1, phone: '+201000000001', isAdmin: true },
+      { itemType: ItemType.ORDER, itemId: 50, title: 'Packed', state: true },
+    );
+
+    expect(result).toEqual({
+      step: expect.objectContaining({ id: 71, state: true }),
+    });
+  });
+
+  it('creates followup step with explicit false state', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
+      .mockResolvedValueOnce({
+        rows: [{ id: 72, item_type: 'order', item_id: 50, title: 'Queued', step_image_file_id: null, state: false, sort_order: 3 }],
+      });
+
+    const result = await service.adminCreateFollowupStep(
+      { sub: 1, phone: '+201000000001', isAdmin: true },
+      { itemType: ItemType.ORDER, itemId: 50, title: 'Queued', state: false, sortOrder: 3 },
+    );
+
+    expect(result).toEqual({
+      step: expect.objectContaining({ id: 72, state: false, sort_order: 3 }),
+    });
+  });
+
+  it('updates followup step state without changing other fields', async () => {
+    databaseService.query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ id: 70, item_type: 'order', item_id: 50, title: 'Packed', step_image_file_id: 11, state: true, sort_order: 0 }],
+    });
+
+    const result = await service.adminUpdateFollowupStep(70, { state: true });
+
+    expect(result).toEqual({
+      step: expect.objectContaining({ id: 70, state: true }),
+    });
+    expect(databaseService.query).toHaveBeenCalledWith(
+      expect.stringContaining('state = COALESCE($4,state)'),
+      [null, null, null, true, 70],
+    );
+  });
+
+  it('leaves followup step state unchanged when omitted on update', async () => {
+    databaseService.query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ id: 70, item_type: 'order', item_id: 50, title: 'Packed updated', step_image_file_id: 11, state: false, sort_order: 1 }],
+    });
+
+    const result = await service.adminUpdateFollowupStep(70, { title: 'Packed updated' });
+
+    expect(result).toEqual({
+      step: expect.objectContaining({ id: 70, title: 'Packed updated', state: false }),
+    });
+    expect(databaseService.query).toHaveBeenCalledWith(
+      expect.any(String),
+      ['Packed updated', null, null, null, 70],
+    );
   });
 
   it('rejects followup step creation when target item is missing', async () => {
