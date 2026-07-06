@@ -108,11 +108,11 @@ export class KayanService {
     }
     if (query.fromDate) {
       params.push(query.fromDate);
-      conditions.push(`created_at >= $${params.length}::date`);
+      conditions.push(`cp.created_at >= $${params.length}::date`);
     }
     if (query.toDate) {
       params.push(query.toDate);
-      conditions.push(`created_at < ($${params.length}::date + INTERVAL '1 day')`);
+      conditions.push(`cp.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
 
     const sortBy = query.sortBy ?? ProductSortBy.CREATED_AT;

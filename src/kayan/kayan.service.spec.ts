@@ -75,8 +75,8 @@ describe('KayanService', () => {
     expect(queryText).toContain('title ILIKE');
     expect(queryText).toContain('price >= $2');
     expect(queryText).toContain('price <= $3');
-    expect(queryText).toContain('created_at >= $4');
-    expect(queryText).toContain("created_at < ($5::date + INTERVAL '1 day')");
+    expect(queryText).toContain('cp.created_at >= $4');
+    expect(queryText).toContain("cp.created_at < ($5::date + INTERVAL '1 day')");
     expect(queryText).toContain('ORDER BY price ASC, cp.id DESC');
     expect(queryText).toContain('LIMIT $6 OFFSET $7');
     expect(params).toEqual(['%chair%', 100, 300, '2026-01-01', '2026-01-31', 20, 0]);

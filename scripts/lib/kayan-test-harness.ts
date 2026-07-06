@@ -370,8 +370,8 @@ export async function runKayanHappyPath(
   await runAndRecord(config, steps, 'public list products filtered', 200, () =>
     requestJson(config, 'GET', '/api/products?query=Sim&sortBy=price&sortDirection=asc'),
   );
-  await runAndRecord(config, steps, 'user list products by date', 200, () =>
-    requestJson(config, 'GET', '/api/products?availability=active&sortBy=createdAt&sortDirection=desc'),
+  await runAndRecord(config, steps, 'user list products by date filter', 200, () =>
+    requestJson(config, 'GET', '/api/products?availability=active&fromDate=2000-01-01&toDate=2100-12-31&sortBy=createdAt&sortDirection=desc'),
   );
   await runAndRecord(config, steps, 'user get product details', 200, () =>
     requestJson(config, 'GET', `/api/products/${state.productId}`),
