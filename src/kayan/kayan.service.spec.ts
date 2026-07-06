@@ -238,6 +238,56 @@ describe('KayanService', () => {
     });
   });
 
+  it('lists cart items with embedded product objects', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 10,
+            product_id: 3,
+            quantity: 2,
+            created_at: '2026-01-02T00:00:00.000Z',
+            updated_at: '2026-01-02T00:00:00.000Z',
+            title: 'Lamp',
+            description: 'Desk lamp',
+            amount: 5,
+            price: '150.00',
+            is_active: true,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            product_id: 3,
+            file_id: 88,
+            asset_type: 'image',
+            sort_order: 0,
+            object_key: 'products/3/lamp.jpg',
+            original_filename: 'lamp.jpg',
+            mime_type: 'image/jpeg',
+            status: 'uploaded',
+          },
+        ],
+      });
+
+    const result = await service.listCart({ sub: 7, phone: '+201000000007', isAdmin: false });
+
+    expect(result).toMatchObject({
+      items: [
+        expect.objectContaining({
+          id: 10,
+          product_id: 3,
+          product: expect.objectContaining({
+            id: 3,
+            title: 'Lamp',
+            images: [expect.objectContaining({ file_id: 88 })],
+          }),
+        }),
+      ],
+    });
+  });
+
   it('creates a direct order and returns expanded items', async () => {
     const client = {
       query: jest
@@ -329,7 +379,12 @@ describe('KayanService', () => {
         expect.objectContaining({
           id: 15,
           item_count: 1,
-          items: [expect.objectContaining({ product_id: 7 })],
+          items: [
+            expect.objectContaining({
+              product_id: 7,
+              product: expect.objectContaining({ id: 7, title: 'Fan' }),
+            }),
+          ],
         }),
       ],
     });
@@ -404,8 +459,55 @@ describe('KayanService', () => {
             id: 9,
             name: 'Sara',
           }),
+          items: [
+            expect.objectContaining({
+              product_id: 4,
+              product: expect.objectContaining({ id: 4, title: 'Mirror' }),
+            }),
+          ],
         }),
       ],
+    });
+  });
+
+  it('gets a single order with embedded product objects', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [
+          {
+            id: 20,
+            user_id: 9,
+            delivery_address: 'Heliopolis',
+            status: 'delivered',
+            created_at: '2026-03-01T00:00:00.000Z',
+            updated_at: '2026-03-02T00:00:00.000Z',
+            user_name: 'Sara',
+            user_email: 'sara@example.com',
+            user_phone: '+201000000009',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          { order_id: 20, id: 2, product_id: 4, quantity: 1, unit_price: '80.00', title: 'Mirror', is_active: true },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await service.getOrderForUser(9, 20);
+
+    expect(result).toMatchObject({
+      order: expect.objectContaining({
+        id: 20,
+        user: expect.objectContaining({ id: 9, name: 'Sara' }),
+        items: [
+          expect.objectContaining({
+            product_id: 4,
+            product: expect.objectContaining({ id: 4, title: 'Mirror' }),
+          }),
+        ],
+      }),
     });
   });
 

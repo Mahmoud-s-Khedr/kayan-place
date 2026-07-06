@@ -218,4 +218,31 @@ describe('FkExpansionService', () => {
     expect(output.rating.rater).toBeNull();
     expect(output.rating.rater_id).toBeUndefined();
   });
+
+  it('preserves explicit sibling fields when fk expansion would target the same output key', async () => {
+    const { service } = createService();
+
+    const output = await service.expand({
+      item: {
+        product_id: 17,
+        product: {
+          id: 17,
+          title: 'Catalog product 17',
+          price: '10.00',
+        },
+      },
+    }) as {
+      item: {
+        product: { id: number; title: string; price: string };
+        product_id?: number;
+      };
+    };
+
+    expect(output.item.product).toEqual({
+      id: 17,
+      title: 'Catalog product 17',
+      price: '10.00',
+    });
+    expect(output.item.product_id).toBeUndefined();
+  });
 });

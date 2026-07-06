@@ -146,6 +146,9 @@ export class FkExpansionService {
       const rule = FK_RULES[key];
       if (rule && (!rule.shouldExpand || rule.shouldExpand(node))) {
         const outputKey = rule.outputKey ?? this.deriveOutputKey(key);
+        if (outputKey !== key && Object.prototype.hasOwnProperty.call(node, outputKey)) {
+          continue;
+        }
         if (!Object.prototype.hasOwnProperty.call(out, outputKey)) {
           const id = this.toPositiveInt(value);
           out[outputKey] = id === null ? null : mapsByEntity.get(rule.entity)?.get(id) ?? null;
