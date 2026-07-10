@@ -332,6 +332,24 @@ export class GetItemReviewsQueryDto extends KayanListPaginationQueryDto {
   @IsEnum(RatingItemType) itemType!: RatingItemType;
 }
 
+export enum AdminUserRatingItemType {
+  FAULT = 'fault',
+  SERVICE = 'service',
+}
+
+export class ListAdminRatingsQueryDto extends KayanListPaginationQueryDto {
+  @IsOptional() @IsEnum(RatingItemType) itemType?: RatingItemType;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) userId?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(5) ratingValue?: number;
+  @IsOptional() @IsDateString() fromDate?: string;
+  @IsOptional() @IsDateString() toDate?: string;
+  @IsOptional() @IsString() @IsNotEmpty() search?: string;
+}
+
+export class ListAdminUserRatingsQueryDto extends KayanListPaginationQueryDto {
+  @IsOptional() @IsEnum(AdminUserRatingItemType) itemType?: AdminUserRatingItemType;
+}
+
 export class ItemIdParamDto {
   @Type(() => Number) @IsInt() @Min(1) itemId!: number;
 }

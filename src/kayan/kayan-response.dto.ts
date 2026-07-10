@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SuccessEnvelopeDto } from '../common/dto/api-response-envelope.dto';
-import { RelatedFileDto } from '../common/dto/related-entities.dto';
+import { RelatedFileDto, RelatedUserDto } from '../common/dto/related-entities.dto';
 import { FaultSeverity, FaultStatus, ItemType, OrderStatus, RatingItemType, ServiceStatus, ServiceType } from './kayan.dto';
 
 class KayanAssetDto {
@@ -169,6 +169,7 @@ class FollowupMessageDto {
 class ItemRatingDto {
   @ApiProperty() id!: number;
   @ApiProperty() user_id!: number;
+  @ApiPropertyOptional({ type: RelatedUserDto, nullable: true }) user?: RelatedUserDto | null;
   @ApiPropertyOptional({ nullable: true, enum: RatingItemType }) item_type?: RatingItemType;
   @ApiPropertyOptional({ nullable: true }) item_id?: number;
   @ApiPropertyOptional({ nullable: true }) order_id?: number;

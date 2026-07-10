@@ -658,6 +658,38 @@ describe('KayanService', () => {
     expect(params).toEqual([4, 7]);
   });
 
+  it('gets a product with null review when the current user has not rated it', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [
+          {
+            id: 4,
+            title: 'Desk',
+            description: 'Office desk',
+            amount: 2,
+            price: '500.00',
+            details: null,
+            is_active: true,
+            created_at: '2026-03-10T00:00:00.000Z',
+            updated_at: '2026-03-10T00:00:00.000Z',
+            rate: '4.0',
+            review: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await service.getProduct(4, 7);
+
+    expect(result).toMatchObject({
+      product: expect.objectContaining({
+        id: 4,
+        review: null,
+      }),
+    });
+  });
+
   it('gets a single order with embedded product objects', async () => {
     databaseService.query
       .mockResolvedValueOnce({
@@ -743,6 +775,41 @@ describe('KayanService', () => {
     expect(queryText).toContain("so.created_at < ($4::date + INTERVAL '1 day')");
     expect(queryText).toContain('ORDER BY so.created_at ASC, so.id DESC');
     expect(params).toEqual([6, ServiceType.MAINTENANCE, '2026-03-01', '2026-03-31', 20, 0]);
+  });
+
+  it('lists my services with the current user rate object when already rated', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 51,
+            user_id: 6,
+            service_type: ServiceType.MAINTENANCE,
+            description: 'Fix AC',
+            address: 'Cairo',
+            status: ServiceStatus.FINISHED,
+            created_at: '2026-03-01T00:00:00.000Z',
+            updated_at: '2026-03-01T00:00:00.000Z',
+            rate: { id: 14, user_id: 6, item_type: RatingItemType.SERVICE, item_id: 51, rating_value: 5 },
+          },
+        ],
+      });
+
+    const result = await service.listMyServices(
+      { sub: 6, phone: '+201000000006', isAdmin: false },
+      {},
+    );
+
+    expect(result).toMatchObject({
+      items: [
+        expect.objectContaining({
+          id: 51,
+          rate: expect.objectContaining({ id: 14, user_id: 6, item_type: RatingItemType.SERVICE, item_id: 51 }),
+        }),
+      ],
+      total: 1,
+    });
   });
 
   it('lists admin services with filters and user information', async () => {
@@ -891,6 +958,229 @@ describe('KayanService', () => {
     expect(databaseService.query.mock.calls[1][0]).toContain('FROM product_ratings');
   });
 
+  it('admin item review lookup reuses the public product review query', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 11,
+          user_id: 4,
+          item_type: RatingItemType.PRODUCT,
+          item_id: 2,
+          order_id: 6,
+          product_id: 2,
+          rating_value: 5,
+          comment: 'Excellent',
+          created_at: '2026-04-01T00:00:00.000Z',
+        }],
+      });
+
+    const result = await service.adminGetItemReviews(2, { itemType: RatingItemType.PRODUCT });
+
+    expect(result).toEqual({
+      items: [expect.objectContaining({ item_type: RatingItemType.PRODUCT, item_id: 2 })],
+      total: 1,
+    });
+  });
+
+  it('admin item review lookup returns fault reviews from item_ratings', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 12,
+          user_id: 5,
+          item_type: RatingItemType.FAULT,
+          item_id: 44,
+          rating_value: 4,
+          comment: 'Handled well',
+          created_at: '2026-04-02T00:00:00.000Z',
+        }],
+      });
+
+    const result = await service.adminGetItemReviews(44, { itemType: RatingItemType.FAULT });
+
+    expect(result).toEqual({
+      items: [expect.objectContaining({ item_type: RatingItemType.FAULT, item_id: 44 })],
+      total: 1,
+    });
+    expect(databaseService.query.mock.calls[0][0]).toContain('FROM item_ratings');
+    expect(databaseService.query.mock.calls[1][0]).toContain('FROM item_ratings');
+  });
+
+  it('admin user review lookup returns only reviews on the user owned faults and services', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 7 }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '2' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 21,
+            user_id: 9,
+            item_type: RatingItemType.FAULT,
+            item_id: 41,
+            order_id: null,
+            product_id: null,
+            rating_value: 5,
+            comment: 'Great follow-up',
+            created_at: '2026-04-03T00:00:00.000Z',
+          },
+          {
+            id: 22,
+            user_id: 10,
+            item_type: RatingItemType.SERVICE,
+            item_id: 51,
+            order_id: null,
+            product_id: null,
+            rating_value: 4,
+            comment: 'Resolved',
+            created_at: '2026-04-02T00:00:00.000Z',
+          },
+        ],
+      });
+
+    const result = await service.adminGetUserReceivedReviews(7, {});
+
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({ item_type: RatingItemType.FAULT, item_id: 41 }),
+        expect.objectContaining({ item_type: RatingItemType.SERVICE, item_id: 51 }),
+      ],
+      total: 2,
+    });
+    expect(databaseService.query.mock.calls[1][0]).toContain('fault_reports fr');
+    expect(databaseService.query.mock.calls[1][0]).toContain('service_orders so');
+  });
+
+  it('admin user review lookup excludes product reviews and honors item type filters', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 7 }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 22,
+            user_id: 10,
+            item_type: RatingItemType.SERVICE,
+            item_id: 51,
+            order_id: null,
+            product_id: null,
+            rating_value: 4,
+            comment: 'Resolved',
+            created_at: '2026-04-02T00:00:00.000Z',
+          },
+        ],
+      });
+
+    const result = await service.adminGetUserReceivedReviews(7, { itemType: RatingItemType.SERVICE as any });
+
+    expect(result).toEqual({
+      items: [expect.objectContaining({ item_type: RatingItemType.SERVICE, item_id: 51 })],
+      total: 1,
+    });
+    expect(databaseService.query.mock.calls[1][1]).toEqual([7, RatingItemType.SERVICE]);
+  });
+
+  it('admin user review lookup rejects unknown users', async () => {
+    databaseService.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+    await expect(service.adminGetUserReceivedReviews(999, {})).rejects.toThrow('User not found');
+  });
+
+  it('admin global review list returns mixed product, fault, and service reviews', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '3' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 11,
+            user_id: 4,
+            item_type: RatingItemType.PRODUCT,
+            item_id: 2,
+            order_id: 6,
+            product_id: 2,
+            rating_value: 5,
+            comment: 'Excellent',
+            created_at: '2026-04-05T00:00:00.000Z',
+          },
+          {
+            id: 12,
+            user_id: 5,
+            item_type: RatingItemType.FAULT,
+            item_id: 44,
+            order_id: null,
+            product_id: null,
+            rating_value: 4,
+            comment: 'Handled well',
+            created_at: '2026-04-04T00:00:00.000Z',
+          },
+          {
+            id: 13,
+            user_id: 6,
+            item_type: RatingItemType.SERVICE,
+            item_id: 55,
+            order_id: null,
+            product_id: null,
+            rating_value: 3,
+            comment: 'Okay',
+            created_at: '2026-04-03T00:00:00.000Z',
+          },
+        ],
+      });
+
+    const result = await service.adminListRatings({});
+
+    expect(result).toEqual({
+      items: [
+        expect.objectContaining({ item_type: RatingItemType.PRODUCT, order_id: 6, product_id: 2 }),
+        expect.objectContaining({ item_type: RatingItemType.FAULT }),
+        expect.objectContaining({ item_type: RatingItemType.SERVICE }),
+      ],
+      total: 3,
+    });
+    expect(databaseService.query.mock.calls[0][0]).toContain('UNION ALL');
+    expect(databaseService.query.mock.calls[1][0]).toContain('ORDER BY r.created_at DESC, r.id DESC');
+  });
+
+  it('admin global review list applies filters and pagination', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await service.adminListRatings({
+      itemType: RatingItemType.FAULT,
+      userId: 5,
+      ratingValue: 4,
+      fromDate: '2026-04-01',
+      toDate: '2026-04-30',
+      search: 'handled',
+      limit: 10,
+      offset: 20,
+    });
+
+    const [countQuery, countParams] = databaseService.query.mock.calls[0];
+    const [listQuery, listParams] = databaseService.query.mock.calls[1];
+    expect(countQuery).toContain('r.item_type = $1');
+    expect(countQuery).toContain('r.user_id = $2');
+    expect(countQuery).toContain('r.rating_value = $3');
+    expect(countQuery).toContain('r.created_at >= $4::date');
+    expect(countQuery).toContain("r.created_at < ($5::date + INTERVAL '1 day')");
+    expect(countQuery).toContain("COALESCE(r.comment, '') ILIKE $6 ESCAPE '\\'");
+    expect(countParams).toEqual([RatingItemType.FAULT, 5, 4, '2026-04-01', '2026-04-30', '%handled%']);
+    expect(listQuery).toContain('LIMIT $7 OFFSET $8');
+    expect(listParams).toEqual([RatingItemType.FAULT, 5, 4, '2026-04-01', '2026-04-30', '%handled%', 10, 20]);
+  });
+
+  it('admin global review list returns empty items with zero total', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '0' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await service.adminListRatings({ itemType: RatingItemType.SERVICE });
+
+    expect(result).toEqual({ items: [], total: 0 });
+  });
+
   it('rejects service rating before service is finished', async () => {
     databaseService.query
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: 7 }] })
@@ -1001,6 +1291,66 @@ describe('KayanService', () => {
     expect(queryText).toContain('END ASC');
     expect(queryText).toContain('LIMIT $5 OFFSET $6');
     expect(params).toEqual([5, FaultStatus.ASSIGNED, 'urgent', '2026-01-01', 20, 0]);
+  });
+
+  it('gets a fault with the current user rate object when already rated', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          id: 42,
+          user_id: 7,
+          title: 'Road issue',
+          description: 'Pothole',
+          severity: 'normal',
+          address: 'Nasr City',
+          status: FaultStatus.FINISHED,
+          cancelled_at: null,
+          created_at: '2026-03-05T00:00:00.000Z',
+          updated_at: '2026-03-06T00:00:00.000Z',
+          user_name: 'User',
+          user_email: 'user@example.com',
+          user_phone: '+201000000007',
+          rate: { id: 15, user_id: 7, item_type: RatingItemType.FAULT, item_id: 42, rating_value: 4 },
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await service.getFaultForUser(7, 42, false);
+
+    expect(result).toMatchObject({
+      fault: expect.objectContaining({
+        id: 42,
+        rate: expect.objectContaining({ id: 15, user_id: 7, item_type: RatingItemType.FAULT, item_id: 42 }),
+      }),
+    });
+  });
+
+  it('gets a service with null rate when the current user has not rated it', async () => {
+    databaseService.query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{
+        id: 52,
+        user_id: 6,
+        service_type: ServiceType.MAINTENANCE,
+        description: 'Fix AC',
+        address: 'Cairo',
+        status: ServiceStatus.FINISHED,
+        cancelled_at: null,
+        created_at: '2026-03-01T00:00:00.000Z',
+        updated_at: '2026-03-01T00:00:00.000Z',
+        rate: null,
+      }],
+    });
+
+    const result = await service.getServiceForUser(6, 52, false);
+
+    expect(result).toMatchObject({
+      service: expect.objectContaining({
+        id: 52,
+        rate: null,
+      }),
+    });
   });
 
   it('enriches admin fault list with user and images', async () => {

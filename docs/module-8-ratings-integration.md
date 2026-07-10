@@ -6,6 +6,7 @@ This guide covers all rating and review functionality:
 
 - creating a rating for a completed order product, finished fault, or finished service
 - retrieving reviews for a specific item
+- admin review browsing endpoints for moderation and support
 - legacy per-user rating summary endpoint
 
 Shared contract:
@@ -72,6 +73,17 @@ Use this to display a review list below a product, fault, or service detail view
 2. Render `data.items[]`.
 
 Authentication is optional — the endpoint uses `OptionalJwtAuthGuard`.
+
+### Admin Review Browsing
+
+Admin users can browse Kayan item reviews from admin-only endpoints:
+
+1. `GET /api/admin/ratings/items/:itemId?itemType=...` for all reviews on one item.
+2. `GET /api/admin/ratings/users/:userId` for reviews received on that user's owned `fault` and `service` items.
+3. `GET /api/admin/ratings` for a global paginated moderation list.
+
+> [!NOTE]
+> These admin endpoints cover only the current Kayan item-review system (`product`, `fault`, `service`). They do not include legacy `user_ratings`.
 
 ## Endpoint Contract
 
@@ -158,6 +170,71 @@ Important review fields:
 Possible errors:
 
 - `400`: missing or invalid `itemType` query param
+
+### `GET /api/admin/ratings/items/:itemId`
+
+Auth: admin bearer token required
+
+Required query param:
+
+- `itemType`: `product`, `fault`, or `service`
+
+Optional query params:
+
+- `page`: integer, min `1`
+- `limit`: integer, min `1`, max `100`
+- `offset`: integer, min `0`
+
+Success:
+
+- `200`
+- `data.items[]`
+
+### `GET /api/admin/ratings/users/:userId`
+
+Auth: admin bearer token required
+
+Path param:
+
+- `userId`: integer, target user ID
+
+Optional query params:
+
+- `itemType`: `fault` or `service`
+- `page`: integer, min `1`
+- `limit`: integer, min `1`, max `100`
+- `offset`: integer, min `0`
+
+Success:
+
+- `200`
+- `data.items[]`
+
+Possible errors:
+
+- `404`: user not found
+
+### `GET /api/admin/ratings`
+
+Auth: admin bearer token required
+
+Optional query params:
+
+- `itemType`: `product`, `fault`, or `service`
+- `userId`: reviewer user ID
+- `ratingValue`: integer `1-5`
+- `fromDate`: ISO date
+- `toDate`: ISO date
+- `search`: review comment text search
+- `page`: integer, min `1`
+- `limit`: integer, min `1`, max `100`
+- `offset`: integer, min `0`
+
+Success:
+
+- `200`
+- `data.items[]`
+- `data.total`
 
 ### `GET /api/ratings/summary/:userId` _(Legacy)_
 

@@ -6,6 +6,7 @@ This guide covers all admin-side user management operations and the public user 
 
 - listing users with filters
 - viewing user details and their listings
+- browsing Kayan reviews for moderation
 - updating user account status
 - soft-deleting users
 - admin role management (promote/demote)
@@ -35,6 +36,16 @@ Shared contract:
 
 1. Call `GET /api/admin/users/:id/listings` to see products/listings created by the user.
 2. Apply optional `status` and pagination filters.
+
+### Browse Kayan Reviews
+
+Admin review browsing endpoints:
+
+- `GET /api/admin/ratings/items/:itemId?itemType=product|fault|service`
+- `GET /api/admin/ratings/users/:userId`
+- `GET /api/admin/ratings`
+
+These routes expose only the current Kayan item-review system. Legacy user-to-user ratings are not included.
 
 ### Update User Status
 
@@ -187,6 +198,51 @@ Success:
 Possible errors:
 
 - `404`: user not found
+
+### `GET /api/admin/ratings/items/:itemId`
+
+Auth: admin bearer token required
+
+Required query param:
+
+- `itemType`: `product`, `fault`, or `service`
+
+Success:
+
+- `200`
+- paginated review rows for the target item
+
+### `GET /api/admin/ratings/users/:userId`
+
+Auth: admin bearer token required
+
+Optional query param:
+
+- `itemType`: `fault` or `service`
+
+Success:
+
+- `200`
+- paginated review rows received on the user's owned Kayan faults/services
+
+### `GET /api/admin/ratings`
+
+Auth: admin bearer token required
+
+Supported filters:
+
+- `itemType`
+- `userId`
+- `ratingValue`
+- `fromDate`
+- `toDate`
+- `search`
+- pagination via `page`, `limit`, `offset`
+
+Success:
+
+- `200`
+- mixed paginated `product` / `fault` / `service` review rows for moderation
 
 ### `DELETE /api/admin/users/:id`
 

@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AuthUser } from '../common/types/auth-user.type';
 import {
   AdminCreateProductDto,
+  GetItemReviewsQueryDto,
   AdminUpdateFaultStatusDto,
   AdminUpdateOrderStatusDto,
   AdminUpdateProductDto,
@@ -16,8 +17,11 @@ import {
   FollowupScopeParamDto,
   FollowupStepParamDto,
   GalleryIdParamDto,
+  ItemIdParamDto,
   ListGalleryQueryDto,
   ListAdminFaultsQueryDto,
+  ListAdminRatingsQueryDto,
+  ListAdminUserRatingsQueryDto,
   ListOrdersQueryDto,
   ListServicesQueryDto,
   OrderIdParamDto,
@@ -35,11 +39,13 @@ import {
   KayanOrderResponseDto,
   KayanOrdersResponseDto,
   KayanProductResponseDto,
+  KayanRatingsResponseDto,
   KayanServiceResponseDto,
   KayanServicesResponseDto,
   FollowupStepResponseDto,
 } from '../kayan/kayan-response.dto';
 import { KayanService } from '../kayan/kayan.service';
+import { IdParamDto } from '../common/dto/id-param.dto';
 
 @ApiTags('Kayan Admin')
 @ApiBearerAuth()
@@ -96,6 +102,24 @@ export class KayanAdminController {
   @ApiResponse({ status: 200, type: KayanServiceResponseDto })
   updateServiceStatus(@CurrentUser() admin: AuthUser, @Param() params: ServiceIdParamDto, @Body() dto: AdminUpdateServiceStatusDto): Promise<Record<string, unknown>> {
     return this.kayanService.adminUpdateServiceStatus(admin, params.id, dto);
+  }
+
+  @Get('ratings/items/:itemId')
+  @ApiResponse({ status: 200, type: KayanRatingsResponseDto })
+  listItemRatings(@Param() params: ItemIdParamDto, @Query() query: GetItemReviewsQueryDto): Promise<Record<string, unknown>> {
+    return this.kayanService.adminGetItemReviews(params.itemId, query);
+  }
+
+  @Get('ratings/users/:id')
+  @ApiResponse({ status: 200, type: KayanRatingsResponseDto })
+  listUserRatings(@Param() params: IdParamDto, @Query() query: ListAdminUserRatingsQueryDto): Promise<Record<string, unknown>> {
+    return this.kayanService.adminGetUserReceivedReviews(params.id, query);
+  }
+
+  @Get('ratings')
+  @ApiResponse({ status: 200, type: KayanRatingsResponseDto })
+  listRatings(@Query() query: ListAdminRatingsQueryDto): Promise<Record<string, unknown>> {
+    return this.kayanService.adminListRatings(query);
   }
 
   @Post('followups/:itemType/:itemId/steps')

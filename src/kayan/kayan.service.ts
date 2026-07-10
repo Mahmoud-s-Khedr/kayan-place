@@ -3,6 +3,7 @@ import { resolveOffsetPagination } from '../common/helpers/pagination.helpers';
 import { DatabaseService } from '../database/database.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import {
+  AdminUserRatingItemType,
   AdminCreateProductDto,
   AdminUpdateFaultStatusDto,
   AdminUpdateOrderStatusDto,
@@ -22,6 +23,8 @@ import {
   GetItemReviewsQueryDto,
   ItemType,
   ListAdminFaultsQueryDto,
+  ListAdminRatingsQueryDto,
+  ListAdminUserRatingsQueryDto,
   ListFollowupStepsQueryDto,
   ListGalleryQueryDto,
   ListMyFaultsQueryDto,
@@ -1135,6 +1138,118 @@ export class KayanService {
     return { items: q.rows, total };
   }
 
+  async adminGetItemReviews(itemId: number, query: GetItemReviewsQueryDto): Promise<Record<string, unknown>> {
+    return this.getItemReviews(itemId, query);
+  }
+
+  async adminGetUserReceivedReviews(userId: number, query: ListAdminUserRatingsQueryDto = {}): Promise<Record<string, unknown>> {
+    await this.assertActiveUserExists(userId);
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
+
+    const conditions = ['1=1'];
+    const params: unknown[] = [userId];
+
+    if (query.itemType) {
+      params.push(query.itemType);
+      conditions.push(`ir.item_type = $${params.length}`);
+    }
+
+    const ownershipCondition = `(
+      (ir.item_type = 'fault' AND EXISTS (
+        SELECT 1 FROM fault_reports fr
+        WHERE fr.id = ir.item_id AND fr.user_id = $1
+      ))
+      OR
+      (ir.item_type = 'service' AND EXISTS (
+        SELECT 1 FROM service_orders so
+        WHERE so.id = ir.item_id AND so.user_id = $1
+      ))
+    )`;
+    conditions.push(ownershipCondition);
+
+    const whereClause = `WHERE ${conditions.join(' AND ')}`;
+    const totalQ = await this.db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+       FROM item_ratings ir
+       ${whereClause}`,
+      params,
+    );
+    const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
+
+    const q = await this.db.query(
+      `SELECT ir.id, ir.user_id, ir.item_type, ir.item_id, NULL::bigint AS order_id, NULL::bigint AS product_id,
+              ir.rating_value, ir.comment, ir.created_at::text AS created_at
+       FROM item_ratings ir
+       ${whereClause}
+       ORDER BY ir.created_at DESC, ir.id DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
+    );
+
+    return { items: q.rows, total };
+  }
+
+  async adminListRatings(query: ListAdminRatingsQueryDto = {}): Promise<Record<string, unknown>> {
+    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
+    const union = `
+      SELECT pr.id, pr.user_id, 'product'::text AS item_type, pr.product_id AS item_id, pr.order_id, pr.product_id,
+             pr.rating_value, pr.comment, pr.created_at
+      FROM product_ratings pr
+      UNION ALL
+      SELECT ir.id, ir.user_id, ir.item_type::text AS item_type, ir.item_id, NULL::bigint AS order_id, NULL::bigint AS product_id,
+             ir.rating_value, ir.comment, ir.created_at
+      FROM item_ratings ir
+    `;
+
+    const conditions = ['1=1'];
+    const params: unknown[] = [];
+
+    if (query.itemType) {
+      params.push(query.itemType);
+      conditions.push(`r.item_type = $${params.length}`);
+    }
+    if (query.userId) {
+      params.push(query.userId);
+      conditions.push(`r.user_id = $${params.length}`);
+    }
+    if (query.ratingValue) {
+      params.push(query.ratingValue);
+      conditions.push(`r.rating_value = $${params.length}`);
+    }
+    if (query.fromDate) {
+      params.push(query.fromDate);
+      conditions.push(`r.created_at >= $${params.length}::date`);
+    }
+    if (query.toDate) {
+      params.push(query.toDate);
+      conditions.push(`r.created_at < ($${params.length}::date + INTERVAL '1 day')`);
+    }
+    if (query.search) {
+      params.push(`%${this.escapeLike(query.search)}%`);
+      conditions.push(`COALESCE(r.comment, '') ILIKE $${params.length} ESCAPE '\\'`);
+    }
+
+    const whereClause = `WHERE ${conditions.join(' AND ')}`;
+    const totalQ = await this.db.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count
+       FROM (${union}) r
+       ${whereClause}`,
+      params,
+    );
+    const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
+
+    const q = await this.db.query(
+      `SELECT r.id, r.user_id, r.item_type, r.item_id, r.order_id, r.product_id, r.rating_value, r.comment, r.created_at::text AS created_at
+       FROM (${union}) r
+       ${whereClause}
+       ORDER BY r.created_at DESC, r.id DESC
+       LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+      [...params, limit, offset],
+    );
+
+    return { items: q.rows, total };
+  }
+
   async createFollowupConversation(user: AuthUser, dto: CreateFollowupConversationDto): Promise<Record<string, unknown>> {
     await this.assertUserOwnsItem(user, dto.itemType, dto.itemId);
     const adminId = dto.adminId ?? await this.findAnyAdminId();
@@ -1203,6 +1318,14 @@ export class KayanService {
   private async assertItemExists(itemType: ItemType, itemId: number): Promise<void> {
     const ownership = await this.resolveOwnership(itemType, itemId);
     if (ownership === null) throw new NotFoundException('Item not found');
+  }
+
+  private async assertActiveUserExists(userId: number): Promise<void> {
+    const q = await this.db.query<{ id: number }>(
+      `SELECT id FROM users WHERE id = $1 AND deleted_at IS NULL LIMIT 1`,
+      [userId],
+    );
+    if (!q.rowCount) throw new NotFoundException('User not found');
   }
 
   private async isActiveAdmin(userId: number): Promise<boolean> {
