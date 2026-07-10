@@ -12,6 +12,16 @@ class KayanAssetDto {
   @ApiPropertyOptional({ nullable: true }) status!: string | null;
 }
 
+class KayanProductReviewDto {
+  @ApiProperty() id!: number;
+  @ApiProperty() user_id!: number;
+  @ApiPropertyOptional({ nullable: true }) order_id!: number | null;
+  @ApiPropertyOptional({ nullable: true }) product_id!: number | null;
+  @ApiProperty() rating_value!: number;
+  @ApiPropertyOptional({ nullable: true }) comment!: string | null;
+  @ApiPropertyOptional({ nullable: true }) created_at!: string | null;
+}
+
 class KayanProductDto {
   @ApiProperty() id!: number;
   @ApiProperty() title!: string;
@@ -25,6 +35,7 @@ class KayanProductDto {
   @ApiProperty() updated_at!: string;
   @ApiProperty({ type: [KayanAssetDto] }) images!: KayanAssetDto[];
   @ApiProperty({ type: [KayanAssetDto] }) files!: KayanAssetDto[];
+  @ApiPropertyOptional({ type: () => KayanProductReviewDto, nullable: true, description: "Current user's review on this product (null for guests or unreviewed products)" }) review!: KayanProductReviewDto | null;
 }
 
 class KayanCartItemDto {
@@ -72,7 +83,7 @@ class KayanOrderDto {
   @ApiProperty() updated_at!: string;
   @ApiProperty() item_count!: number;
   @ApiProperty({ type: [KayanOrderItemDto] }) items!: KayanOrderItemDto[];
-  @ApiPropertyOptional({ type: KayanOrderUserDto }) user?: KayanOrderUserDto;
+  @ApiProperty({ type: KayanOrderUserDto }) user!: KayanOrderUserDto;
 }
 
 class KayanFaultUserDto {
@@ -95,7 +106,7 @@ class KayanFaultDto {
   @ApiProperty() updated_at!: string;
   @ApiPropertyOptional({ type: () => ItemRatingDto, nullable: true }) rate!: ItemRatingDto | null;
   @ApiProperty({ type: [KayanAssetDto] }) images!: KayanAssetDto[];
-  @ApiPropertyOptional({ type: KayanFaultUserDto }) user?: KayanFaultUserDto;
+  @ApiProperty({ type: KayanFaultUserDto }) user!: KayanFaultUserDto;
 }
 
 class KayanServiceUserDto {

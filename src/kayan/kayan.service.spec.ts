@@ -11,7 +11,7 @@ describe('KayanService', () => {
   const service = new KayanService(databaseService as any);
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
 
   it('applies product filters/sorting and includes assets', async () => {
@@ -106,6 +106,41 @@ describe('KayanService', () => {
 
     const [queryText] = databaseService.query.mock.calls[0];
     expect(queryText).toContain('deleted_at IS NULL AND is_active = true');
+  });
+
+  it('includes the current user review in product listings for authenticated callers', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 1,
+            title: 'Chair',
+            description: 'Wooden chair',
+            amount: 4,
+            price: '200.00',
+            details: null,
+            is_active: true,
+            created_at: '2026-01-01T00:00:00.000Z',
+            updated_at: '2026-01-01T00:00:00.000Z',
+            rate: '4.5',
+            review: { id: 12, user_id: 7, rating_value: 5 },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await service.listProducts(
+      { query: 'chair' },
+      { sub: 7, phone: '+201000000007', isAdmin: false },
+    );
+
+    expect(result).toMatchObject({
+      items: [expect.objectContaining({ review: expect.objectContaining({ id: 12, user_id: 7 }) })],
+    });
+
+    const [queryText, params] = databaseService.query.mock.calls[0];
+    expect(queryText).toContain('r.user_id = $2');
+    expect(params).toEqual(['%chair%', 7, 20, 0]);
   });
 
   it('ignores inactive/all availability filters for public and non-admin callers', async () => {
@@ -293,6 +328,7 @@ describe('KayanService', () => {
       query: jest
         .fn()
         .mockResolvedValueOnce({ rows: [{ id: 91 }] })
+        .mockResolvedValueOnce({ rows: [{ name: 'User', email: 'user@test.com', phone: '+2' }] })
         .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 4, amount: 3, price: '50.00', is_active: true }] })
         .mockResolvedValueOnce({ rowCount: 1, rows: [] })
         .mockResolvedValueOnce({ rowCount: 1, rows: [] })
@@ -327,6 +363,7 @@ describe('KayanService', () => {
         .fn()
         .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 1, product_id: 9, quantity: 1 }] })
         .mockResolvedValueOnce({ rows: [{ id: 55 }] })
+        .mockResolvedValueOnce({ rows: [{ name: 'User', email: 'user@test.com', phone: '+2' }] })
         .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 9, amount: 2, price: '500.00', is_active: true }] })
         .mockResolvedValueOnce({ rowCount: 1, rows: [] })
         .mockResolvedValueOnce({ rowCount: 1, rows: [] })
@@ -395,6 +432,48 @@ describe('KayanService', () => {
     expect(queryText).toContain('ORDER BY po.created_at ASC, po.id DESC');
     expect(queryText).toContain('LIMIT $4 OFFSET $5');
     expect(params).toEqual([3, OrderStatus.RECEIVED, '2026-02-01', 5, 5]);
+  });
+
+  it('lists my orders with search and price filters', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 25,
+            user_id: 3,
+            delivery_address: 'Nasr City',
+            status: 'received',
+            created_at: '2026-02-03T00:00:00.000Z',
+            updated_at: '2026-02-03T00:00:00.000Z',
+            user_name: 'Mona',
+            user_email: 'mona@example.com',
+            user_phone: '+201000000003',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ order_id: 25, id: 6, product_id: 8, quantity: 2, unit_price: '75.00', title: 'Shelf', is_active: true }],
+      });
+
+    const result = await service.listMyOrders(
+      { sub: 3, phone: '+201000000003', isAdmin: false },
+      { search: 'Mona', minPrice: 100, maxPrice: 200, sortBy: 'price' as any, sortDirection: 'asc' as any },
+    );
+
+    expect(result).toMatchObject({
+      items: [
+        expect.objectContaining({
+          user: expect.objectContaining({ id: 3, name: 'Mona' }),
+        }),
+      ],
+    });
+
+    const [queryText, params] = databaseService.query.mock.calls[0];
+    expect(queryText).toContain('u.name ILIKE $2');
+    expect(queryText).toContain('>= $3');
+    expect(queryText).toContain('<= $4');
+    expect(queryText).toContain('ORDER BY (SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0) FROM order_items oi WHERE oi.order_id = po.id) ASC, po.id DESC');
+    expect(params).toEqual([3, '%Mona%', 100, 200, 20, 0]);
   });
 
   it('prefers explicit offset over page in my faults list', async () => {
@@ -468,6 +547,115 @@ describe('KayanService', () => {
         }),
       ],
     });
+  });
+
+  it('lists admin orders with search filters using the same joined count query', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 20,
+            user_id: 9,
+            delivery_address: 'Heliopolis',
+            status: 'delivered',
+            created_at: '2026-03-01T00:00:00.000Z',
+            updated_at: '2026-03-02T00:00:00.000Z',
+            user_name: 'Sara',
+            user_email: 'sara@example.com',
+            user_phone: '+201000000009',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ order_id: 20, id: 2, product_id: 4, quantity: 1, unit_price: '80.00', title: 'Mirror', is_active: true }],
+      });
+
+    const result = await service.adminListOrders({ search: 'Sara' });
+
+    expect(result).toMatchObject({
+      total: 1,
+      items: [expect.objectContaining({ user: expect.objectContaining({ id: 9, name: 'Sara' }) })],
+    });
+
+    const [countQueryText, countParams] = databaseService.query.mock.calls[0];
+    const [listQueryText, listParams] = databaseService.query.mock.calls[1];
+    expect(countQueryText).toContain('FROM product_orders po');
+    expect(countQueryText).toContain('LEFT JOIN users u ON u.id = po.user_id');
+    expect(countQueryText).toContain('u.name ILIKE $1');
+    expect(countParams).toEqual(['%Sara%']);
+    expect(listQueryText).toContain('LEFT JOIN users u ON u.id = po.user_id');
+    expect(listParams).toEqual(['%Sara%', 20, 0]);
+  });
+
+  it('lists admin orders with aggregated price filters and sorting', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '1' }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 31,
+            user_id: 10,
+            delivery_address: 'Zamalek',
+            status: 'received',
+            created_at: '2026-03-05T00:00:00.000Z',
+            updated_at: '2026-03-05T00:00:00.000Z',
+            user_name: 'Nour',
+            user_email: 'nour@example.com',
+            user_phone: '+201000000010',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ order_id: 31, id: 8, product_id: 11, quantity: 2, unit_price: '120.00', title: 'Table', is_active: true }],
+      });
+
+    await service.adminListOrders({ minPrice: 200, maxPrice: 300, sortBy: 'price' as any, sortDirection: 'asc' as any });
+
+    const [countQueryText, countParams] = databaseService.query.mock.calls[0];
+    const [listQueryText, listParams] = databaseService.query.mock.calls[1];
+    expect(countQueryText).toContain('SELECT COUNT(*)::text AS count');
+    expect(countQueryText).toContain('>= $1');
+    expect(countQueryText).toContain('<= $2');
+    expect(countParams).toEqual([200, 300]);
+    expect(listQueryText).toContain('ORDER BY (SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0) FROM order_items oi WHERE oi.order_id = po.id) ASC, po.id DESC');
+    expect(listParams).toEqual([200, 300, 20, 0]);
+  });
+
+  it('gets a product with the current user review using query parameters', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [
+          {
+            id: 4,
+            title: 'Desk',
+            description: 'Office desk',
+            amount: 2,
+            price: '500.00',
+            details: null,
+            is_active: true,
+            created_at: '2026-03-10T00:00:00.000Z',
+            updated_at: '2026-03-10T00:00:00.000Z',
+            rate: '4.0',
+            review: { id: 3, user_id: 7, rating_value: 4 },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await service.getProduct(4, 7);
+
+    expect(result).toMatchObject({
+      product: expect.objectContaining({
+        id: 4,
+        review: expect.objectContaining({ id: 3, user_id: 7 }),
+      }),
+    });
+
+    const [queryText, params] = databaseService.query.mock.calls[0];
+    expect(queryText).toContain('r.user_id = $2');
+    expect(params).toEqual([4, 7]);
   });
 
   it('gets a single order with embedded product objects', async () => {

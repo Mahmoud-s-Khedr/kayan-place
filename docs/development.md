@@ -25,8 +25,8 @@ docker compose -f docker-compose.dev.yml exec -T app npm run db:migrate
 ## 3) Access endpoints
 
 - API base: `http://localhost:800`
-- Health (live): `http://localhost:800/health/live`
-- Health (ready): `http://localhost:800/health/ready`
+- Health (live): `http://localhost:800/api/health/live`
+- Health (ready): `http://localhost:800/api/health/ready`
 - Swagger: `http://localhost:800/api/docs`
 - Swagger JSON: `http://localhost:800/api/docs-json`
 
@@ -67,7 +67,7 @@ Use the dedicated auth test runner against the live API URL.
 
 ### Prerequisites
 
-1. Backend is reachable (`BASE_URL`, default `http://localhost:3000`)
+1. Backend is reachable (`BASE_URL`, default `http://localhost:3000` for direct host-run, `http://localhost:800` for Docker/Nginx)
 2. Backend runs with `OTP_DEV_MODE=true` for deterministic OTP automation
 
 ### Environment variables
@@ -79,17 +79,17 @@ Use the dedicated auth test runner against the live API URL.
 ### Run CLI script
 
 ```bash
-OTP_DEV_MODE=true BASE_URL=http://localhost:800 npm run test:auth:cli
+OTP_DEV_MODE=true BASE_URL=http://localhost:3000 npm run test:auth:cli
 ```
 
 Verbose mode:
 
 ```bash
-OTP_DEV_MODE=true BASE_URL=http://localhost:800 npm run test:auth:cli -- --verbose
+OTP_DEV_MODE=true BASE_URL=http://localhost:3000 npm run test:auth:cli -- --verbose
 ```
 
 ### Run Jest e2e wrapper
 
 ```bash
-OTP_DEV_MODE=true BASE_URL=http://localhost:800 npm run test:auth:e2e
+OTP_DEV_MODE=true BASE_URL=http://localhost:3000 npm run test:auth:e2e
 ```

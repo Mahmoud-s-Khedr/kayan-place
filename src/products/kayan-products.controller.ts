@@ -26,7 +26,7 @@ export class KayanProductsController {
   @ApiOperation({ summary: 'Get Kayan product by id' })
   @ApiResponse({ status: 200, type: KayanProductResponseDto })
   @ApiResponse({ status: 404, type: ErrorResponseDto })
-  getProduct(@Param() params: ProductIdParamDto): Promise<Record<string, unknown>> {
-    return this.kayanService.getProduct(params.id);
+  getProduct(@Param() params: ProductIdParamDto, @CurrentUser() user?: AuthUser | null): Promise<Record<string, unknown>> {
+    return this.kayanService.getProduct(params.id, user?.sub ?? null);
   }
 }

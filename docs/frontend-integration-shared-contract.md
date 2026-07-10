@@ -19,10 +19,11 @@ Use it together with:
 ## Base URL and Environment
 
 - Canonical REST prefix: `/api`
-- Local reverse-proxy base URL: `http://localhost`
-- Canonical local API example: `http://localhost/api/auth/login`
-- Swagger UI: `http://localhost/api/docs`
-- OpenAPI JSON: `http://localhost/api/docs-json`
+- Direct host-run base URL: `http://localhost:3000`
+- Docker/Nginx base URL: `http://localhost:800`
+- Canonical local API example: `http://localhost:3000/api/auth/login`
+- Swagger UI: `http://localhost:800/api/docs`
+- OpenAPI JSON: `http://localhost:800/api/docs-json`
 - Health endpoints:
   - `GET /api/health/live`
   - `GET /api/health/ready`

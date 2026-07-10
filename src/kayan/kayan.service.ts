@@ -133,6 +133,10 @@ export class KayanService {
       havingClauses.push(`COALESCE(ROUND(AVG(pr.rating_value)::numeric, 2), 0) <= $${params.length}`);
     }
     const havingClause = havingClauses.length ? `HAVING ${havingClauses.join(' AND ')}` : '';
+    const reviewParam = user?.sub ? params.push(user.sub) : null;
+    const reviewSubquery = reviewParam
+      ? `(SELECT row_to_json(rev_row) FROM (SELECT r.id, r.user_id, r.order_id, r.product_id, r.rating_value, r.comment, r.created_at::text AS created_at FROM product_ratings r WHERE r.product_id = cp.id AND r.user_id = $${reviewParam} ORDER BY r.created_at DESC, r.id DESC LIMIT 1) rev_row) AS review`
+      : 'NULL::json AS review';
     const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
 
     params.push(limit);
@@ -143,7 +147,8 @@ export class KayanService {
     const q = await this.db.query(
       `SELECT cp.id, cp.title, cp.description, cp.amount, cp.price, cp.details, cp.is_active,
               cp.created_at::text AS created_at, cp.updated_at::text AS updated_at,
-              COALESCE(ROUND(AVG(pr.rating_value)::numeric, 2), 0)::text AS rate
+              COALESCE(ROUND(AVG(pr.rating_value)::numeric, 2), 0)::text AS rate,
+              ${reviewSubquery}
        FROM catalog_products cp
        LEFT JOIN product_ratings pr ON pr.product_id = cp.id
        WHERE ${conditions.join(' AND ')}
@@ -157,8 +162,8 @@ export class KayanService {
     return { items: await this.attachProductAssets(this.db, q.rows as Array<Record<string, unknown>>) };
   }
 
-  async getProduct(productId: number): Promise<Record<string, unknown>> {
-    return this.getProductWithAssets(this.db, productId);
+  async getProduct(productId: number, userId?: number | null): Promise<Record<string, unknown>> {
+    return this.getProductWithAssets(this.db, productId, userId);
   }
 
   async adminCreateProduct(admin: AuthUser, dto: AdminCreateProductDto): Promise<Record<string, unknown>> {
@@ -305,6 +310,10 @@ export class KayanService {
       params.push(query.status);
       conditions.push(`po.status = $${params.length}`);
     }
+    if (query.search) {
+      params.push(`%${this.escapeLike(query.search)}%`);
+      conditions.push(`(po.delivery_address ILIKE $${params.length} ESCAPE '\\' OR u.name ILIKE $${params.length} ESCAPE '\\' OR u.email ILIKE $${params.length} ESCAPE '\\' OR u.phone ILIKE $${params.length} ESCAPE '\\' OR EXISTS (SELECT 1 FROM order_items oi JOIN catalog_products cp ON cp.id = oi.product_id WHERE oi.order_id = po.id AND (cp.title ILIKE $${params.length} ESCAPE '\\' OR cp.description ILIKE $${params.length} ESCAPE '\\')))`);
+    }
     if (query.fromDate) {
       params.push(query.fromDate);
       conditions.push(`po.created_at >= $${params.length}::date`);
@@ -313,10 +322,20 @@ export class KayanService {
       params.push(query.toDate);
       conditions.push(`po.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
+    if (query.minPrice !== undefined) {
+      params.push(query.minPrice);
+      conditions.push(`(SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0) FROM order_items oi WHERE oi.order_id = po.id) >= $${params.length}`);
+    }
+    if (query.maxPrice !== undefined) {
+      params.push(query.maxPrice);
+      conditions.push(`(SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0) FROM order_items oi WHERE oi.order_id = po.id) <= $${params.length}`);
+    }
 
     const sortBy = query.sortBy ?? OrderSortBy.CREATED_AT;
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
-    const orderColumn = sortBy === OrderSortBy.CREATED_AT ? 'po.created_at' : 'po.created_at';
+    const orderColumn = sortBy === OrderSortBy.PRICE
+      ? '(SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0) FROM order_items oi WHERE oi.order_id = po.id)'
+      : 'po.created_at';
     const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
 
     params.push(limit);
@@ -325,14 +344,16 @@ export class KayanService {
     const offsetParam = params.length;
 
     const q = await this.db.query(
-      `SELECT po.id, po.user_id, po.delivery_address, po.status, po.created_at::text AS created_at, po.updated_at::text AS updated_at
+      `SELECT po.id, po.user_id, po.delivery_address, po.status, po.created_at::text AS created_at, po.updated_at::text AS updated_at,
+              u.name AS user_name, u.email AS user_email, u.phone AS user_phone
        FROM product_orders po
+       LEFT JOIN users u ON u.id = po.user_id
        WHERE ${conditions.join(' AND ')}
        ORDER BY ${orderColumn} ${sortDirection}, po.id DESC
        LIMIT $${limitParam} OFFSET $${offsetParam}`,
       params,
     );
-    return { items: await this.attachOrderItems(this.db, q.rows as Array<Record<string, unknown>>, false) };
+    return { items: await this.attachOrderItems(this.db, q.rows as Array<Record<string, unknown>>, true) };
   }
 
   async getOrderForUser(userId: number, orderId: number, allowAdmin = false): Promise<Record<string, unknown>> {
@@ -384,6 +405,10 @@ export class KayanService {
       params.push(query.status);
       conditions.push(`po.status = $${params.length}`);
     }
+    if (query.search) {
+      params.push(`%${this.escapeLike(query.search)}%`);
+      conditions.push(`(po.delivery_address ILIKE $${params.length} ESCAPE '\\' OR u.name ILIKE $${params.length} ESCAPE '\\' OR u.email ILIKE $${params.length} ESCAPE '\\' OR u.phone ILIKE $${params.length} ESCAPE '\\' OR EXISTS (SELECT 1 FROM order_items oi JOIN catalog_products cp ON cp.id = oi.product_id WHERE oi.order_id = po.id AND (cp.title ILIKE $${params.length} ESCAPE '\\' OR cp.description ILIKE $${params.length} ESCAPE '\\')))`);
+    }
     if (query.fromDate) {
       params.push(query.fromDate);
       conditions.push(`po.created_at >= $${params.length}::date`);
@@ -392,9 +417,23 @@ export class KayanService {
       params.push(query.toDate);
       conditions.push(`po.created_at < ($${params.length}::date + INTERVAL '1 day')`);
     }
+    if (query.minPrice !== undefined) {
+      params.push(query.minPrice);
+      conditions.push(`(SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0) FROM order_items oi WHERE oi.order_id = po.id) >= $${params.length}`);
+    }
+    if (query.maxPrice !== undefined) {
+      params.push(query.maxPrice);
+      conditions.push(`(SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0) FROM order_items oi WHERE oi.order_id = po.id) <= $${params.length}`);
+    }
 
+    const fromClause = `FROM product_orders po
+       LEFT JOIN users u ON u.id = po.user_id`;
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const sortBy = query.sortBy ?? OrderSortBy.CREATED_AT;
     const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
+    const orderColumn = sortBy === OrderSortBy.PRICE
+      ? '(SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0) FROM order_items oi WHERE oi.order_id = po.id)'
+      : 'po.created_at';
 
     const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
 
@@ -404,7 +443,9 @@ export class KayanService {
     const offsetParam = params.length;
 
     const totalQ = await this.db.query<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM product_orders po ${whereClause}`,
+      `SELECT COUNT(*)::text AS count
+       ${fromClause}
+       ${whereClause}`,
       params.slice(0, params.length - 2),
     );
     const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
@@ -412,10 +453,9 @@ export class KayanService {
     const q = await this.db.query(
       `SELECT po.id, po.user_id, po.delivery_address, po.status, po.created_at::text AS created_at, po.updated_at::text AS updated_at,
               u.name AS user_name, u.email AS user_email, u.phone AS user_phone
-       FROM product_orders po
-       LEFT JOIN users u ON u.id = po.user_id
+       ${fromClause}
        ${whereClause}
-       ORDER BY po.created_at ${sortDirection}, po.id DESC
+       ORDER BY ${orderColumn} ${sortDirection}, po.id DESC
        LIMIT $${limitParam} OFFSET $${offsetParam}`,
       params,
     );
@@ -494,6 +534,7 @@ export class KayanService {
     const q = await this.db.query(
       `SELECT fr.id, fr.user_id, fr.title, fr.description, fr.severity, fr.address, fr.status, fr.cancelled_at::text AS cancelled_at,
               fr.created_at::text AS created_at, fr.updated_at::text AS updated_at,
+              u.name AS user_name, u.email AS user_email, u.phone AS user_phone,
               (
                 SELECT row_to_json(ir_row)
                 FROM (
@@ -505,12 +546,27 @@ export class KayanService {
                 ) ir_row
               ) AS rate
        FROM fault_reports fr
+       LEFT JOIN users u ON u.id = fr.user_id
        WHERE ${conditions.join(' AND ')}
        ${orderClause}
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
       [...params, limit, offset],
     );
-    return { items: await this.attachFaultAssets(this.db, q.rows as Array<Record<string, unknown>>) };
+    const items = await this.attachFaultAssets(this.db, q.rows as Array<Record<string, unknown>>);
+    return {
+      items: items.map((item) => ({
+        ...item,
+        user: {
+          id: Number(item.user_id),
+          name: (item.user_name as string | null) ?? null,
+          email: (item.user_email as string | null) ?? null,
+          phone: (item.user_phone as string | null) ?? null,
+        },
+        user_name: undefined,
+        user_email: undefined,
+        user_phone: undefined,
+      })),
+    };
   }
 
   async cancelFault(user: AuthUser, faultId: number): Promise<Record<string, unknown>> {
@@ -533,8 +589,9 @@ export class KayanService {
     allowAdmin = false,
   ): Promise<Record<string, unknown>> {
     const q = await executor.query(
-      `SELECT id, user_id, title, description, severity, address, status, cancelled_at::text AS cancelled_at,
-              created_at::text AS created_at, updated_at::text AS updated_at,
+      `SELECT fr.id, fr.user_id, fr.title, fr.description, fr.severity, fr.address, fr.status, fr.cancelled_at::text AS cancelled_at,
+              fr.created_at::text AS created_at, fr.updated_at::text AS updated_at,
+              u.name AS user_name, u.email AS user_email, u.phone AS user_phone,
               (
                 SELECT row_to_json(ir_row)
                 FROM (
@@ -545,14 +602,28 @@ export class KayanService {
                   LIMIT 1
                 ) ir_row
               ) AS rate
-       FROM fault_reports WHERE id = $1 LIMIT 1`,
+       FROM fault_reports fr
+       LEFT JOIN users u ON u.id = fr.user_id
+       WHERE fr.id = $1 LIMIT 1`,
       [faultId, userId],
     );
     if (!q.rowCount) throw new NotFoundException('Fault not found');
-    const fault = q.rows[0] as { user_id: number } & Record<string, unknown>;
+    const fault = q.rows[0] as { user_id: number; user_name: string | null; user_email: string | null; user_phone: string | null } & Record<string, unknown>;
     if (!allowAdmin && Number(fault.user_id) !== userId) throw new ForbiddenException('Not allowed');
     const [withAssets] = await this.attachFaultAssets(executor, [fault]);
-    return { fault: withAssets };
+    const result: Record<string, unknown> = {
+      ...withAssets,
+      user: {
+        id: Number(fault.user_id),
+        name: fault.user_name ?? null,
+        email: fault.user_email ?? null,
+        phone: fault.user_phone ?? null,
+      },
+    };
+    delete result.user_name;
+    delete result.user_email;
+    delete result.user_phone;
+    return { fault: result };
   }
 
   async adminListFaults(query: ListAdminFaultsQueryDto = {}): Promise<Record<string, unknown>> {
@@ -1203,17 +1274,21 @@ export class KayanService {
     if (!q.rowCount) throw new NotFoundException('Conversation not found');
   }
 
-  private async getProductWithAssets(executor: SqlExecutor, productId: number): Promise<Record<string, unknown>> {
+  private async getProductWithAssets(executor: SqlExecutor, productId: number, userId?: number | null): Promise<Record<string, unknown>> {
+    const reviewSubquery = userId
+      ? `(SELECT row_to_json(rev_row) FROM (SELECT r.id, r.user_id, r.order_id, r.product_id, r.rating_value, r.comment, r.created_at::text AS created_at FROM product_ratings r WHERE r.product_id = cp.id AND r.user_id = $2 ORDER BY r.created_at DESC, r.id DESC LIMIT 1) rev_row) AS review`
+      : 'NULL::json AS review';
     const q = await executor.query(
       `SELECT cp.id, cp.title, cp.description, cp.amount, cp.price, cp.details, cp.is_active,
               cp.created_at::text AS created_at, cp.updated_at::text AS updated_at,
-              COALESCE(ROUND(AVG(pr.rating_value)::numeric, 2), 0)::text AS rate
+              COALESCE(ROUND(AVG(pr.rating_value)::numeric, 2), 0)::text AS rate,
+              ${reviewSubquery}
        FROM catalog_products cp
        LEFT JOIN product_ratings pr ON pr.product_id = cp.id
        WHERE cp.id = $1 AND cp.deleted_at IS NULL
        GROUP BY cp.id
        LIMIT 1`,
-      [productId],
+      userId ? [productId, userId] : [productId],
     );
     if (!q.rowCount) throw new NotFoundException('Product not found');
     const [product] = await this.attachProductAssets(executor, q.rows as Array<Record<string, unknown>>);
@@ -1343,6 +1418,12 @@ export class KayanService {
     );
     const orderId = Number((order.rows[0] as { id: number }).id);
 
+    const userResult = await client.query(
+      `SELECT name, email, phone FROM users WHERE id = $1 LIMIT 1`,
+      [user.sub]
+    ) as { rows: Array<{ name: string | null; email: string | null; phone: string | null }> };
+    const userData = userResult.rows[0] ?? { name: null, email: null, phone: null };
+
     for (const item of items) {
       const product = await client.query(
         `SELECT id, amount, price::text, is_active FROM catalog_products WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`,
@@ -1367,12 +1448,15 @@ export class KayanService {
       [{
         id: orderId,
         user_id: user.sub,
+        user_name: userData.name,
+        user_email: userData.email,
+        user_phone: userData.phone,
         delivery_address: deliveryAddress,
         status: OrderStatus.RECEIVED,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }],
-      false,
+      true,
     );
     return { order: fullOrder };
   }

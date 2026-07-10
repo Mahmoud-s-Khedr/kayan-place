@@ -34,7 +34,7 @@ This API covers:
 1. Copy environment variables:
 
 ```bash
-cp .env.example .env
+cp .env.dev.example .env
 ```
 
 2. Start local stack:
@@ -46,8 +46,8 @@ docker compose up --build
 3. Verify health:
 
 ```bash
-curl -fsS http://localhost/health/live
-curl -fsS http://localhost/health/ready
+curl -fsS http://localhost:800/api/health/live
+curl -fsS http://localhost:800/api/health/ready
 ```
 
 4. Optional manual migration run (recovery/debug/idempotency check):
@@ -65,19 +65,19 @@ docker compose down -v
 Notes:
 - In Docker, the app container now runs `npm run db:migrate` automatically on startup before booting NestJS.
 - Manual `db:migrate` remains useful to verify idempotency or recover from interrupted startup.
-- Docker Compose uses an external database via `DATABASE_URL` (no Postgres service is provisioned in Compose).
-- For local host PostgreSQL, set `DATABASE_URL=postgres://postgres@host.docker.internal:15432/market_place_db`.
+- `docker-compose.dev.yml` provisions local `postgres` and `redis` services for a self-contained stack.
+- Docker service-to-service addresses such as `postgres` and `redis` only work inside the Compose network.
 
 ## Access Points
 
-- App entry (through Nginx): `http://localhost`
-- Swagger UI (through Nginx): `http://localhost/api/docs`
-- Health (live): `http://localhost/health/live`
-- Health (ready): `http://localhost/health/ready`
+- App entry (through Nginx): `http://localhost:800`
+- Swagger UI (through Nginx): `http://localhost:800/api/docs`
+- Health (live): `http://localhost:800/api/health/live`
+- Health (ready): `http://localhost:800/api/health/ready`
 
 Notes:
 - The NestJS app listens on port `3000` inside the container.
-- Docker Compose exposes `3000` to the `nginx` service and publishes `80:80` for external access.
+- Docker Compose exposes `3000` to the `nginx` service and publishes `800:80` for external access by default.
 
 ## Local Development (Non-Docker)
 
@@ -93,10 +93,20 @@ npm ci
 npm run build
 ```
 
-3. Run in development mode:
+3. Choose one local mode:
+
+- Direct host-run local app:
 
 ```bash
-npm run start:dev
+npm run build
+npm start
+```
+
+- Docker dev stack:
+
+```bash
+cp .env.dev.example .env
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 4. Database scripts (require `DATABASE_URL`):
@@ -128,7 +138,7 @@ docker compose exec -T app sh -lc 'ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=
 ```
 
 `seed:dev` requirements:
-- Server is running and reachable at `BASE_URL` (defaults to `http://localhost`)
+- Server is running and reachable at `BASE_URL` (`http://localhost:3000` for direct host-run, `http://localhost:800` for Docker/Nginx)
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD` are set and valid (`ADMIN_PHONE` optional)
 - `OTP_DEV_MODE=true` is enabled on the server so registration responses include OTP (`000000` for console provider)
 
@@ -137,7 +147,8 @@ docker compose exec -T app sh -lc 'ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=
 Choose an environment template, then copy it to `.env`:
 
 ```bash
-cp .env.dev.example .env   # local development defaults
+cp .env.example .env       # direct host-run local app defaults
+cp .env.dev.example .env   # Docker dev stack defaults
 # or
 cp .env.prod.example .env  # production-oriented defaults
 ```
@@ -171,11 +182,19 @@ Then run:
 NODE_ENV=development OTP_DEV_MODE=true npm run simulate
 ```
 
+For direct host-run local app, default script/harness fallbacks now target `http://localhost:3000`.
+For Docker/Nginx runs, override explicitly:
+
+```bash
+BASE_URL=http://localhost:800 npm run simulate:kayan
+BASE_URL=http://localhost:800 npm run simulate:kayan:admin
+```
+
 Module 6 (Follow-Up + Item Chat) client-flow simulation:
 
 ```bash
 # stack already running (docker compose up -d)
-BASE_URL=http://localhost \
+BASE_URL=http://localhost:800 \
 ADMIN_EMAIL=admin@example.com \
 ADMIN_PASSWORD=ChangeMe123 \
 OTP_DEV_MODE=true \
@@ -198,9 +217,9 @@ If simulation fails at `POST /auth/login (admin)` with `401 Invalid credentials`
 docker compose exec -T app sh -lc 'ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=ChangeMe123 ADMIN_PHONE=+201000000000 npm run seed:admin:prod'
 ```
 
-If Docker app startup fails with DB host resolution errors:
-- This compose stack uses external Postgres via `DATABASE_URL`.
-- For local host Postgres, use `host.docker.internal` (for example `postgres://postgres:postgres@host.docker.internal:5432/market_place_db`).
+If direct host-run startup fails with DB or Redis host resolution errors:
+- Your `.env` is probably using Docker-only service names such as `postgres` or `redis`.
+- Use `.env.example` for direct host-run local development, or override `DATABASE_URL`, `REDIS_URL`, and `BASE_URL` with host-reachable values.
 
 ## Testing and Quality
 

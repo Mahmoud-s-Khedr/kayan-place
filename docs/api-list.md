@@ -795,10 +795,10 @@ _No documented error responses._
 
 | Method | Path | Auth | Summary |
 |---|---|---|---|
-| GET | /health/live | public | Liveness probe — always returns 200 |
-| GET | /health/ready | public | Readiness probe — checks DB connectivity |
+| GET | /api/health/live | public | Liveness probe — always returns 200 |
+| GET | /api/health/ready | public | Readiness probe — checks DB connectivity |
 
-#### GET /health/live
+#### GET /api/health/live
 
 - Name: `HealthController_live`
 - Auth: `public`
@@ -824,7 +824,7 @@ _No request body._
 
 _No documented error responses._
 
-#### GET /health/ready
+#### GET /api/health/ready
 
 - Name: `HealthController_ready`
 - Auth: `public`
@@ -2458,4 +2458,3 @@ _No request body._
 **Response Payload / Emitted Events**
 
 - Shape: `message.received`
-

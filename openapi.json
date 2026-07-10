@@ -1697,7 +1697,7 @@
             }
           }
         },
-        "summary": "Get reviews for a specific item (fault, service, or order)",
+        "summary": "Get reviews for a specific item (product, fault, or service)",
         "tags": [
           "Kayan Ratings"
         ]
@@ -1944,7 +1944,8 @@
               "type": "string",
               "enum": [
                 "available",
-                "sold"
+                "sold",
+                "archived"
               ]
             }
           },
@@ -4369,6 +4370,11 @@
             "type": "string",
             "example": "+201012345678"
           },
+          "address": {
+            "type": "object",
+            "example": "123 Main St, Cairo",
+            "nullable": true
+          },
           "status": {
             "type": "string",
             "example": "active",
@@ -4892,6 +4898,41 @@
           "sort_order"
         ]
       },
+      "KayanProductReviewDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "user_id": {
+            "type": "number"
+          },
+          "order_id": {
+            "type": "object",
+            "nullable": true
+          },
+          "product_id": {
+            "type": "object",
+            "nullable": true
+          },
+          "rating_value": {
+            "type": "number"
+          },
+          "comment": {
+            "type": "object",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "rating_value"
+        ]
+      },
       "KayanProductDto": {
         "type": "object",
         "properties": {
@@ -4938,6 +4979,15 @@
             "items": {
               "$ref": "#/components/schemas/KayanAssetDto"
             }
+          },
+          "review": {
+            "nullable": true,
+            "description": "Current user's review on this product (null for guests or unreviewed products)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/KayanProductReviewDto"
+              }
+            ]
           }
         },
         "required": [
@@ -5887,7 +5937,12 @@
           },
           "item_type": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "enum": [
+              "product",
+              "fault",
+              "service"
+            ]
           },
           "item_id": {
             "type": "number",
@@ -6199,7 +6254,8 @@
             "example": "available",
             "enum": [
               "available",
-              "sold"
+              "sold",
+              "archived"
             ]
           },
           "city": {
@@ -6504,13 +6560,43 @@
             "type": "object",
             "nullable": true
           },
+          "description": {
+            "type": "object",
+            "nullable": true
+          },
+          "amount": {
+            "type": "object",
+            "nullable": true
+          },
+          "price": {
+            "type": "object",
+            "nullable": true
+          },
+          "details": {
+            "type": "object",
+            "nullable": true
+          },
           "is_active": {
             "type": "object",
             "nullable": true
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KayanAssetDto"
+            }
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KayanAssetDto"
+            }
           }
         },
         "required": [
-          "id"
+          "id",
+          "images",
+          "files"
         ]
       },
       "KayanOrderItemDto": {
@@ -6612,7 +6698,8 @@
           "created_at",
           "updated_at",
           "item_count",
-          "items"
+          "items",
+          "user"
         ]
       },
       "KayanOrdersDataDto": {
@@ -6757,9 +6844,13 @@
           "updated_at": {
             "type": "string"
           },
-          "has_rated": {
-            "type": "object",
-            "nullable": true
+          "rate": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItemRatingDto"
+              }
+            ]
           },
           "images": {
             "type": "array",
@@ -6781,7 +6872,8 @@
           "status",
           "created_at",
           "updated_at",
-          "images"
+          "images",
+          "user"
         ]
       },
       "KayanFaultsDataDto": {
@@ -6919,6 +7011,14 @@
           },
           "updated_at": {
             "type": "string"
+          },
+          "rate": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ItemRatingDto"
+              }
+            ]
           },
           "user": {
             "$ref": "#/components/schemas/KayanServiceUserDto"

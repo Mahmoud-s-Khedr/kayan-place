@@ -4,7 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import { ADMIN_PASSWORD_REGEX, ADMIN_PHONE_REGEX } from '../admin/admin-seeder';
 
 const DEV_PROFILE = 'medium';
-const DEFAULT_BASE_URL = 'http://localhost';
+const DEFAULT_BASE_URL = 'http://localhost:3000';
 const DEFAULT_TIMEOUT_MS = 12_000;
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 const RETRY_ATTEMPTS = 4;
@@ -641,8 +641,8 @@ async function performPreflightChecks(
   api: SeedApiClient,
   input: DevSeedInput,
 ): Promise<{ adminToken: string; adminUserId: number }> {
-  await api.request('GET', '/health/live', { expectedStatuses: [200], retryable: false });
-  await api.request('GET', '/health/ready', { expectedStatuses: [200], retryable: false });
+  await api.request('GET', '/api/health/live', { expectedStatuses: [200], retryable: false });
+  await api.request('GET', '/api/health/ready', { expectedStatuses: [200], retryable: false });
 
   let adminLogin: RequestResult<unknown>;
   try {

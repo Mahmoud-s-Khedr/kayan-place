@@ -175,7 +175,7 @@ export function createProfileTestContext(overrides?: Partial<ProfileTestConfig>)
   identity: ProfileIdentity;
 } {
   const config: ProfileTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:3000'),
     timeoutMs: overrides?.timeoutMs ?? Number(process.env.PROFILE_TEST_TIMEOUT_MS ?? 15000),
     verbose: overrides?.verbose ?? (process.argv.includes('--verbose') || process.argv.includes('-v')),
     password: overrides?.password ?? process.env.PROFILE_TEST_PASSWORD ?? 'ProfilePass123',

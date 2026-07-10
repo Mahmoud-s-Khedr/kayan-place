@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { FileReadUrlService } from './file-read-url.service';
 
 describe('FileReadUrlService', () => {

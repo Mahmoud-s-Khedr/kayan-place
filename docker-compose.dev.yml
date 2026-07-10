@@ -8,7 +8,7 @@ services:
     environment:
       PORT: ${PORT:-3000}
       REDIS_URL: redis://redis:6379
-      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/market_place_db}
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/market_place_db
       DATABASE_SSL: ${DATABASE_SSL:-false}
     restart: unless-stopped
     init: true

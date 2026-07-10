@@ -55,7 +55,7 @@ describe('dev-seeder', () => {
     });
 
     try {
-      const response = await client.request<{ success: boolean }>('GET', '/health/live', {
+      const response = await client.request<{ success: boolean }>('GET', '/api/health/live', {
         expectedStatuses: [200],
       });
 

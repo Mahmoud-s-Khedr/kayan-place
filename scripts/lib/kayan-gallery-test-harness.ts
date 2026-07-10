@@ -422,7 +422,7 @@ export function createGalleryTestContext(overrides?: Partial<GalleryTestConfig>)
   const uploadMode: 'real' | 'skip' = uploadModeEnv === 'skip' ? 'skip' : 'real';
 
   const config: GalleryTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:3000'),
     timeoutMs: overrides?.timeoutMs ?? parsePositiveInt(process.env.SIM_KAYAN_GALLERY_TIMEOUT_MS, 30000),
     verbose: overrides?.verbose ?? parseBool(process.env.SIM_KAYAN_GALLERY_VERBOSE, true),
     negativeTests: overrides?.negativeTests ?? parseBool(process.env.SIM_KAYAN_GALLERY_NEGATIVE_TESTS, true),
@@ -467,7 +467,7 @@ export async function runGalleryHappyPath(
   pushAssertion(
     config,
     steps,
-    'preflight: /health/ready reachable',
+    'preflight: /api/health/ready reachable',
     healthy,
     healthy
       ? `Service ready after preflight checks`

@@ -321,7 +321,7 @@ export function createKayanServicesTestContext(overrides?: Partial<KayanServices
   userB: AuthIdentity;
 } {
   const config: KayanServicesTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:3000'),
     timeoutMs: overrides?.timeoutMs ?? parsePositiveInt(process.env.SIM_KAYAN_SERVICES_TIMEOUT_MS, 20000),
     verbose: overrides?.verbose ?? parseBool(process.env.SIM_KAYAN_SERVICES_VERBOSE, true),
     negativeTests: overrides?.negativeTests ?? parseBool(process.env.SIM_KAYAN_SERVICES_NEGATIVE_TESTS, true),

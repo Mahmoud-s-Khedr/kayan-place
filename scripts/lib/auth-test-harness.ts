@@ -149,7 +149,7 @@ export function createAuthTestContext(overrides?: Partial<AuthTestConfig>): {
   newPassword: string;
 } {
   const config: AuthTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:3000'),
     timeoutMs: overrides?.timeoutMs ?? Number(process.env.AUTH_TEST_TIMEOUT_MS ?? 15000),
     verbose: overrides?.verbose ?? (process.argv.includes('--verbose') || process.argv.includes('-v')),
     password: overrides?.password ?? process.env.AUTH_TEST_PASSWORD ?? 'AuthPass123',

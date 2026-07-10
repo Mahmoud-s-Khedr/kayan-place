@@ -729,7 +729,7 @@ export function createFollowupTestContext(overrides?: Partial<FollowupTestConfig
   userB: AuthIdentity;
 } {
   const config: FollowupTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:3000'),
     timeoutMs: overrides?.timeoutMs ?? parsePositiveInt(process.env.KAYAN_FOLLOWUP_TEST_TIMEOUT_MS, 20000),
     verbose: overrides?.verbose ?? parseBool(process.env.KAYAN_FOLLOWUP_TEST_VERBOSE, true),
     negativeTests: overrides?.negativeTests ?? parseBool(process.env.KAYAN_FOLLOWUP_TEST_NEGATIVE, true),

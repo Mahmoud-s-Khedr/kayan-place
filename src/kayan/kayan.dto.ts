@@ -70,6 +70,7 @@ export enum ProductSortBy {
 
 export enum OrderSortBy {
   CREATED_AT = 'createdAt',
+  PRICE = 'price',
 }
 
 export enum FaultSortBy {
@@ -145,8 +146,11 @@ export class AdminUpdateOrderStatusDto {
 
 export class ListOrdersQueryDto extends KayanListPaginationQueryDto {
   @IsOptional() @IsEnum(OrderStatus) status?: OrderStatus;
+  @IsOptional() @IsString() @IsNotEmpty() search?: string;
   @IsOptional() @IsDateString() fromDate?: string;
   @IsOptional() @IsDateString() toDate?: string;
+  @IsOptional() @Type(() => Number) @Min(0) minPrice?: number;
+  @IsOptional() @Type(() => Number) @Min(0) maxPrice?: number;
   @IsOptional() @IsEnum(OrderSortBy) sortBy?: OrderSortBy;
   @IsOptional() @IsEnum(SortDirection) sortDirection?: SortDirection;
 }

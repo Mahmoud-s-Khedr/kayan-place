@@ -51,6 +51,8 @@ export type KayanAdminHappyState = {
   targetUserTokens: Tokens;
   adminTokens: Tokens;
   targetUserId: number;
+  productId: number;
+  orderId: number;
 };
 
 export type KayanAdminHappyPathResult = {
@@ -268,7 +270,7 @@ export function createKayanAdminTestContext(overrides?: Partial<KayanAdminTestCo
   targetUser: AuthIdentity;
 } {
   const config: KayanAdminTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:3000'),
     timeoutMs: overrides?.timeoutMs ?? parsePositiveInt(process.env.SIM_KAYAN_ADMIN_TIMEOUT_MS, 20000),
     verbose: overrides?.verbose ?? parseBool(process.env.SIM_KAYAN_ADMIN_VERBOSE, true),
     negativeTests: overrides?.negativeTests ?? parseBool(process.env.SIM_KAYAN_ADMIN_NEGATIVE_TESTS, true),
@@ -315,6 +317,27 @@ export async function runKayanAdminHappyPath(
   state.targetUserId = pickId(meRes.body, 'user');
   const userId = state.targetUserId;
 
+  const createProduct = await runAndRecord(config, steps, 'admin create product for order flow', [200, 201], () =>
+    requestJson(config, 'POST', '/api/admin/products', {
+      title: `Kayan Admin Sim Product ${Date.now()}`,
+      description: 'Simulation product for admin order filters.',
+      amount: 10,
+      price: 120.5,
+      details: { source: 'simulate-kayan-admin-flows' },
+      imageFileIds: [],
+      fileIds: [],
+    }, { Authorization: `Bearer ${adminToken}` }),
+  );
+  state.productId = pickId(createProduct.body, 'product');
+
+  await runAndRecord(config, steps, 'target user add product to cart', [200, 201], () =>
+    requestJson(config, 'POST', '/api/cart/items', { productId: state.productId, quantity: 1 }, { Authorization: `Bearer ${userToken}` }),
+  );
+  const checkout = await runAndRecord(config, steps, 'target user checkout cart', [200, 201], () =>
+    requestJson(config, 'POST', '/api/cart/checkout', { deliveryAddress: 'Cairo, Nasr City, Abbas Al Akkad' }, { Authorization: `Bearer ${userToken}` }),
+  );
+  state.orderId = pickId(checkout.body, 'order');
+
   // List users
   await runAndRecord(config, steps, 'admin list users', 200, () =>
     requestJson(config, 'GET', '/api/admin/users?limit=10&offset=0', undefined, { Authorization: `Bearer ${adminToken}` }),
@@ -359,6 +382,28 @@ export async function runKayanAdminHappyPath(
   );
   await runAndRecord(config, steps, 'admin demote user from admin', 200, () =>
     requestJson(config, 'DELETE', `/api/admin/admins/${userId}`, undefined, { Authorization: `Bearer ${adminToken}` }),
+  );
+
+  await runAndRecord(config, steps, 'admin list all orders', 200, () =>
+    requestJson(config, 'GET', '/api/admin/orders', undefined, { Authorization: `Bearer ${adminToken}` }),
+  );
+  await runAndRecord(config, steps, 'admin search orders by target user', 200, () =>
+    requestJson(
+      config,
+      'GET',
+      `/api/admin/orders?search=${encodeURIComponent(targetUser.name.split(' ')[0])}&status=received`,
+      undefined,
+      { Authorization: `Bearer ${adminToken}` },
+    ),
+  );
+  await runAndRecord(config, steps, 'admin filter orders by price and sort ascending', 200, () =>
+    requestJson(
+      config,
+      'GET',
+      '/api/admin/orders?minPrice=100&maxPrice=130&sortBy=price&sortDirection=asc&status=received',
+      undefined,
+      { Authorization: `Bearer ${adminToken}` },
+    ),
   );
 
   // Delete user (do this last as it soft deletes)
@@ -415,6 +460,8 @@ export async function writeKayanAdminReport(
     state: {
       targetUserEmail: state.targetUser.email,
       targetUserId: state.targetUserId,
+      productId: state.productId,
+      orderId: state.orderId,
     },
     totals,
     firstFailure: steps.find((s) => !s.ok) ?? null,

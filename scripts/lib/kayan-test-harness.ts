@@ -311,7 +311,7 @@ export function createKayanTestContext(overrides?: Partial<KayanTestConfig>): {
   userB: AuthIdentity;
 } {
   const config: KayanTestConfig = {
-    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:800'),
+    baseUrl: sanitizeBaseUrl(overrides?.baseUrl ?? process.env.BASE_URL ?? 'http://localhost:3000'),
     timeoutMs: overrides?.timeoutMs ?? parsePositiveInt(process.env.SIM_KAYAN_TIMEOUT_MS, 20000),
     verbose: overrides?.verbose ?? parseBool(process.env.SIM_KAYAN_VERBOSE, true),
     negativeTests: overrides?.negativeTests ?? parseBool(process.env.SIM_KAYAN_NEGATIVE_TESTS, true),
@@ -431,17 +431,17 @@ export async function runKayanHappyPath(
   );
   await runAndRecord(config, steps, 'user rate delivered product', [200, 201], () =>
     requestJson(config, 'POST', '/api/ratings', {
-      itemType: 'order',
+      itemType: 'product',
+      itemId: state.productId,
       orderId: state.orderId,
-      productId: state.productId,
       ratingValue: 5,
     }, { Authorization: `Bearer ${userAToken}` }),
   );
   await runAndRecord(config, steps, 'negative duplicate rating', 400, () =>
     requestJson(config, 'POST', '/api/ratings', {
-      itemType: 'order',
+      itemType: 'product',
+      itemId: state.productId,
       orderId: state.orderId,
-      productId: state.productId,
       ratingValue: 4,
     }, { Authorization: `Bearer ${userAToken}` }),
   );
@@ -451,7 +451,7 @@ export async function runKayanHappyPath(
 
   // Ratings and Reviews fetch
   await runAndRecord(config, steps, 'public get item reviews', 200, () =>
-    requestJson(config, 'GET', `/api/ratings/items/${state.productId}?itemType=order`),
+    requestJson(config, 'GET', `/api/ratings/items/${state.productId}?itemType=product`),
   );
   
   // To test the legacy summary and public profile, we need userA's ID. Let's fetch it from /api/me
@@ -490,17 +490,17 @@ export async function runKayanNegativeCases(
   );
   await runAndRecord(config, steps, 'negative rating before delivered', [400, 403], () =>
     requestJson(config, 'POST', '/api/ratings', {
-      itemType: 'order',
+      itemType: 'product',
+      itemId: state.productId,
       orderId: state.orderId,
-      productId: state.productId,
       ratingValue: 5,
     }, { Authorization: `Bearer ${state.userBTokens.accessToken}` }),
   );
   await runAndRecord(config, steps, 'negative rating product not in order', 400, () =>
     requestJson(config, 'POST', '/api/ratings', {
-      itemType: 'order',
+      itemType: 'product',
+      itemId: 99999999,
       orderId: state.orderId,
-      productId: 99999999,
       ratingValue: 5,
     }, { Authorization: `Bearer ${userAToken}` }),
   );
