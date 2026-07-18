@@ -53,6 +53,7 @@ describe('AuthService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
+    appConfig.otpDevMode = true;
   });
 
   it('rejects duplicate email/phone on registration OTP request', async () => {
@@ -153,6 +154,16 @@ describe('AuthService', () => {
 
     expect(response).toMatchObject({ message: 'OTP sent' });
     expect(response).not.toHaveProperty('otp');
+  });
+
+  it('hides an internally generated OTP from production responses', async () => {
+    appConfig.otpDevMode = false;
+    databaseService.query.mockResolvedValue({ rowCount: 1, rows: [{ id: 1 }] });
+    otpVerificationProvider.startVerification.mockResolvedValue({ otp: '123456' });
+
+    const response = await service.requestPasswordResetOtp({ email: 'user@example.com' });
+
+    expect(response).toEqual({ message: 'OTP sent' });
   });
 
   it('calls otp verification before registration completion', async () => {

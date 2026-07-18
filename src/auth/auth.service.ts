@@ -314,8 +314,9 @@ export class AuthService {
   }
 
   private buildOtpSentResponse(result: StartVerificationResult): Record<string, unknown> {
-    return { message: 'OTP sent',
-      ...(result.otp ? { otp: result.otp } : {}),
+    return {
+      message: 'OTP sent',
+      ...(this.appConfig.otpDevMode && result.otp ? { otp: result.otp } : {}),
     };
   }
 

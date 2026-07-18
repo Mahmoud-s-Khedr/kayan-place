@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
 import { createHmac } from 'crypto';
 import { AppConfig } from '../../config/configuration';
 import { DatabaseService } from '../../database/database.service';
@@ -6,13 +7,14 @@ import { AuthStateStore } from '../auth-state.store';
 import { ConsoleOtpSender } from './console-otp.sender';
 
 describe('ConsoleOtpSender.startVerification', () => {
-  function buildSender(otpDevMode: boolean) {
+  function buildSender(otpDevMode: boolean, nodeEnv = 'development') {
     const queryMock = jest.fn().mockResolvedValue({});
     const databaseService = {
       query: queryMock,
     } as unknown as DatabaseService;
     const configService = {
       get: jest.fn().mockReturnValue({
+        nodeEnv,
         otpDevMode,
         otpTtlMinutes: 10,
         otpSigningSecret: 'otp-secret',
@@ -49,7 +51,7 @@ describe('ConsoleOtpSender.startVerification', () => {
     expect(hash).toBe(expectedHash);
   });
 
-  it('keeps random OTP generation path when otpDevMode=false', async () => {
+  it('keeps random OTP generation path when otpDevMode=false and returns it for internal delivery', async () => {
     const { sender, queryMock } = buildSender(false);
 
     const result = await sender.startVerification({
@@ -58,7 +60,7 @@ describe('ConsoleOtpSender.startVerification', () => {
       purpose: 'registration',
     });
 
-    expect(result).toEqual({});
+    expect(result.otp).toMatch(/^\d{6}$/);
     expect(queryMock).toHaveBeenCalledTimes(1);
 
     const params = queryMock.mock.calls[0][1] as [number | null, string, string, string, string, number];
@@ -69,5 +71,18 @@ describe('ConsoleOtpSender.startVerification', () => {
       .digest('hex');
 
     expect(hash).not.toBe(fixedOtpHash);
+  });
+
+  it('does not log OTP values in production', async () => {
+    const logSpy = jest.spyOn(Logger.prototype, 'log');
+    const { sender } = buildSender(false, 'production');
+
+    await sender.startVerification({
+      userId: null,
+      email: 'user@example.com',
+      purpose: 'registration',
+    });
+
+    expect(logSpy).not.toHaveBeenCalled();
   });
 });

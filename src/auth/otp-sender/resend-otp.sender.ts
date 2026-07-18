@@ -45,7 +45,9 @@ export class ResendOtpSender implements OtpVerificationProvider {
       throw new ServiceUnavailableException(`Failed to send OTP email: ${body ?? response.statusText}`);
     }
 
-    return result;
+    // The OTP is delivery-provider internals and must not be returned through
+    // the API response after it has been emailed.
+    return {};
   }
 
   async checkVerification(payload: CheckVerificationPayload): Promise<CheckVerificationResult> {

@@ -27,7 +27,14 @@ describe('ResendOtpSender', () => {
     const sender = new ResendOtpSender(configService as any, consoleOtpSender as any);
     const result = await sender.startVerification({ email: 'user@example.com', purpose: 'registration', userId: null });
 
-    expect(result).toEqual({ otp: '123456' });
+    expect(result).toEqual({});
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://api.resend.com/emails',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('123456'),
+      }),
+    );
   });
 
   it('throws when resend API fails', async () => {

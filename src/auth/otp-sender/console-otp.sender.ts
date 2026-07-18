@@ -34,11 +34,13 @@ export class ConsoleOtpSender implements OtpVerificationProvider {
       [payload.userId, payload.email, otpHash, salt, payload.purpose, this.appConfig.otpTtlMinutes],
     );
 
-    this.logger.log(`OTP (${payload.purpose}) for ${payload.email}: ${otp}`);
+    if (this.appConfig.nodeEnv !== 'production') {
+      this.logger.log(`OTP (${payload.purpose}) for ${payload.email}: ${otp}`);
+    }
 
-    return {
-      ...(this.appConfig.otpDevMode ? { otp } : {}),
-    };
+    // The code is required by non-console delivery providers. API response
+    // construction decides whether it may be exposed to a development client.
+    return { otp };
   }
 
   async checkVerification(payload: CheckVerificationPayload): Promise<CheckVerificationResult> {
