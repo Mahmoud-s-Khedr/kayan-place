@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import { DatabaseService } from '../database/database.service';
@@ -9,6 +9,7 @@ import { CreateUploadIntentDto } from './dto/create-upload-intent.dto';
 import { MarkUploadedDto } from './dto/mark-uploaded.dto';
 import { FileReadUrlService } from './file-read-url.service';
 import { STORAGE_UPLOADER, StorageUploader } from './storage/storage-uploader.interface';
+import { cloudinaryPublicIdIncludesExtension } from './cloudinary-resource-type';
 
 @Injectable()
 export class FilesService {
@@ -91,8 +92,9 @@ export class FilesService {
       id: number;
       uploader_user_id: number | null;
       object_key: string;
+      mime_type: string | null;
       status: string;
-    }>('SELECT id, uploader_user_id, object_key, status FROM files WHERE id = $1', [fileId]);
+    }>('SELECT id, uploader_user_id, object_key, mime_type, status FROM files WHERE id = $1', [fileId]);
 
     if (!file.rowCount) {
       throw new NotFoundException('File not found');
@@ -102,6 +104,19 @@ export class FilesService {
     const uploaderUserId = toPositiveInt(row.uploader_user_id);
     if (!uploaderUserId || uploaderUserId !== user.sub) {
       throw new ForbiddenException('Not allowed');
+    }
+    if (row.status === 'uploaded') {
+      return { file: { id: fileId, objectKey: row.object_key, status: 'uploaded' } };
+    }
+    if (row.status !== 'pending') {
+      throw new BadRequestException('File cannot be marked as uploaded');
+    }
+    const existsInStorage = await this.storageUploader.verifyUploadedObject({
+      objectKey: row.object_key,
+      mimeType: row.mime_type ?? '',
+    });
+    if (!existsInStorage) {
+      throw new BadRequestException('File has not been uploaded to storage');
     }
 
     await this.databaseService.query(
@@ -167,8 +182,9 @@ export class FilesService {
 
   private buildObjectKey(ownerType: string, ownerId: number | undefined, filename: string, mimeType: string): string {
     const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const isImageOrVideo = mimeType.startsWith('image/') || mimeType.startsWith('video/');
-    const safeBaseName = isImageOrVideo ? safeFilename.replace(/\.[^.]+$/, '') : safeFilename;
+    const safeBaseName = cloudinaryPublicIdIncludesExtension(mimeType)
+      ? safeFilename
+      : safeFilename.replace(/\.[^.]+$/, '');
     return `${ownerType}/${ownerId ?? 'temp'}/${Date.now()}-${randomBytes(4).toString('hex')}-${safeBaseName}`;
   }
 }

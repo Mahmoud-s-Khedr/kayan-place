@@ -333,6 +333,8 @@ Success:
 - `200`
 - `data.order`
 
+Order responses include a full profile-shaped `user` object. Each order item includes `product.rate`, the buyer's review for that exact order/product or `null`.
+
 Important order fields:
 
 - `id`
@@ -355,6 +357,7 @@ Important order item fields:
 - `product.description`
 - `product.price`
 - `product.is_active`
+- `product.rate`: the buyer's review for this exact order/product, or `null`
 
 ### `PATCH /api/orders/:id/address`
 
@@ -401,7 +404,8 @@ Success:
 
 - `200`
 - `data.items[]`
-- each order includes nested `user`
+- each order includes a full profile-shaped `user` object
+- each item product includes its order-specific `rate` review object or `null`
 
 ### `PATCH /api/admin/orders/:id/status`
 

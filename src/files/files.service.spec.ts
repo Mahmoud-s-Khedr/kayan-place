@@ -27,6 +27,7 @@ describe('FilesService', () => {
         },
         expiresAt: '2030-01-01T00:00:00.000Z',
       }),
+      verifyUploadedObject: jest.fn(),
     };
     const fileReadUrlService = {
       buildReadUrl: jest.fn(),
@@ -79,5 +80,35 @@ describe('FilesService', () => {
         expiresAt: '2030-01-01T00:00:00.000Z',
       },
     });
+  });
+
+  it('confirms an uploaded file after backend storage verification without changing the client payload', async () => {
+    const databaseService = {
+      query: jest.fn()
+        .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 44, uploader_user_id: 7, object_key: 'product/9/manual.pdf', mime_type: 'application/pdf', status: 'pending' }] })
+        .mockResolvedValueOnce({ rowCount: 1, rows: [] }),
+    };
+    const storageUploader = { createUploadIntent: jest.fn(), verifyUploadedObject: jest.fn().mockResolvedValue(true) };
+    const service = new FilesService(databaseService as any, {} as any, { buildReadUrl: jest.fn() } as any, storageUploader as any);
+
+    await expect(service.markUploaded(
+      { sub: 7, phone: '+201000000007', isAdmin: false }, 44,
+      {},
+    )).resolves.toMatchObject({ file: { id: 44, status: 'uploaded' } });
+    expect(storageUploader.verifyUploadedObject).toHaveBeenCalledWith({ objectKey: 'product/9/manual.pdf', mimeType: 'application/pdf' });
+  });
+
+  it('leaves the file pending when storage does not contain it', async () => {
+    const databaseService = {
+      query: jest.fn().mockResolvedValue({ rowCount: 1, rows: [{ id: 44, uploader_user_id: 7, object_key: 'product/9/manual.pdf', mime_type: 'application/pdf', status: 'pending' }] }),
+    };
+    const storageUploader = { createUploadIntent: jest.fn(), verifyUploadedObject: jest.fn().mockResolvedValue(false) };
+    const service = new FilesService(databaseService as any, {} as any, { buildReadUrl: jest.fn() } as any, storageUploader as any);
+
+    await expect(service.markUploaded(
+      { sub: 7, phone: '+201000000007', isAdmin: false }, 44,
+      {},
+    )).rejects.toThrow('File has not been uploaded to storage');
+    expect(databaseService.query).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,9 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { resolveOffsetPagination } from '../common/helpers/pagination.helpers';
 import { DatabaseService } from '../database/database.service';
+import { FileReadUrlService } from '../files/file-read-url.service';
 import { AuthUser } from '../common/types/auth-user.type';
 import {
-  AdminUserRatingItemType,
   AdminCreateProductDto,
   AdminUpdateFaultStatusDto,
   AdminUpdateOrderStatusDto,
@@ -85,7 +85,10 @@ type FaultAssetRow = {
 
 @Injectable()
 export class KayanService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly fileReadUrlService: FileReadUrlService,
+  ) {}
 
   async listProducts(query: ListProductsQueryDto = {}, user?: AuthUser | null): Promise<Record<string, unknown>> {
     const conditions = ['deleted_at IS NULL'];
@@ -674,7 +677,17 @@ export class KayanService {
     const q = await this.db.query(
       `SELECT fr.id, fr.user_id, fr.title, fr.description, fr.severity, fr.address, fr.status, fr.cancelled_at::text AS cancelled_at,
               fr.created_at::text AS created_at, fr.updated_at::text AS updated_at,
-              u.name AS user_name, u.email AS user_email, u.phone AS user_phone
+              u.name AS user_name, u.email AS user_email, u.phone AS user_phone,
+              (
+                SELECT row_to_json(ir_row)
+                FROM (
+                  SELECT ir.id, ir.user_id, ir.item_type, ir.item_id, ir.rating_value, ir.comment, ir.created_at::text AS created_at
+                  FROM item_ratings ir
+                  WHERE ir.item_type = 'fault' AND ir.item_id = fr.id
+                  ORDER BY ir.created_at DESC, ir.id DESC
+                  LIMIT 1
+                ) ir_row
+              ) AS rate
        FROM fault_reports fr
        LEFT JOIN users u ON u.id = fr.user_id
        ${whereClause}
@@ -683,15 +696,11 @@ export class KayanService {
       params,
     );
     const items = await this.attachFaultAssets(this.db, q.rows as Array<Record<string, unknown>>);
+    const users = await this.getFullUsers(this.db, items.map((item) => Number(item.user_id)));
     return {
       items: items.map((item) => ({
         ...item,
-        user: {
-          id: Number(item.user_id),
-          name: item.user_name ?? null,
-          email: item.user_email ?? null,
-          phone: item.user_phone ?? null,
-        },
+        user: users.get(Number(item.user_id)) ?? this.buildFallbackUser(item),
       })),
       total,
     };
@@ -791,7 +800,12 @@ export class KayanService {
        LIMIT $${limitParam} OFFSET $${offsetParam}`,
       params,
     );
-    return { items: q.rows, total };
+    const items = q.rows as Array<Record<string, unknown>>;
+    const users = await this.getFullUsers(this.db, items.map((item) => Number(item.user_id)));
+    return {
+      items: items.map((item) => ({ ...item, user: users.get(Number(item.user_id)) ?? this.buildFallbackUser(item) })),
+      total,
+    };
   }
 
   async cancelService(user: AuthUser, serviceId: number): Promise<Record<string, unknown>> {
@@ -827,61 +841,10 @@ export class KayanService {
     return { service };
   }
 
-  async publicListServices(query: ListServicesQueryDto = {}): Promise<Record<string, unknown>> {
-    const conditions = ['1=1'];
-    const params: unknown[] = [];
-
-    if (query.serviceType) {
-      params.push(query.serviceType);
-      conditions.push(`so.service_type = $${params.length}`);
-    }
-    if (query.status) {
-      params.push(query.status);
-      conditions.push(`so.status = $${params.length}`);
-    }
-    if (query.search) {
-      params.push(`%${this.escapeLike(query.search)}%`);
-      conditions.push(`(so.description ILIKE $${params.length} ESCAPE '\\' OR so.address ILIKE $${params.length} ESCAPE '\\')`);
-    }
-    if (query.fromDate) {
-      params.push(query.fromDate);
-      conditions.push(`so.created_at >= $${params.length}::date`);
-    }
-    if (query.toDate) {
-      params.push(query.toDate);
-      conditions.push(`so.created_at < ($${params.length}::date + INTERVAL '1 day')`);
-    }
-
-    const sortBy = query.sortBy ?? ServiceSortBy.CREATED_AT;
-    const sortDirection = (query.sortDirection ?? SortDirection.DESC).toUpperCase();
-    const orderColumn = sortBy === ServiceSortBy.CREATED_AT ? 'so.created_at' : 'so.created_at';
-
-    const { limit, offset } = resolveOffsetPagination(query, { defaultLimit: 20, maxLimit: 100 });
-
-    params.push(limit);
-    const limitParam = params.length;
-    params.push(offset);
-    const offsetParam = params.length;
-
-    const totalQ = await this.db.query<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM service_orders so WHERE ${conditions.join(' AND ')}`,
-      params.slice(0, params.length - 2),
-    );
-    const total = parseInt(totalQ.rows[0]?.count ?? '0', 10);
-
-    const q = await this.db.query(
-      `SELECT so.*
-       FROM service_orders so
-       WHERE ${conditions.join(' AND ')}
-       ORDER BY ${orderColumn} ${sortDirection}, so.id DESC
-       LIMIT $${limitParam} OFFSET $${offsetParam}`,
-      params,
-    );
-
-    return {
-      items: q.rows,
-      total,
-    };
+  async publicListServices(user: AuthUser, query: ListServicesQueryDto = {}): Promise<Record<string, unknown>> {
+    return user.isAdmin
+      ? this.adminListServices(query)
+      : this.listMyServices(user, query);
   }
 
   async adminListServices(query: ListServicesQueryDto = {}): Promise<Record<string, unknown>> {
@@ -928,24 +891,26 @@ export class KayanService {
 
     const q = await this.db.query(
       `SELECT so.*,
-              u.name AS user_name, u.email AS user_email, u.phone AS user_phone
+              (
+                SELECT row_to_json(ir_row)
+                FROM (
+                  SELECT ir.id, ir.user_id, ir.item_type, ir.item_id, ir.rating_value, ir.comment, ir.created_at::text AS created_at
+                  FROM item_ratings ir
+                  WHERE ir.item_type = 'service' AND ir.item_id = so.id
+                  ORDER BY ir.created_at DESC, ir.id DESC
+                  LIMIT 1
+                ) ir_row
+              ) AS rate
        FROM service_orders so
-       LEFT JOIN users u ON u.id = so.user_id
        WHERE ${conditions.join(' AND ')}
        ORDER BY ${orderColumn} ${sortDirection}, so.id DESC
        LIMIT $${limitParam} OFFSET $${offsetParam}`,
       params,
     );
+    const items = q.rows as Array<Record<string, unknown>>;
+    const users = await this.getFullUsers(this.db, items.map((item) => Number(item.user_id)));
     return {
-      items: q.rows.map((item) => ({
-        ...item,
-        user: {
-          id: Number(item.user_id),
-          name: item.user_name ?? null,
-          email: item.user_email ?? null,
-          phone: item.user_phone ?? null,
-        },
-      })),
+      items: items.map((item) => ({ ...item, user: users.get(Number(item.user_id)) ?? this.buildFallbackUser(item) })),
       total,
     };
   }
@@ -1594,7 +1559,17 @@ export class KayanService {
     const orderIds = orders.map((order) => Number(order.id));
     const items = await executor.query(
       `SELECT oi.order_id, oi.id, oi.product_id, oi.quantity, oi.unit_price::text AS unit_price,
-              cp.title, cp.description, cp.amount, cp.price::text AS product_price, cp.details, cp.is_active
+              cp.title, cp.description, cp.amount, cp.price::text AS product_price, cp.details, cp.is_active,
+              (
+                SELECT row_to_json(rate_row)
+                FROM (
+                  SELECT pr.id, pr.user_id, pr.order_id, pr.product_id, pr.rating_value, pr.comment, pr.created_at::text AS created_at
+                  FROM product_ratings pr
+                  WHERE pr.order_id = oi.order_id AND pr.product_id = oi.product_id
+                  ORDER BY pr.created_at DESC, pr.id DESC
+                  LIMIT 1
+                ) rate_row
+              ) AS rate
        FROM order_items oi
        LEFT JOIN catalog_products cp ON cp.id = oi.product_id
        WHERE oi.order_id = ANY($1::bigint[])
@@ -1650,6 +1625,7 @@ export class KayanService {
       product_price: string | null;
       details: Record<string, unknown> | null;
       is_active: boolean | null;
+      rate: Record<string, unknown> | null;
     }>) {
       const orderId = Number(item.order_id);
       const bucket = itemsByOrderId.get(orderId) ?? [];
@@ -1667,12 +1643,17 @@ export class KayanService {
           price: item.product_price,
           details: item.details ?? null,
           is_active: item.is_active ?? null,
+          rate: item.rate ?? null,
           images: productAssets.images,
           files: productAssets.files,
         },
       });
       itemsByOrderId.set(orderId, bucket);
     }
+
+    const users = includeUser
+      ? await this.getFullUsers(executor, orders.map((order) => Number(order.user_id)))
+      : new Map<number, Record<string, unknown>>();
 
     return orders.map((order) => {
       const orderId = Number(order.id);
@@ -1683,18 +1664,75 @@ export class KayanService {
         items: orderItems,
       };
       if (includeUser) {
-        enriched.user = {
-          id: Number(order.user_id),
-          name: order.user_name,
-          email: order.user_email,
-          phone: order.user_phone,
-        };
+        enriched.user = users.get(Number(order.user_id)) ?? this.buildFallbackUser(order);
       }
       delete enriched.user_name;
       delete enriched.user_email;
       delete enriched.user_phone;
       return enriched;
     });
+  }
+
+  private async getFullUsers(
+    executor: SqlExecutor,
+    userIds: number[],
+  ): Promise<Map<number, Record<string, unknown>>> {
+    const ids = [...new Set(userIds.filter(Number.isFinite))];
+    if (!ids.length) return new Map();
+
+    const query = await executor.query(
+      `SELECT u.id, u.name, u.email, u.phone, u.address, u.status, u.contact_info,
+              COALESCE(ROUND(AVG(ur.rating_value)::numeric, 2), 0.00)::text AS rate,
+              f.id AS avatar_file_id, f.object_key AS avatar_object_key, f.mime_type AS avatar_mime_type,
+              f.purpose AS avatar_purpose, f.status AS avatar_status,
+              f.created_at::text AS avatar_created_at, f.uploaded_at::text AS avatar_uploaded_at
+       FROM users u
+       LEFT JOIN user_ratings ur ON ur.rated_user_id = u.id
+       LEFT JOIN files f ON f.id = u.avatar_file_id
+       WHERE u.id = ANY($1::bigint[]) AND u.deleted_at IS NULL
+       GROUP BY u.id, f.id, f.object_key, f.mime_type, f.purpose, f.status, f.created_at, f.uploaded_at`,
+      [ids],
+    );
+
+    return new Map(((query?.rows ?? []) as Array<Record<string, unknown>>).map((row) => {
+      const avatarFileId = row.avatar_file_id ? Number(row.avatar_file_id) : null;
+      const avatarObjectKey = row.avatar_object_key as string | null;
+      const avatarMimeType = row.avatar_mime_type as string | null;
+      return [Number(row.id), {
+        id: Number(row.id),
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        address: row.address,
+        status: row.status,
+        rate: row.rate,
+        contactInfo: row.contact_info,
+        avatar: avatarFileId && avatarObjectKey ? {
+          id: avatarFileId,
+          purpose: row.avatar_purpose ?? 'avatar',
+          object_key: avatarObjectKey,
+          mime_type: avatarMimeType,
+          status: row.avatar_status ?? 'uploaded',
+          created_at: row.avatar_created_at ?? null,
+          uploaded_at: row.avatar_uploaded_at ?? null,
+          url: this.fileReadUrlService.buildReadUrl(avatarObjectKey, avatarMimeType ?? ''),
+        } : null,
+      }];
+    }));
+  }
+
+  private buildFallbackUser(row: Record<string, unknown>): Record<string, unknown> {
+    return {
+      id: Number(row.user_id),
+      name: row.user_name ?? null,
+      email: row.user_email ?? null,
+      phone: row.user_phone ?? null,
+      address: null,
+      status: null,
+      rate: null,
+      contactInfo: null,
+      avatar: null,
+    };
   }
 
   private async assertCartProductState(productId: number, quantity: number): Promise<void> {

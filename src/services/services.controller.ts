@@ -22,8 +22,8 @@ export class ServicesController {
 
   @Get()
   @ApiResponse({ status: 200, type: KayanServicesResponseDto })
-  listServices(@Query() query: ListServicesQueryDto): Promise<Record<string, unknown>> {
-    return this.kayanService.publicListServices(query);
+  listServices(@CurrentUser() user: AuthUser, @Query() query: ListServicesQueryDto): Promise<Record<string, unknown>> {
+    return this.kayanService.publicListServices(user, query);
   }
 
   @Patch(':id')

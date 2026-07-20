@@ -16,4 +16,9 @@ describe('FileReadUrlService', () => {
 
     expect(url).toBe('https://res.cloudinary.com/demo-cloud/raw/upload/product/9/1700000000-manual.pdf');
   });
+
+  it('uses the video delivery type for audio files', () => {
+    expect(service.buildReadUrl('message/9/voice-note', 'audio/mpeg'))
+      .toBe('https://res.cloudinary.com/demo-cloud/video/upload/message/9/voice-note.mp3');
+  });
 });

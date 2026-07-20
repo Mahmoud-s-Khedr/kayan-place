@@ -8,10 +8,13 @@ describe('KayanService', () => {
     withTransaction: jest.fn(),
   };
 
-  const service = new KayanService(databaseService as any);
+  const service = new KayanService(databaseService as any, {
+    buildReadUrl: jest.fn().mockReturnValue('https://cdn.example.test/avatar.jpg'),
+  } as any);
 
   beforeEach(() => {
     jest.resetAllMocks();
+    databaseService.query.mockResolvedValue({ rows: [] });
   });
 
   it('applies product filters/sorting and includes assets', async () => {
@@ -404,6 +407,10 @@ describe('KayanService', () => {
       })
       .mockResolvedValueOnce({
         rows: [{ order_id: 15, id: 5, product_id: 7, quantity: 1, unit_price: '40.00', title: 'Fan', is_active: true }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{ id: 3, name: 'Mona', email: 'mona@example.com', phone: '+201000000003', address: 'Giza', status: 'active', rate: '4.50', contact_info: '+201000000003', avatar_file_id: null }],
       });
 
     const result = await service.listMyOrders(
@@ -415,6 +422,7 @@ describe('KayanService', () => {
       items: [
         expect.objectContaining({
           id: 15,
+          user: expect.objectContaining({ address: 'Giza', status: 'active', rate: '4.50', avatar: null }),
           item_count: 1,
           items: [
             expect.objectContaining({
@@ -432,6 +440,7 @@ describe('KayanService', () => {
     expect(queryText).toContain('ORDER BY po.created_at ASC, po.id DESC');
     expect(queryText).toContain('LIMIT $4 OFFSET $5');
     expect(params).toEqual([3, OrderStatus.RECEIVED, '2026-02-01', 5, 5]);
+    expect(databaseService.query.mock.calls[1][0]).toContain('pr.order_id = oi.order_id AND pr.product_id = oi.product_id');
   });
 
   it('lists my orders with search and price filters', async () => {
@@ -746,7 +755,10 @@ describe('KayanService', () => {
           updated_at: '2026-03-01T00:00:00.000Z',
         },
       ],
-    });
+    })
+      .mockResolvedValueOnce({
+        rows: [{ id: 6, name: 'Mona', email: 'mona@example.com', phone: '+201000000006', address: 'Cairo', status: 'active', rate: '4.50', contact_info: '+201000000006', avatar_file_id: null }],
+      });
 
     const result = await service.listMyServices(
       { sub: 6, phone: '+201000000006', isAdmin: false },
@@ -764,6 +776,7 @@ describe('KayanService', () => {
         expect.objectContaining({
           id: 51,
           service_type: ServiceType.MAINTENANCE,
+          user: expect.objectContaining({ id: 6, address: 'Cairo', rate: '4.50', avatar: null }),
         }),
       ],
     });
@@ -791,9 +804,12 @@ describe('KayanService', () => {
             status: ServiceStatus.FINISHED,
             created_at: '2026-03-01T00:00:00.000Z',
             updated_at: '2026-03-01T00:00:00.000Z',
-            rate: { id: 14, user_id: 6, item_type: RatingItemType.SERVICE, item_id: 51, rating_value: 5 },
-          },
-        ],
+          rate: { id: 14, user_id: 6, item_type: RatingItemType.SERVICE, item_id: 51, rating_value: 5 },
+        },
+      ],
+    })
+      .mockResolvedValueOnce({
+        rows: [{ id: 6, name: 'Mona', email: 'mona@example.com', phone: '+201000000006', address: 'Cairo', status: 'active', rate: '4.50', contact_info: '+201000000006', avatar_file_id: null }],
       });
 
     const result = await service.listMyServices(
@@ -806,6 +822,7 @@ describe('KayanService', () => {
         expect.objectContaining({
           id: 51,
           rate: expect.objectContaining({ id: 14, user_id: 6, item_type: RatingItemType.SERVICE, item_id: 51 }),
+          user: expect.objectContaining({ id: 6, address: 'Cairo', rate: '4.50', avatar: null }),
         }),
       ],
       total: 1,
@@ -830,7 +847,10 @@ describe('KayanService', () => {
           user_phone: '+201000000012',
         },
       ],
-    });
+    })
+      .mockResolvedValueOnce({
+        rows: [{ id: 12, name: 'Laila', email: 'laila@example.com', phone: '+201000000012', address: 'Giza', status: 'active', rate: '4.00', contact_info: '+201000000012', avatar_file_id: null }],
+      });
 
     const result = await service.adminListServices({
       serviceType: ServiceType.DESIGNING,
@@ -849,13 +869,16 @@ describe('KayanService', () => {
             name: 'Laila',
             email: 'laila@example.com',
             phone: '+201000000012',
+            address: 'Giza',
+            rate: '4.00',
+            avatar: null,
           }),
         }),
       ],
     });
 
     const [queryText, params] = databaseService.query.mock.calls[1];
-    expect(queryText).toContain('LEFT JOIN users u ON u.id = so.user_id');
+    expect(queryText).not.toContain('LEFT JOIN users u ON u.id = so.user_id');
     expect(queryText).toContain('so.service_type = $1');
     expect(queryText).toContain('so.created_at >= $2');
     expect(queryText).toContain("so.created_at < ($3::date + INTERVAL '1 day')");
@@ -883,6 +906,26 @@ describe('KayanService', () => {
     expect(queryText).toContain('so.status = $3');
     expect(queryText).toContain("so.description ILIKE $4 ESCAPE '\\'");
     expect(params).toEqual([6, ServiceType.MAINTENANCE, ServiceStatus.NOT_STARTED, '%AC%', 10, 5]);
+  });
+
+  it('scopes the general services list to the caller unless the caller is an admin', async () => {
+    databaseService.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '0' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await service.publicListServices({ sub: 6, phone: '+201000000006', isAdmin: false }, {});
+
+    expect(databaseService.query.mock.calls[0][0]).toContain('so.user_id = $1');
+    expect(databaseService.query.mock.calls[1][0]).toContain('so.user_id = $1');
+
+    databaseService.query.mockReset()
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ count: '0' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await service.publicListServices({ sub: 1, phone: '+201000000001', isAdmin: true }, {});
+
+    expect(databaseService.query.mock.calls[0][0]).not.toContain('so.user_id = $1');
+    expect(databaseService.query.mock.calls[1][0]).not.toContain('so.user_id = $1');
   });
 
   it('creates a product rating only for delivered ordered products', async () => {
@@ -1377,6 +1420,9 @@ describe('KayanService', () => {
       })
       .mockResolvedValueOnce({
         rows: [{ fault_id: 41, file_id: 902, sort_order: 0, object_key: 'faults/41/a.jpg', original_filename: 'a.jpg', mime_type: 'image/jpeg', status: 'uploaded' }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ id: 11, name: 'Mona', email: 'mona@example.com', phone: '+201000000011', address: 'Giza', status: 'active', rate: '4.25', contact_info: '+201000000011', avatar_file_id: null }],
       });
 
     const result = await service.adminListFaults();
@@ -1384,7 +1430,7 @@ describe('KayanService', () => {
       items: [
         expect.objectContaining({
           id: 41,
-          user: expect.objectContaining({ id: 11, name: 'Mona' }),
+          user: expect.objectContaining({ id: 11, name: 'Mona', address: 'Giza', rate: '4.25', avatar: null }),
           images: [expect.objectContaining({ file_id: 902 })],
         }),
       ],

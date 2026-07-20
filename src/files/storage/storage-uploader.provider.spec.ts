@@ -2,7 +2,7 @@ import { resolveStorageUploader } from './storage-uploader.provider';
 
 describe('resolveStorageUploader', () => {
   it('returns cloudinary uploader when provider is cloudinary', () => {
-    const cloudinaryUploader = { createUploadIntent: jest.fn() };
+    const cloudinaryUploader = { createUploadIntent: jest.fn(), verifyUploadedObject: jest.fn() };
 
     const uploader = resolveStorageUploader(
       { storageProvider: 'cloudinary' } as any,
@@ -13,7 +13,7 @@ describe('resolveStorageUploader', () => {
   });
 
   it('throws when provider is unsupported', () => {
-    const cloudinaryUploader = { createUploadIntent: jest.fn() };
+    const cloudinaryUploader = { createUploadIntent: jest.fn(), verifyUploadedObject: jest.fn() };
 
     expect(() =>
       resolveStorageUploader({ storageProvider: 'unknown' } as any, cloudinaryUploader as any),

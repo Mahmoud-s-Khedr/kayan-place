@@ -182,8 +182,8 @@ Used by profile avatar, faults, gallery, and any future asset-linked flows.
 Canonical sequence:
 
 1. `POST /api/files/upload-intent`
-2. Upload the binary to the returned signed target
-3. `PATCH /api/files/:id/mark-uploaded`
+2. Upload the binary to the returned signed target.
+3. `PATCH /api/files/:id/mark-uploaded`.
 4. Use the returned `file.id` in later business requests
 5. Optionally `GET /api/files/:id` for metadata and `readUrl`
 
@@ -220,6 +220,8 @@ Example mark-uploaded request:
   "checksumSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 }
 ```
+
+Cloudinary handling is selected by MIME type: images use `image`, audio/video use `video`, and documents (including PDFs, Office files, and ZIPs) use `raw`. Raw public IDs retain their filename extension, which is required for delivery.
 
 ## WebSocket Notes for Module 6
 

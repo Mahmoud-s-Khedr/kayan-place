@@ -211,7 +211,7 @@ Success:
 
 - `200`
 - `data.items[]`
-- each fault includes nested `user`
+- each fault includes the reporter's full profile-shaped `user` object and `rate`, the reporter's fault-review object or `null`
 
 ### `PATCH /api/admin/faults/:id/status`
 

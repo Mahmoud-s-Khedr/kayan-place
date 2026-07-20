@@ -6,9 +6,9 @@ This guide covers:
 
 - service order creation
 - user update/cancel flows
-- user and admin service listing
 - admin status changes
 - service rating after completion
+- user and admin service listing
 
 Shared contract:
 
@@ -26,6 +26,10 @@ Shared contract:
 1. User sends `PATCH /api/services/:id`.
 2. `description` and `address` are editable by the user.
 3. Update is allowed only while status is `not_started`.
+
+### List Services
+
+Use `GET /api/services` with the same filters below. Admins receive all service requests; other users receive only their own requests.
 
 ### List My Services
 
@@ -147,6 +151,15 @@ Success:
 - `200`
 - `data.items[]`
 
+Each item includes the owner's full profile-shaped `user` object and `rate`, the owner's service-review object or `null`.
+
+### `GET /api/services`
+
+Uses the same query parameters and response shape as `GET /api/services/me`.
+
+- Admin callers receive all service requests.
+- Non-admin callers receive only their own service requests.
+
 ### `POST /api/services/:id/cancel`
 
 Allowed only while status is `not_started`.
@@ -174,7 +187,7 @@ Success:
 
 - `200`
 - `data.items[]`
-- each item includes nested `user`
+- each item includes the owner's full profile-shaped `user` object and `rate`, the owner's service-review object or `null`
 
 ### `PATCH /api/admin/services/:id/status`
 

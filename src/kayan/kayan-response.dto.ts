@@ -55,6 +55,7 @@ class KayanOrderItemProductDto {
   @ApiPropertyOptional({ nullable: true }) price!: string | null;
   @ApiPropertyOptional({ nullable: true, type: Object }) details!: Record<string, unknown> | null;
   @ApiPropertyOptional({ nullable: true }) is_active!: boolean | null;
+  @ApiPropertyOptional({ type: () => ItemRatingDto, nullable: true, description: 'Buyer review for this exact order product' }) rate!: ItemRatingDto | null;
   @ApiProperty({ type: [KayanAssetDto] }) images!: KayanAssetDto[];
   @ApiProperty({ type: [KayanAssetDto] }) files!: KayanAssetDto[];
 }
@@ -72,6 +73,11 @@ class KayanOrderUserDto {
   @ApiPropertyOptional({ nullable: true }) name!: string | null;
   @ApiPropertyOptional({ nullable: true }) email!: string | null;
   @ApiPropertyOptional({ nullable: true }) phone!: string | null;
+  @ApiPropertyOptional({ nullable: true }) address!: string | null;
+  @ApiPropertyOptional({ nullable: true }) status!: string | null;
+  @ApiPropertyOptional({ nullable: true }) rate!: string | null;
+  @ApiPropertyOptional({ type: RelatedFileDto, nullable: true }) avatar!: RelatedFileDto | null;
+  @ApiPropertyOptional({ nullable: true }) contactInfo!: string | null;
 }
 
 class KayanOrderDto {
@@ -91,6 +97,11 @@ class KayanFaultUserDto {
   @ApiPropertyOptional({ nullable: true }) name!: string | null;
   @ApiPropertyOptional({ nullable: true }) email!: string | null;
   @ApiPropertyOptional({ nullable: true }) phone!: string | null;
+  @ApiPropertyOptional({ nullable: true }) address!: string | null;
+  @ApiPropertyOptional({ nullable: true }) status!: string | null;
+  @ApiPropertyOptional({ nullable: true }) rate!: string | null;
+  @ApiPropertyOptional({ type: RelatedFileDto, nullable: true }) avatar!: RelatedFileDto | null;
+  @ApiPropertyOptional({ nullable: true }) contactInfo!: string | null;
 }
 
 class KayanFaultDto {
@@ -114,6 +125,11 @@ class KayanServiceUserDto {
   @ApiPropertyOptional({ nullable: true }) name!: string | null;
   @ApiPropertyOptional({ nullable: true }) email!: string | null;
   @ApiPropertyOptional({ nullable: true }) phone!: string | null;
+  @ApiPropertyOptional({ nullable: true }) address!: string | null;
+  @ApiPropertyOptional({ nullable: true }) status!: string | null;
+  @ApiPropertyOptional({ nullable: true }) rate!: string | null;
+  @ApiPropertyOptional({ type: RelatedFileDto, nullable: true }) avatar!: RelatedFileDto | null;
+  @ApiPropertyOptional({ nullable: true }) contactInfo!: string | null;
 }
 
 class KayanServiceDto {

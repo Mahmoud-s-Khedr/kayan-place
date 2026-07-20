@@ -12,6 +12,11 @@ export interface StorageUploader {
     mimeType: string;
     expiresInSeconds: number;
   }): Promise<UploadIntent>;
+
+  verifyUploadedObject(params: {
+    objectKey: string;
+    mimeType: string;
+  }): Promise<boolean>;
 }
 
 export const STORAGE_UPLOADER = Symbol('STORAGE_UPLOADER');
