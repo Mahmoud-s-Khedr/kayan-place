@@ -53,7 +53,7 @@ export class AuthService {
 
   async requestRegistrationOtp(dto: RequestRegistrationOtpDto): Promise<Record<string, unknown>> {
     const existingUser = await this.databaseService.query(
-      'SELECT id FROM users WHERE LOWER(email) = LOWER($1) OR phone = $2 LIMIT 1',
+      'SELECT id FROM users WHERE deleted_at IS NULL AND (LOWER(email) = LOWER($1) OR phone = $2) LIMIT 1',
       [dto.email, dto.phone],
     );
     if (existingUser.rowCount && existingUser.rowCount > 0) {

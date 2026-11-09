@@ -144,6 +144,11 @@ describe('AuthService', () => {
       userId: null,
     });
     expect(response).toMatchObject({ message: 'OTP sent', otp: '123456' });
+    expect(databaseService.query).toHaveBeenNthCalledWith(
+      1,
+      'SELECT id FROM users WHERE deleted_at IS NULL AND (LOWER(email) = LOWER($1) OR phone = $2) LIMIT 1',
+      ['user@example.com', '+201000000001'],
+    );
   });
 
   it('hides otp in response when verification provider does not return one', async () => {

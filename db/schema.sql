@@ -16,7 +16,7 @@ CREATE TABLE users (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
     ssn VARCHAR(32) NOT NULL UNIQUE,
-    phone VARCHAR(32) UNIQUE,
+    phone VARCHAR(32),
     email TEXT,
     password_hash TEXT NOT NULL,
     -- New canonical relation to files table.
@@ -35,6 +35,10 @@ CREATE TABLE users (
 CREATE UNIQUE INDEX users_email_unique_idx
     ON users (LOWER(email))
     WHERE email IS NOT NULL AND deleted_at IS NULL;
+
+CREATE UNIQUE INDEX users_phone_unique_idx
+    ON users (phone)
+    WHERE phone IS NOT NULL AND deleted_at IS NULL;
 
 CREATE TABLE auth_otps (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
